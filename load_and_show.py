@@ -8,11 +8,11 @@ import color_settings
 colorspace = color_settings.rgb()
 
 
-def load_image(filename, test=True):
+def load_image(filename, filetype='jpeg', test=True):
     image_directory = './images/original/'
     if test:
         image_directory = './images/test_images/'
-    image_dir = os.path.join(image_directory, filename)
+    image_dir = os.path.join(image_directory, f'{filename}.{filetype}')
     image = ski.io.imread(image_dir)
     if image.shape[-1] == 4:
         image = ski.color.rgba2rgb(rgba=image)
@@ -108,14 +108,16 @@ def create_and_show_color_histogram(image, show=True, save=None):
 
 
 if __name__ == '__main__':
-    # filename = 'monitor_test_original.jpeg'
-    # filename = 'test_image_original.jpeg'
-    # filename = 'rgb_test_original.jpeg'
-    filename = 'climbing_test_original.jpeg'
+    # filename = 'monitor_test_original'
+    filename = 'test_image_original'
+    # filename = 'rgb_test_original'
+    # filename = 'climbing_test_original'
     image = load_image(filename=filename)
 
-    create_and_show_separate_colors(image=image)
-    create_and_show_color_histogram(image=image)
+    savedir = 'images/test_images/color_histograms/'
+
+    create_and_show_separate_colors(image=image, show=True)
+    create_and_show_color_histogram(image=image, show=True, save=savedir + f'{filename}_histogram')
 
 
 
