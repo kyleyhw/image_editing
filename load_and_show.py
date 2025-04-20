@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import color_settings
 
-colorspace = globals.rgb()
+colorspace = color_settings.rgb()
 
 
 def load_image(filename, test=True):
