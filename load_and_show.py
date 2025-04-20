@@ -99,7 +99,7 @@ def create_and_show_color_histogram(image, show=True, save=None):
 
     plot_image_and_color_histogram(image=image, axs=axs, bins=256)
 
-    fig
+    fig.tight_layout()
 
     if show:
         plt.show()
@@ -109,15 +109,16 @@ def create_and_show_color_histogram(image, show=True, save=None):
 
 if __name__ == '__main__':
     # filename = 'monitor_test_original'
-    filename = 'test_image_original'
+    # filename = 'test_image_original'
     # filename = 'rgb_test_original'
-    # filename = 'climbing_test_original'
+    filename = 'climbing_test_original'
     image = load_image(filename=filename)
 
-    savedir = 'images/test_images/color_histograms/'
+    color_savedir = 'images/test_images/color_decompositions/'
+    hist_savedir = 'images/test_images/color_histograms/'
 
-    create_and_show_separate_colors(image=image, show=True)
-    create_and_show_color_histogram(image=image, show=True, save=savedir + f'{filename}_histogram')
+    create_and_show_separate_colors(image=image, show=True, save=color_savedir + f'{filename}_decomposition')
+    create_and_show_color_histogram(image=image, show=True, save=hist_savedir + f'{filename}_histogram')
 
 
 
