@@ -6,6 +6,7 @@
 main idea: 
 define the transformation between color intensity cdfs of images as the "editing" 
 approximate cdf as polynomial? maybe order 5? then can quantify transformation
+(may not need to fit at all, maybe can take value in each bin as value and do some inner product or analogous to scalar quantify "closeness")
 tweak parameters such as exposure, saturation, blur etc then compute cdf, optimizing for closeness to ideal cdf
 
 usage idea:
