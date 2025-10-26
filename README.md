@@ -47,14 +47,3 @@ The project is organized to facilitate a smooth workflow from data generation to
 ├───README.md                     # This file.
 └───test.py                       # Unit tests for various components.
 ```
-
-## Emphasis on Intermediate Steps and Visualization
-
-Throughout the project, a strong emphasis is placed on understanding and visualizing intermediate steps. This is crucial for debugging, verifying mathematical principles, and gaining insights into the transformations being applied.
-
-*   **Data Generation:** The `data_generation` process will be designed to allow for the visualization of each applied transformation (e.g., showing the image after tone curve, then after color grading, then after grain, etc.). This ensures that the programmatic styling accurately reflects the desired "film" aesthetic. The `images/styled/` directories will not only store the final styled images but can also be configured to save intermediate outputs for analysis.
-*   **Feature Engineering:** When extracting CDFs and CNN features, tools will be developed to visualize these features. For CDFs, this means plotting the curves. For CNN features, this could involve visualizing feature maps or using dimensionality reduction techniques to plot feature vectors.
-*   **Model Development:** During model training, the output of the learned LUTs or transformation parameters will be visualized. This includes plotting the learned tone curves, inspecting the generated 3D LUTs, and comparing the CDFs of the model's output with the target CDFs.
-*   **`load_and_show.py`**: This existing module already demonstrates the importance of visualization by providing functions to show RGB separations and histograms, which are fundamental to the CDF analysis. Its capabilities will be extended as needed to support new visualizations.
-
-This commitment to visualization ensures that the complex mathematical and deep learning processes are transparent and understandable at every stage of development.
