@@ -1,5 +1,11 @@
 # Image Editing Project: CDF-based Transformations with Deep Learning Augmentation
 
+![Conceptual Diagram 1](https://github.com/user-attachments/assets/70683034-17da-4cb2-acfc-a16a546a428c)
+*Figure 1: Illustrates the core idea of defining image editing as a transformation between color intensity Cumulative Distribution Functions (CDFs) of images.*
+
+![Conceptual Diagram 2](https://github.com/user-attachments/assets/6541fb73-f3a1-422f-ab81-ee305ef51a6f)
+*Figure 2: Depicts a usage idea, suggesting the use of presets and iterative refinement for similar kinds of photos, providing data for retraining and applying new transformations.*
+
 ## Project Overview
 
 This project explores a novel, mathematically-grounded approach to image editing. The core idea is to define image transformations based on the manipulation of Cumulative Distribution Functions (CDFs) of pixel intensities. To overcome the inherent limitations of purely statistical methods (lack of spatial awareness) and to achieve complex, stylistic edits (e.g., "film," "cyberpunk"), we augment this CDF analysis with deep learning techniques, specifically Convolutional Neural Networks (CNNs) and learned Look-Up Tables (LUTs).
