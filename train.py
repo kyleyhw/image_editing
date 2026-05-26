@@ -28,6 +28,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Dataset
 
+from data_generation.mit5k_loader import MIT5KDataset
 from data_generation.styles.fujifilm import FujifilmGenerator
 from models.composite_loss import CompositeLoss
 from models.differentiable_renderer import DifferentiableFujifilm
@@ -81,12 +82,17 @@ class ImagePairDataset(Dataset):
 
 
 def _build_dataloader(args, transform) -> DataLoader:
-    # Phase 3 cyberpunk/tilt-shift use a flat <style>/ directory; Fujifilm
-    # uses <style>/<recipe>/. Pass recipe=None for the flat case.
-    recipe = args.recipe if args.style in {"fujifilm"} else None
-    dataset = ImagePairDataset(
-        root_dir=args.data_dir, style=args.style, recipe=recipe, transform=transform
-    )
+    if args.mit5k_root:
+        dataset = MIT5KDataset(
+            root=args.mit5k_root, expert=args.mit5k_expert, transform=transform
+        )
+    else:
+        # Phase 3 cyberpunk/tilt-shift use a flat <style>/ directory;
+        # Fujifilm uses <style>/<recipe>/. Pass recipe=None for the flat case.
+        recipe = args.recipe if args.style in {"fujifilm"} else None
+        dataset = ImagePairDataset(
+            root_dir=args.data_dir, style=args.style, recipe=recipe, transform=transform
+        )
     return DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -135,6 +141,8 @@ def _ckpt_path(args) -> str:
     if args.checkpoint:
         return args.checkpoint
     arch_tag = args.arch
+    if args.mit5k_root:
+        return os.path.join("checkpoints", f"model_{arch_tag}_mit5k_{args.mit5k_expert}.pth")
     recipe_tag = f"_{args.recipe}" if args.style == "fujifilm" else ""
     return os.path.join("checkpoints", f"model_{arch_tag}_{args.style}{recipe_tag}.pth")
 
@@ -210,6 +218,12 @@ def main():
     parser.add_argument("--style", type=str, default="fujifilm")
     parser.add_argument("--recipe", type=str, default="classic_chrome",
                         help="Sub-folder of <data_dir>/<style>/ when --style fujifilm.")
+    parser.add_argument("--mit5k_root", type=str, default=None,
+                        help="Path to a MIT-Adobe FiveK root (must contain "
+                             "original/ and expert_<letter>/). When set, this "
+                             "overrides --style/--recipe/--data_dir.")
+    parser.add_argument("--mit5k_expert", type=str, default="c",
+                        help="Which MIT-5K expert (a-e) to train against.")
     parser.add_argument("--checkpoint", type=str, default=None,
                         help="Override the default save path.")
     parser.add_argument("--batch_size", type=int, default=4)
