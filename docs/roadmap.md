@@ -1,5 +1,18 @@
 # Project Roadmap: CDF-based Image Editing with Deep Learning Augmentation
 
+> **Status (2026):** This document is the original Phase-1 design rationale
+> for the project. The architecture it sketches has been built and extended
+> through Phase 6. For current status and the implemented pipeline see
+> [`../PROJECT_PLAN.md`](../PROJECT_PLAN.md) (status ledger),
+> [`architecture.md`](architecture.md) (current math + primitives), and
+> [`training_and_inference.md`](training_and_inference.md) (how to use it).
+> Where this roadmap discusses two output mechanisms (parametric CDF vs.
+> learned LUT), the implementation chose a **third** route compatible with
+> both: a small set of *generic primitives* (tone curve, $3 \times 3$
+> colour matrix, grain, vignette) whose parameters are predicted by the
+> network. The CDF still participates -- it is the basis of both an input
+> feature and a training loss term.
+
 ## 1. Project Overview
 
 The core objective of this project is to develop a novel, mathematically-grounded approach to image editing. Initially, this involves defining image transformations based on the manipulation of Cumulative Distribution Functions (CDFs) of pixel intensities. To overcome the inherent limitations of purely statistical methods (lack of spatial awareness) and to achieve complex, stylistic edits (e.g., "cyberpunk," "digicam," "film"), we will augment this CDF analysis with deep learning techniques, specifically Convolutional Neural Networks (CNNs) and learned Look-Up Tables (LUTs).
