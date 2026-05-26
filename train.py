@@ -54,11 +54,14 @@ def train(args):
     
     # 2. Model
     model = StyleNet().to(device)
-    
+
     # 3. Loss & Optimizer
-    # Differentiable Renderer to apply predicted parameters
+    # Differentiable Renderer to apply predicted parameters.
+    # Construct it with the same chrome strength used by the data generator
+    # so that the rendered output and the training targets share a pipeline.
     from models.differentiable_renderer import DifferentiableFujifilm
-    renderer = DifferentiableFujifilm().to(device)
+    chrome_strength = FujifilmGenerator(recipe_name=args.recipe).chrome_strength
+    renderer = DifferentiableFujifilm(chrome_strength=chrome_strength).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.MSELoss()

@@ -4,6 +4,15 @@ from scipy.interpolate import PchipInterpolator
 from ..core import StyleGenerator
 from .film import Grain, Vignette
 
+# Color Chrome Effect strength (alpha) for each recipe-level setting.
+# The chrome effect scales V <- V * (1 - alpha * S) in HSV; alpha controls
+# how aggressively saturated regions are darkened. These values match the
+# magnitudes that were previously inline in _apply_chrome_effect and are
+# re-used by the differentiable renderer so that the simulated and learned
+# pipelines stay numerically consistent.
+CHROME_STRENGTHS: dict[str, float] = {"off": 0.0, "weak": 0.1, "strong": 0.2}
+
+
 class FujifilmGenerator(StyleGenerator):
     """
     Simulates Fujifilm film recipes.
@@ -105,25 +114,29 @@ class FujifilmGenerator(StyleGenerator):
         
         return ski.color.hsv2rgb(hsv)
 
+    @property
+    def chrome_strength(self) -> float:
+        """Alpha used by the Color Chrome Effect for this recipe.
+
+        Exposed so that the differentiable renderer can be constructed with
+        the same alpha that produced the training pairs.
+        """
+        return CHROME_STRENGTHS[self.recipe["color_chrome"]]
+
     def _apply_chrome_effect(self, image: np.ndarray) -> np.ndarray:
         """
         Simulates Color Chrome Effect: Deepens high-saturation colors.
+        Math: V_new = V * (1 - alpha * S) in HSV, with alpha drawn from
+        CHROME_STRENGTHS.
         """
-        effect = self.recipe["color_chrome"]
-        if effect == "off":
+        alpha = self.chrome_strength
+        if alpha == 0.0:
             return image
-            
-        strength = 0.2 if effect == "strong" else 0.1
-        
+
         hsv = ski.color.rgb2hsv(image)
         saturation = hsv[:, :, 1]
         value = hsv[:, :, 2]
-        
-        # Reduce Value where Saturation is high
-        # V_new = V * (1 - strength * S)
-        value_mod = value * (1.0 - strength * saturation)
-        
-        hsv[:, :, 2] = value_mod
+        hsv[:, :, 2] = value * (1.0 - alpha * saturation)
         return ski.color.hsv2rgb(hsv)
 
     def generate_pair(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
