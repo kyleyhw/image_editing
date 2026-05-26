@@ -6,6 +6,7 @@ import skimage as ski
 import numpy as np
 from models.style_net import StyleNet
 from models.differentiable_renderer import DifferentiableFujifilm
+from data_generation.styles.fujifilm import FujifilmGenerator
 
 def load_image(path, max_size=None):
     image = ski.io.imread(path)
@@ -42,9 +43,12 @@ def inference(args):
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model.eval()
     
-    # 2. Load Renderer
-    renderer = DifferentiableFujifilm().to(device)
-    renderer.eval() # Disable noise randomness if implemented
+    # 2. Load Renderer. Chrome strength must match the value used to generate
+    #    the training pairs for this recipe; otherwise the network's predicted
+    #    parameters will be compensated for an effect the renderer never applies.
+    chrome_strength = FujifilmGenerator(recipe_name=args.recipe).chrome_strength
+    renderer = DifferentiableFujifilm(chrome_strength=chrome_strength).to(device)
+    renderer.eval()
     
     # 3. Load Image
     image = load_image(args.image_path)

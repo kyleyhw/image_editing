@@ -9,6 +9,7 @@ from io import BytesIO
 import rawpy
 from models.style_net import StyleNet
 from models.differentiable_renderer import DifferentiableFujifilm
+from data_generation.styles.fujifilm import FujifilmGenerator
 
 # Page Config
 st.set_page_config(page_title="AI Image Editor", layout="wide")
@@ -30,8 +31,10 @@ def load_model(style="fujifilm", recipe="classic_chrome"):
     except FileNotFoundError:
         return None, None, f"Checkpoint not found: {checkpoint_path}"
         
-    # Load Renderer
-    renderer = DifferentiableFujifilm().to(device)
+    # Load Renderer with the recipe-matched chrome strength so the rendered
+    # output reproduces the data-generation pipeline.
+    chrome_strength = FujifilmGenerator(recipe_name=recipe).chrome_strength
+    renderer = DifferentiableFujifilm(chrome_strength=chrome_strength).to(device)
     renderer.eval()
     
     return model, renderer, None
