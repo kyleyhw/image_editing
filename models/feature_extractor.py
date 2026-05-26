@@ -43,10 +43,12 @@ class SpatialEncoder(nn.Module):
     """
     Extracts spatial features using a CNN backbone (ResNet-18).
     """
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained: bool = True):
         super().__init__()
-        # Use ResNet18, remove fully connected layer
-        resnet = models.resnet18(pretrained=pretrained)
+        # Use the modern torchvision weights API. `pretrained=True` was
+        # deprecated in torchvision 0.13 and emits a warning every import.
+        weights = models.ResNet18_Weights.DEFAULT if pretrained else None
+        resnet = models.resnet18(weights=weights)
         self.features = nn.Sequential(*list(resnet.children())[:-1]) # Output: (B, 512, 1, 1)
         
     def forward(self, x):
