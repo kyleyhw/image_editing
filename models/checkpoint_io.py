@@ -56,6 +56,7 @@ def build_model_from_checkpoint(ckpt: dict[str, Any]):
     from .generic_style_net import GenericStyleNet
     from .differentiable_renderer import DifferentiableFujifilm
     from .generic_renderer import DifferentiableGenericRenderer
+    from .tilt_shift import DifferentiableTiltShiftComposite, TiltShiftStyleNet
     from data_generation.styles.fujifilm import FujifilmGenerator
 
     arch = ckpt.get("arch", LEGACY_DEFAULT_ARCH)
@@ -69,5 +70,11 @@ def build_model_from_checkpoint(ckpt: dict[str, Any]):
         K = ckpt.get("num_tone_points") or 9
         model = GenericStyleNet(num_tone_points=K)
         renderer = DifferentiableGenericRenderer(num_tone_points=K)
+        return model, renderer
+    if arch == "tilt_shift":
+        K = ckpt.get("num_tone_points") or 9
+        sigma = ckpt.get("tilt_max_sigma") or 8.0
+        model = TiltShiftStyleNet(num_tone_points=K)
+        renderer = DifferentiableTiltShiftComposite(num_tone_points=K, max_sigma=sigma)
         return model, renderer
     raise ValueError(f"unknown checkpoint arch: {arch!r}")

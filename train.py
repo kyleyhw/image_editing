@@ -34,6 +34,7 @@ from models.differentiable_renderer import DifferentiableFujifilm
 from models.generic_renderer import DifferentiableGenericRenderer
 from models.generic_style_net import GenericStyleNet
 from models.style_net import StyleNet
+from models.tilt_shift import DifferentiableTiltShiftComposite, TiltShiftStyleNet
 
 
 class ImagePairDataset(Dataset):
@@ -114,6 +115,18 @@ def _build_model_and_renderer(args, device):
         ).to(device)
         return model, renderer, criterion, True
 
+    if args.arch == "tilt_shift":
+        model = TiltShiftStyleNet(num_tone_points=args.tone_points).to(device)
+        renderer = DifferentiableTiltShiftComposite(
+            num_tone_points=args.tone_points, max_sigma=args.tilt_max_sigma
+        ).to(device)
+        criterion = CompositeLoss(
+            lambda_pixel=args.lambda_pixel,
+            lambda_perceptual=args.lambda_perceptual,
+            lambda_cdf=args.lambda_cdf,
+        ).to(device)
+        return model, renderer, criterion, True
+
     raise ValueError(f"unknown --arch: {args.arch}")
 
 
@@ -121,7 +134,7 @@ def _ckpt_path(args) -> str:
     os.makedirs("checkpoints", exist_ok=True)
     if args.checkpoint:
         return args.checkpoint
-    arch_tag = "generic" if args.arch == "generic" else "fujifilm"
+    arch_tag = args.arch
     recipe_tag = f"_{args.recipe}" if args.style == "fujifilm" else ""
     return os.path.join("checkpoints", f"model_{arch_tag}_{args.style}{recipe_tag}.pth")
 
@@ -178,6 +191,7 @@ def train(args):
             "state_dict": model.state_dict(),
             "arch": args.arch,
             "num_tone_points": getattr(args, "tone_points", None),
+            "tilt_max_sigma": getattr(args, "tilt_max_sigma", None),
             "style": args.style,
             "recipe": args.recipe,
             "history": history,
@@ -190,7 +204,7 @@ def train(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--arch", choices=["fujifilm", "generic"], default="fujifilm",
+    parser.add_argument("--arch", choices=["fujifilm", "generic", "tilt_shift"], default="fujifilm",
                         help="Which model + renderer pair to train.")
     parser.add_argument("--data_dir", type=str, default="images/styled")
     parser.add_argument("--style", type=str, default="fujifilm")
@@ -204,6 +218,8 @@ def main():
     parser.add_argument("--image_size", type=int, default=256)
     # Generic-arch hyperparameters.
     parser.add_argument("--tone_points", type=int, default=9)
+    parser.add_argument("--tilt_max_sigma", type=float, default=8.0,
+                        help="Pre-baked blur sigma for the tilt_shift renderer.")
     parser.add_argument("--lambda_pixel", type=float, default=1.0)
     parser.add_argument("--lambda_perceptual", type=float, default=0.05)
     parser.add_argument("--lambda_cdf", type=float, default=1.0)
