@@ -11,33 +11,42 @@ a multi-style Streamlit UI, and a MIT-Adobe FiveK data loader.
 
 ## Examples of every trained mode
 
-The figure below was produced by `python tools/make_examples.py`. Each
-row is a style; columns show the original image, the synthetic
-data-generator target, and the trained model's prediction on the same
-input.
+The figure below was produced by `python tools/make_examples.py`. Rows
+are deliberately diverse sample images; columns are the original input
+and the trained-model output for each style. Sample images were chosen
+to exercise different aspects of each style:
 
-![Style comparison: original / data-generator target / trained model prediction, three rows for Fujifilm, Cyberpunk, Tilt-shift](tests/reports/assets/style_comparison.png)
+- *Foggy pine forest* — strong vertical sky/ground contrast for
+  tilt-shift; saturated greens for tone-curve probing.
+- *Misty pastel mountains* — already warm and low-saturation, so the
+  cyberpunk grade has to push aggressively to differentiate.
+- *Backlit bike portrait* — full photographic scene with a centred
+  human subject, ideal for showcasing tilt-shift's focus band.
+
+![Trained-model predictions across three sample inputs: rows are samples, columns are Original / Fujifilm Classic Chrome / Cyberpunk / Tilt-shift](tests/reports/assets/style_comparison.png)
 
 How to read it:
 
-- **Fujifilm Classic Chrome (top row).** The data-generator target is
-  slightly darker and warmer than the original (negative WB-blue shift,
-  soft highlight tone, ~20% vignette). The trained model output
-  reproduces those shifts: visually darker, faint warm cast, a corner
-  vignette.
-- **Cyberpunk (middle row).** Data generator applies a strong S-curve
-  (crushed shadows, lifted highlights) and a teal-and-orange grade
-  (negative red/green bias, positive blue bias). The trained model
-  reproduces the same *direction* on every channel and roughly half of
-  the S-curve amplitude — sufficient to read as cyberpunk, weaker than
-  the target.
-- **Tilt-shift (bottom row).** The middle horizontal band stays sharp
-  while the sky above and the foreground below blur out. The model
-  recovers the focus-band geometry to within $|\Delta| < 0.01$ on both
-  centre and width.
+- **Fujifilm Classic Chrome column.** Each output is a slightly darker,
+  warm-shifted version of its row's original — exactly the recipe's
+  signature (negative WB-blue shift, soft highlights, ~20% vignette).
+  The effect is intentionally subtle; Classic Chrome is a "look", not a
+  filter.
+- **Cyberpunk column.** Each output reproduces the teal-and-orange
+  S-curve: shadows crushed, highlights lifted, R/G channels pulled
+  down and B pushed up. The transformation is most visible on the
+  pastel mountains, where the warm fog is pushed into an unmistakable
+  orange-teal sunset palette.
+- **Tilt-shift column.** A horizontal sharp band remains in the middle
+  of every output while sky and foreground are progressively blurred.
+  The model recovers the focus-band geometry to within $|\Delta| < 0.01$
+  on both centre and width; the blur amount saturates at roughly half
+  of the data generator's, a known optimisation artefact documented in
+  `models/tilt_shift.py`.
 
-Full quantitative interpretation, including per-channel mean shifts and
-effect-magnitude ratios, is in
+Full quantitative interpretation (per-channel mean shifts,
+effect-magnitude ratios, target-vs-prediction comparison on a held-out
+test image) is in
 [`tests/reports/phase3_to_phase6_report.md`](tests/reports/phase3_to_phase6_report.md).
 
 ## Documentation index
