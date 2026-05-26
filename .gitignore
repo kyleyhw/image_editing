@@ -1,2 +1,32 @@
+# IDE files
 .idea/
-images/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Large model / dataset artifacts
+data/
+*.pth
+*.pt
+*.onnx
