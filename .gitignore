@@ -30,3 +30,8 @@ data/
 *.pth
 *.pt
 *.onnx
+
+# Auto-generated datasets (regeneratable via generate_dataset.py).
+# Tracked images live under images/test_images/.
+images/original/
+images/styled/
