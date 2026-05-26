@@ -28,48 +28,63 @@ Build a **general-purpose image stylization engine**. The system architecture (C
 ### Phase 3: Generalization Refactor
 **Goal**: Refactor the architecture from Phase 2 to be style-agnostic, enabling future generalization.
 
-- [ ] **"Film" Style as a Blueprint**
-    - [ ] Implement a generic `ToneCurve` generator (e.g., predicting control points).
-    - [ ] Implement a generic `ColorGrader` (e.g., predicting a 3x3 or 3D LUT).
-    - [ ] Ensure `Grain` and `Vignette` are compatible.
+- [x] **"Film" Style as a Blueprint**
+    - [x] Implement a generic `ToneCurve` generator (e.g., predicting control points).
+    - [x] Implement a generic `ColorGrader` (e.g., predicting a 3x3 or 3D LUT).
+    - [x] Ensure `Grain` and `Vignette` are compatible.
 
-- [ ] **Model Refactoring**
-    - [ ] Modify `TransformationHead` to predict parameters for the generic primitives (tone curve points, color matrix, etc.) instead of Fujifilm values.
-    - [ ] Implement a new `DifferentiableRenderer` that can apply these generic primitives.
-    - [ ] Update the `train.py` script to use the new generalized model and renderer.
+- [x] **Model Refactoring**
+    - [x] Modify `TransformationHead` to predict parameters for the generic primitives (tone curve points, color matrix, etc.) instead of Fujifilm values.
+    - [x] Implement a new `DifferentiableRenderer` that can apply these generic primitives.
+    - [x] Update the `train.py` script to use the new generalized model and renderer.
 
-- [ ] **Loss Function Improvement**
-    - [ ] Implement the composite loss: $L = \lambda_{pixel} L_{1} + \lambda_{perceptual} L_{VGG} + \lambda_{cdf} L_{CDF}$.
+- [x] **Loss Function Improvement**
+    - [x] Implement the composite loss: $L = \lambda_{pixel} L_{1} + \lambda_{perceptual} L_{VGG} + \lambda_{cdf} L_{CDF}$.
 
 ---
 ### Phase 4: Generalization Verification (The "Cyberpunk" Test)
 **Goal**: Prove the refactored system is general by training it on a completely different style *without changing the model code*.
 
-- [ ] **"Cyberpunk" Style Module**
-    - [ ] Create `data_generation/styles/cyberpunk.py`.
-    - [ ] Implement `NeonGlow`, `ColorShift`, etc., using the *generic primitives* from Phase 3.
-    - [ ] Generate "Cyberpunk" dataset.
+- [x] **"Cyberpunk" Style Module**
+    - [x] Create `data_generation/styles/cyberpunk.py`.
+    - [x] Implement S-curve tone + teal/orange color grade using the *generic primitives* from Phase 3 (NeonGlow deferred -- it requires a Gaussian-bloom primitive which is not in the current renderer; the cyberpunk look without bloom is still distinct from Fujifilm).
+    - [x] Generate "Cyberpunk" dataset.
 
-- [ ] **Retraining**
-    - [ ] Train the generalized architecture from Phase 3 on the Cyberpunk dataset.
-    - [ ] **Deliverable**: A second model file (`model_cyberpunk.pth`) that applies the new style.
+- [x] **Retraining**
+    - [x] Train the generalized architecture from Phase 3 on the Cyberpunk dataset.
+    - [x] **Deliverable**: A second model file (`model_generic_cyberpunk.pth`) that applies the new style.
 
 ### Phase 5: Spatially Variant Styles (The "Tilt-Shift" Test)
 **Goal**: Extend the model to handle styles that require spatially variant processing.
 
-- [ ] **"Tilt-Shift" Style Module**
-    - [ ] Create `data_generation/styles/tilt_shift.py`.
-    - [ ] Investigate modifying the `SpatialEncoder` or `TransformationHead` to output parameter maps instead of single values.
+- [x] **"Tilt-Shift" Style Module**
+    - [x] Create `data_generation/styles/tilt_shift.py`.
+    - [x] Investigate modifying the `SpatialEncoder` or `TransformationHead` to output parameter maps instead of single values.
+      *Chosen approach:* parametrise the *spatial structure* (a horizontal focus band) with three global scalars (center_y, width, blur strength) and let the renderer derive the per-pixel blur weight from them. True per-pixel parameter maps would require a U-Net-style decoder and are listed in the project's open work; see the docstring in `models/tilt_shift.py`.
+    - [x] **Deliverable**: `model_tilt_shift_tilt_shift.pth` reproducing the spatially variant blur.
 
 ### Phase 6: Application and Polish
 **Goal**: Create a user-facing application to showcase the trained models.
 
-- [ ] **Web UI**
-    - [ ] Build a simple web interface using Gradio or Streamlit.
-    - [ ] Allow users to upload a photo.
-    - [ ] Provide a dropdown to select the desired style model (Fujifilm, Cyberpunk, etc.).
-    - [ ] Display the final, styled image with a download button.
+- [x] **Web UI**
+    - [x] Streamlit interface (`image_editor_ui.py`).
+    - [x] Allow users to upload a photo.
+    - [x] Auto-discovered dropdown over every checkpoint in `checkpoints/`.
+    - [x] Side-by-side original/styled view with per-channel histograms + CDFs.
+    - [x] Arch-aware predicted-parameter readout.
+    - [x] Download button on the styled output.
 
-- [ ] **Real-World Data (Adobe MIT-5K)**
-    - [ ] Implement a data loader for the MIT-5K dataset.
+- [x] **Real-World Data (Adobe MIT-5K)**
+    - [x] Implement a data loader for the MIT-5K dataset (`data_generation/mit5k_loader.py`).
     - [ ] Train a model on an expert's edits to create a "professional retouch" style.
+      *Status:* the loader and `train.py --mit5k_root` flag are wired and tested; actual training is gated on the user obtaining the ~4 GB JPEG dataset from [data.csail.mit.edu/graphics/fivek](https://data.csail.mit.edu/graphics/fivek/), since redistribution is forbidden by the dataset licence.
+
+---
+
+### Verification report
+
+End-to-end verification of Phases 3-6, including a Playwright/MCP-driven
+test of the Streamlit UI, is recorded in
+[tests/reports/phase3_to_phase6_report.md](tests/reports/phase3_to_phase6_report.md).
+The four UI screenshots captured during verification live in
+`tests/reports/assets/`.
