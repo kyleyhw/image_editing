@@ -1,0 +1,25 @@
+[project]
+name = "image-editing"
+version = "0.1.0"
+description = "Mathematically grounded image stylization combining CDF analysis with CNN-driven differentiable rendering."
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "pillow>=10.0",
+    "rawpy>=0.18",
+    "requests>=2.31",
+    "scikit-image>=0.22",
+    "scipy>=1.11",
+    "streamlit>=1.30",
+    "torch>=2.2",
+    "torchvision>=0.17",
+]
+
+[dependency-groups]
+dev = [
+    "detect-secrets>=1.5.0",
+    "pre-commit>=4.6.0",
+    "ruff>=0.15.14",
+    "ty>=0.0.39",
+]
