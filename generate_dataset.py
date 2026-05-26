@@ -7,21 +7,37 @@ from io import BytesIO
 from data_generation.styles.film import FilmGenerator
 from data_generation.styles.fujifilm import FujifilmGenerator
 
-def download_unsplash_images(output_dir, count=100):
-    """Downloads high-quality images from Unsplash Source."""
-    print(f"Downloading {count} images from Unsplash...")
+def download_sample_images(output_dir: str, count: int = 100) -> None:
+    """Download diverse sample photographs from picsum.photos.
+
+    Lorem Picsum returns a random image per request. Passing ?random=<i>
+    forces a distinct image each iteration (the cache otherwise dedups by URL).
+
+    The previous implementation used source.unsplash.com, which Unsplash
+    deprecated and disabled in 2023; that endpoint now returns 503 and never
+    populates the input directory.
+    """
+    print(f"Downloading {count} images from picsum.photos...")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-        
+
     for i in range(count):
-        # Unsplash Source provides random images
-        response = requests.get(f"https://source.unsplash.com/1600x1200/?nature,landscape,portrait")
-        if response.status_code == 200:
-            filepath = os.path.join(output_dir, f"unsplash_{i:04d}.jpg")
-            with open(filepath, 'wb') as f:
+        url = f"https://picsum.photos/1600/1200?random={i}"
+        try:
+            response = requests.get(url, timeout=30, allow_redirects=True)
+        except requests.RequestException as exc:
+            print(f"Network error on image {i}: {exc}")
+            continue
+
+        if response.status_code == 200 and response.content:
+            filepath = os.path.join(output_dir, f"picsum_{i:04d}.jpg")
+            with open(filepath, "wb") as f:
                 f.write(response.content)
             if (i + 1) % 10 == 0:
                 print(f"Downloaded {i + 1}/{count} images...")
+        else:
+            print(f"Unexpected response for image {i}: HTTP {response.status_code}")
+
     print(f"Completed downloading {count} images to {output_dir}")
 
 def main():
@@ -42,7 +58,7 @@ def main():
     existing_files = [f for f in os.listdir(args.input_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     if len(existing_files) < 10: # If almost empty, download images
         print("Input directory seems empty. Downloading sample images...")
-        download_unsplash_images(args.input_dir, min(args.count, 100))  # Cap at 100 for now
+        download_sample_images(args.input_dir, min(args.count, 100))  # Cap at 100 for now
         
     style_output_dir = os.path.join(args.output_dir, args.style)
     if args.style == "fujifilm":
