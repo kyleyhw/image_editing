@@ -35,3 +35,6 @@ data/
 # Tracked images live under images/test_images/.
 images/original/
 images/styled/
+
+# Playwright MCP working directory (snapshots, console logs)
+.playwright-mcp/
