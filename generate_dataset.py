@@ -6,6 +6,7 @@ import requests
 from io import BytesIO
 from data_generation.styles.film import FilmGenerator
 from data_generation.styles.fujifilm import FujifilmGenerator
+from data_generation.styles.cyberpunk import CyberpunkGenerator
 
 def download_sample_images(output_dir: str, count: int = 100) -> None:
     """Download diverse sample photographs from picsum.photos.
@@ -42,7 +43,7 @@ def download_sample_images(output_dir: str, count: int = 100) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Generate synthetic training dataset.")
-    parser.add_argument("--style", type=str, default="film", choices=["film", "fujifilm"], help="Style generator to use.")
+    parser.add_argument("--style", type=str, default="film", choices=["film", "fujifilm", "cyberpunk"], help="Style generator to use.")
     parser.add_argument("--recipe", type=str, default="classic_chrome", help="Recipe name (only for fujifilm style).")
     parser.add_argument("--input_dir", type=str, default="images/original", help="Directory containing original images.")
     parser.add_argument("--output_dir", type=str, default="images/styled", help="Directory to save generated pairs.")
@@ -72,6 +73,8 @@ def main():
         generator = FilmGenerator()
     elif args.style == "fujifilm":
         generator = FujifilmGenerator(recipe_name=args.recipe)
+    elif args.style == "cyberpunk":
+        generator = CyberpunkGenerator()
     else:
         raise ValueError(f"Unknown style: {args.style}")
         
