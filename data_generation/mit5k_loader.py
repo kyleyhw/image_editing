@@ -1,38 +1,38 @@
 """MIT-Adobe FiveK data loader (Phase 6b).
 
 The MIT-Adobe FiveK Dataset [Bychkovsky et al. 2011] consists of 5,000
-raw photographs together with five expert-retouched JPEG versions per
-photo (experts A-E). Training on this dataset lets the generic model
-learn a real-world "professional retouch" style rather than a
-programmatically generated effect.
+raw photographs together with five expert-retouched versions per photo
+(experts A-E). Training on this dataset lets the generic model learn a
+real-world "professional retouch" style rather than a programmatically
+generated effect - the one regime in which the network does something
+no closed-form data generator can.
 
-Why this is implemented as a loader rather than a downloader
--------------------------------------------------------------
+How to obtain a usable subset
+-----------------------------
 
-The dataset is ~50 GB in DNG form and ~4 GB per expert in JPEG form,
-and the licence requires direct download from the MIT page. We
-therefore expose this class as a `torch.utils.data.Dataset` that
-points at a user-supplied root and pairs original (or sRGB-converted)
-images with one expert's retouches. The user is responsible for
-obtaining the data:
+Run the bundled helper:
 
-    https://data.csail.mit.edu/graphics/fivek/
+    python tools/download_fivek_subset.py --expert c --count 200 --out_dir data/fivek_c_200
+
+It streams the ``logasja/mit-adobe-fivek`` HuggingFace dataset (one
+config per expert, ``a`` ... ``e``), downsizes each image to a 512 px
+long edge, and saves paired JPEGs in exactly the layout this loader
+expects. Streaming avoids downloading the full ~120 GB per expert.
 
 Expected directory layout
 -------------------------
 
     <root>/
-        original/              # or e.g. raw_photos/ + a sRGB conversion step
-            a0001-jmac_DSC1459.jpg
-            a0002-jmac_DSC1460.jpg
-            ...
-        expert_c/              # one expert's retouched outputs
-            a0001-jmac_DSC1459.jpg
-            ...
+        original/img_0000.jpg
+        original/img_0001.jpg
+        ...
+        expert_<letter>/img_0000.jpg
+        expert_<letter>/img_0001.jpg
 
-The class assumes filenames in `original/` and the expert directory
-match exactly. If your downloaded layout differs, override `_pair_paths`
-or pre-process to this structure.
+If you assemble the dataset by other means (e.g. from the official MIT
+release at https://data.csail.mit.edu/graphics/fivek/), ensure the
+filenames in ``original/`` and ``expert_<letter>/`` match exactly; the
+loader pairs by filename intersection.
 """
 
 from __future__ import annotations

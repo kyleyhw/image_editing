@@ -76,8 +76,8 @@ Build a **general-purpose image stylization engine**. The system architecture (C
 
 - [x] **Real-World Data (Adobe MIT-5K)**
     - [x] Implement a data loader for the MIT-5K dataset (`data_generation/mit5k_loader.py`).
-    - [ ] Train a model on an expert's edits to create a "professional retouch" style.
-      *Status:* the loader and `train.py --mit5k_root` flag are wired and tested; actual training is gated on the user obtaining the ~4 GB JPEG dataset from [data.csail.mit.edu/graphics/fivek](https://data.csail.mit.edu/graphics/fivek/), since redistribution is forbidden by the dataset licence.
+    - [x] Implement a streaming downloader (`tools/download_fivek_subset.py`) using the `logasja/mit-adobe-fivek` HuggingFace mirror; no 4 GB up-front download needed.
+    - [x] Train a model on Expert C's edits. **Result:** on a held-out 5-pair test set, the model's prediction is on average ≈10% closer to the expert's edit than the original; 4 / 5 test pairs move toward the expert (see [`tests/reports/mit5k_expert_c_report.md`](tests/reports/mit5k_expert_c_report.md)). This is the first regime in which the NN does something a closed-form data generator cannot — exactly the case for the architecture's existence per the viability analysis in the project's commit history.
 
 ---
 

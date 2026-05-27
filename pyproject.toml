@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Mathematically grounded image stylization combining CDF analysis with CNN-driven differentiable rendering."
 requires-python = ">=3.10"
 dependencies = [
+    "datasets>=2.16",
     "matplotlib>=3.8",
     "numpy>=1.26",
     "pillow>=10.0",

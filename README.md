@@ -49,6 +49,45 @@ effect-magnitude ratios, target-vs-prediction comparison on a held-out
 test image) is in
 [`tests/reports/phase3_to_phase6_report.md`](tests/reports/phase3_to_phase6_report.md).
 
+## MIT-5K: where the NN earns its complexity
+
+The synthetic styles above all reduce to closed-form functions
+$G(\mathbf{I})$ that the data-generator code computes exactly; running
+$G$ directly is always faster and more accurate than the NN. The
+network's value emerges only when there is no $G$ — when the target is
+a real human edit that depends on image content.
+
+Path 1 of the viability analysis pivots to exactly that regime: train
+against expert C's retouches from MIT-Adobe FiveK. 80 paired
+(`original`, `expert_c`) images were streamed from
+`logasja/mit-adobe-fivek` on HuggingFace via
+[`tools/download_fivek_subset.py`](tools/download_fivek_subset.py),
+then the generic architecture trained for 12 epochs. The held-out
+evaluation on 5 unseen test pairs is shown below.
+
+![MIT-5K expert C held-out evaluation: per row, the original input, the expert C ground truth, and the trained model's prediction](tests/reports/assets/mit5k_eval.png)
+
+The headline number:
+
+| | $L_1$(input, expert) | $L_1$(pred, expert) |
+|---|---|---|
+| **mean over 5 held-out pairs** | **0.0917** | **0.0825** |
+
+i.e. the model's prediction lands ≈ 10% closer to expert C's edit than
+the original input does. **4 of 5 test pairs move toward the expert.**
+The fifth (img_0003, glacier) shows the model's training distribution
+was dominated by warm urban / portrait scenes; on a cool alpine
+landscape it over-applies a magenta-tinted darkening that the expert
+did not make — a failure mode that more training data would address.
+
+This is qualitatively different from the synthetic results: the NN is
+now producing *image-dependent* parameter predictions, not imitating a
+fixed function. The 21-D renderer is performing the same role as
+before, but the head's predictions actually vary with input content.
+Full methodology, training trajectory, and per-image direction analysis
+is in
+[`tests/reports/mit5k_expert_c_report.md`](tests/reports/mit5k_expert_c_report.md).
+
 ## Documentation index
 
 | Document | Contents |
