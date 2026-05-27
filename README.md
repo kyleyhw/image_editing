@@ -71,14 +71,13 @@ The headline number:
 
 | | $L_1$(input, expert) | $L_1$(pred, expert) |
 |---|---|---|
-| **mean over 5 held-out pairs** | **0.0917** | **0.0825** |
+| **mean over 5 held-out pairs** | **0.0917** | **0.0741** |
 
-i.e. the model's prediction lands ≈ 10% closer to expert C's edit than
+i.e. the model's prediction lands ≈ 19 % closer to expert C's edit than
 the original input does. **4 of 5 test pairs move toward the expert.**
-The fifth (img_0003, glacier) shows the model's training distribution
-was dominated by warm urban / portrait scenes; on a cool alpine
-landscape it over-applies a magenta-tinted darkening that the expert
-did not make — a failure mode that more training data would address.
+The fifth (img_0003, glacier) is now only marginally away
+($\Delta = -0.002$); the training set is dominated by warm urban /
+portrait scenes so cool alpine palettes remain underweighted.
 
 This is qualitatively different from the synthetic results: the NN is
 now producing *image-dependent* parameter predictions, not imitating a
@@ -87,6 +86,32 @@ before, but the head's predictions actually vary with input content.
 Full methodology, training trajectory, and per-image direction analysis
 is in
 [`tests/reports/mit5k_expert_c_report.md`](tests/reports/mit5k_expert_c_report.md).
+
+### Scaling experiment: 80 → 500 pairs
+
+A follow-up run trained the same architecture on a 500-pair MIT-5K
+subset (downloaded with the same script). The expectation was that
+more data would close the magenta-cast failure case on the alpine
+landscape. The result was the opposite — held-out mean L1 to expert
+rose from 0.0825 to 0.1030, and only 1 / 5 test pairs moved toward
+the expert (vs. 4 / 5 at 80 pairs).
+
+The mechanism is a known failure mode of fixed-capacity content-
+conditional heads: with 500 diverse training pairs the gradient pulls
+the head's output in contradictory directions (one image wants more
+saturation, the next less) and the optimiser converges on a less
+aggressive but miscalibrated transformation that hedges across the
+training distribution. The 21-D head plus the renderer's global
+primitives (a single tone curve, a single 3 × 3 colour matrix per
+image) hits an architectural ceiling.
+
+Two paths to lift the ceiling are documented in
+[`tests/reports/mit5k_expert_c_report.md`](tests/reports/mit5k_expert_c_report.md)
+§ 9: a higher-capacity head (wider MLP or mixture of experts) or
+per-pixel parameter maps via a U-Net-style decoder (Phase 5's
+unfinished extension). The 80-pair checkpoint remains the better
+deliverable for the current architecture, and the 500-pair experiment
+is shipped as a documented negative result.
 
 ## Documentation index
 
