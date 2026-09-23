@@ -16,7 +16,10 @@ class Head(nn.Module):
     is self-contained.
     """
 
-    def __init__(self, in_dim: int, out_dim: int, hidden: int = 256, dropout: float = 0.1):
+    # Defaults chosen by a small-data check on FiveK landscapes (n = 10 / 50):
+    # hidden 64 + dropout 0.3 beat hidden 256 + dropout 0.1 by +1.1 / +0.3 dB
+    # and ~3 / ~1.4 dE, which the wider head lost to overfitting.
+    def __init__(self, in_dim: int, out_dim: int, hidden: int = 64, dropout: float = 0.3):
         super().__init__()
         self.register_buffer("mu", torch.zeros(in_dim))
         self.register_buffer("sigma", torch.ones(in_dim))

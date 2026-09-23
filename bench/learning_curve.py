@@ -110,10 +110,10 @@ def small(it: dict, key: str) -> torch.Tensor:
     return it[key + "_s8"].float() / 255.0
 
 
+@torch.no_grad()
 def render_items(model, renderer, items, small_size=False):
     feats = torch.stack([it["feat"] for it in items])
-    with torch.no_grad():
-        theta = model(feats)
+    theta = model(feats)
     outs = []
     for it, th in zip(items, theta):
         img = small(it, "src") if small_size else it["src"]
@@ -130,10 +130,10 @@ def l1_loss(model, renderer, items) -> torch.Tensor:
     return loss / len(items) + 1e-4 * theta.pow(2).mean()
 
 
-def train(model, renderer, train_items, val_items, steps=None, batch=8, lr=1e-3, eval_every=25):
-    if steps is None:  # longer budget for larger training sets; early stopping still applies
-        steps = 600 if len(train_items) <= 100 else 2000
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+def train(model, renderer, train_items, val_items, steps=3000, batch=8, lr=3e-3,
+          weight_decay=1e-2, patience=20, eval_every=25):
+    """AdamW with early stopping on validation L1 (patience x eval_every steps)."""
+    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     best, best_state, bad = float("inf"), None, 0
     for step in range(1, steps + 1):
         model.train()
@@ -151,7 +151,7 @@ def train(model, renderer, train_items, val_items, steps=None, batch=8, lr=1e-3,
                 best_state = {k: t.clone() for k, t in model.state_dict().items()}
             else:
                 bad += 1
-                if bad >= 6:  # early stopping: 150 steps without improvement
+                if bad >= patience:
                     break
     if best_state is not None:
         model.load_state_dict(best_state)
@@ -159,6 +159,7 @@ def train(model, renderer, train_items, val_items, steps=None, batch=8, lr=1e-3,
     return {"val_l1": best, "steps": step}
 
 
+@torch.enable_grad()
 def oracle_params(renderer, it, steps=200, lr=0.03) -> torch.Tensor:
     theta = torch.zeros(1, renderer.num_params, requires_grad=True)
     opt = torch.optim.Adam([theta], lr=lr)
@@ -194,7 +195,7 @@ def hist_match(src: torch.Tensor, ref_cdf: np.ndarray) -> np.ndarray:
 
 
 def hwc(t: torch.Tensor) -> np.ndarray:
-    return t.permute(1, 2, 0).numpy().astype(np.float64)
+    return t.detach().permute(1, 2, 0).numpy().astype(np.float64)
 
 
 def evaluate(outs, items) -> list[dict]:
@@ -243,7 +244,8 @@ def main() -> None:
     for rname in args.renderers.split(","):
         r = GlobalRenderer(rname)
         otest = test[: args.oracle]
-        outs = [r(it["src"][None], oracle_params(r, it))[0] for it in otest]
+        with torch.no_grad():
+            outs = [r(it["src"][None], oracle_params(r, it))[0] for it in otest]
         results[f"oracle/{rname}"] = evaluate([hwc(o) for o in outs], otest)
         print(f"oracle/{rname}: {summarise(results[f'oracle/{rname}'])}", flush=True)
     for k in ("identity", "histmatch"):
