@@ -39,8 +39,8 @@ from pathlib import Path
 
 from PIL import Image, ImageCms, ImageOps
 
-sys.path.insert(0, str(Path(__file__).parent))
-from collect_style_set import colour_stats, regime_of  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from photostyle.stats import colour_stats, regime_of  # noqa: E402
 
 ROOT = Path("data/owner")
 FIELDS = ["id", "source_name", "width", "height", "icc", "regime",

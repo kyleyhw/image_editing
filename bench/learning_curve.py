@@ -158,13 +158,16 @@ def l1_loss(model, renderer, items) -> torch.Tensor:
     loss = 0.0
     for it, th in zip(items, theta):
         loss = loss + (renderer(small(it, "src")[None], th[None])[0] - small(it, "tgt")).abs().mean()
-    return loss / len(items) + 1e-4 * theta.pow(2).mean()
+    reg = renderer.regularizer() if hasattr(renderer, "regularizer") else 0.0
+    return loss / len(items) + 1e-4 * theta.pow(2).mean() + reg
 
 
 def train(model, renderer, train_items, val_items, steps=3000, batch=8, lr=3e-3,
           weight_decay=1e-2, patience=20, eval_every=25):
     """AdamW with early stopping on validation L1 (patience x eval_every steps)."""
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    # Renderers with learnable state (e.g. the Phase 9 basis LUTs) train jointly.
+    params = list(model.parameters()) + list(renderer.parameters())
+    opt = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
     best, best_state, bad = float("inf"), None, 0
     for step in range(1, steps + 1):
         model.train()
@@ -179,13 +182,15 @@ def train(model, renderer, train_items, val_items, steps=3000, batch=8, lr=3e-3,
                 v = float(l1_loss(model, renderer, val_items))
             if v < best - 1e-5:
                 best, bad = v, 0
-                best_state = {k: t.clone() for k, t in model.state_dict().items()}
+                best_state = ({k: t.clone() for k, t in model.state_dict().items()},
+                              {k: t.clone() for k, t in renderer.state_dict().items()})
             else:
                 bad += 1
                 if bad >= patience:
                     break
     if best_state is not None:
-        model.load_state_dict(best_state)
+        model.load_state_dict(best_state[0])
+        renderer.load_state_dict(best_state[1])
     model.eval()
     return {"val_l1": best, "steps": step}
 
@@ -247,6 +252,9 @@ def main() -> None:
     ap.add_argument("--test", type=int, default=200, help="Fixed random test subset size.")
     ap.add_argument("--oracle", type=int, default=100, help="Test images used for the oracle ceiling.")
     ap.add_argument("--seeds", default="0,1,2")
+    ap.add_argument("--large-n", type=int, default=250,
+                    help="Sizes >= this use only the first seed (large-n runs are slow and low-variance).")
+    ap.add_argument("--resume", action="store_true", help="Skip runs already in <out>/results.json.")
     ap.add_argument("--renderers", default="shared,per_channel")
     ap.add_argument("--val", type=int, default=30)
     ap.add_argument("--threads", type=int, default=4)
@@ -270,33 +278,34 @@ def main() -> None:
                "counts": {"pool": len(pool), "val": len(val), "test": len(test),
                           "dropped_unalignable": data.dropped}, "runs": []}
 
+    prev = None
+    if args.resume and (args.out / "results.json").exists():
+        prev = json.loads((args.out / "results.json").read_text())
+        results["runs"] = prev["runs"]
+    done = {(r["n"], r["seed"], r["renderer"], r["model"]) for r in results["runs"]}
+
     # --- Non-learned references ------------------------------------------------
-    results["identity"] = evaluate([hwc(it["src"]) for it in test], test)
-    cdf = mean_target_cdf(pool)
-    results["histmatch"] = evaluate([hist_match(it["src"], cdf) for it in test], test)
-    for rname in args.renderers.split(","):
-        r = GlobalRenderer(rname)
-        otest = test[: args.oracle]
-        with torch.no_grad():
-            outs = [r(it["src"][None], oracle_params(r, it))[0] for it in otest]
-        results[f"oracle/{rname}"] = evaluate([hwc(o) for o in outs], otest)
-        print(f"oracle/{rname}: {summarise(results[f'oracle/{rname}'])}", flush=True)
-    for k in ("identity", "histmatch"):
-        print(f"{k}: {summarise(results[k])}", flush=True)
+    if prev and "identity" in prev:
+        for k in [k for k in prev if k in ("identity", "histmatch") or k.startswith("oracle/")]:
+            results[k] = prev[k]
+    else:
+        compute_references(results, test, pool, args)
 
     # --- Learning curve ----------------------------------------------------------
+    seeds = list(map(int, args.seeds.split(",")))
     sizes = [len(pool) if s == "all" else int(s) for s in args.sizes.split(",")]
     for n in sizes:
         n = min(n, len(pool))
-        for seed in map(int, args.seeds.split(",")):
+        for seed in (seeds if n < args.large_n else seeds[:1]):
             seed_all(seed)
             train_items = random.Random(seed).sample(pool, n)
             for rname in args.renderers.split(","):
                 r = GlobalRenderer(rname)
                 for kind in ("head", "preset"):
+                    if (n, seed, rname, kind) in done:
+                        continue
                     seed_all(seed)
-                    model = Head(FEATURE_DIM, r.num_params) if kind == "head" \
-                        else Preset(r.num_params)
+                    model = Head(FEATURE_DIM, r.num_params) if kind == "head" else Preset(r.num_params)
                     if kind == "head":
                         model.set_norm(torch.stack([it["feat"] for it in pool]))
                     info = train(model, r, train_items, val)
@@ -310,11 +319,26 @@ def main() -> None:
                     print(f"n={n:4d} seed={seed} {kind}/{rname:11s} psnr={s['psnr']:.2f} "
                           f"dE={s['delta_e']:.2f} spread={spread:.4f} steps={info['steps']} "
                           f"[{time.time() - t0:.0f}s]", flush=True)
-            (args.out / "results.json").write_text(json.dumps(results))
+                    (args.out / "results.json").write_text(json.dumps(results))
 
     write_summary(results, args.out)
     plot(results, args.out)
     print(f"done in {time.time() - t0:.0f}s -> {args.out}")
+
+
+def compute_references(results: dict, test: list[dict], pool: list[dict], args) -> None:
+    results["identity"] = evaluate([hwc(it["src"]) for it in test], test)
+    cdf = mean_target_cdf(pool)
+    results["histmatch"] = evaluate([hist_match(it["src"], cdf) for it in test], test)
+    for rname in args.renderers.split(","):
+        r = GlobalRenderer(rname)
+        otest = test[: args.oracle]
+        with torch.no_grad():
+            outs = [r(it["src"][None], oracle_params(r, it))[0] for it in otest]
+        results[f"oracle/{rname}"] = evaluate([hwc(o) for o in outs], otest)
+        print(f"oracle/{rname}: {summarise(results[f'oracle/{rname}'])}", flush=True)
+    for k in ("identity", "histmatch"):
+        print(f"{k}: {summarise(results[k])}", flush=True)
 
 
 def write_summary(results: dict, out: Path) -> None:

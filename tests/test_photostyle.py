@@ -83,3 +83,38 @@ def test_identity_lut_is_identity():
     img = torch.rand(1, 3, 8, 8)
     out = apply_lut(img, bake_lut(r, torch.zeros(r.num_params), size=17))
     assert torch.allclose(out, img, atol=1e-5)
+
+
+def test_regional_identity_and_gradients():
+    from photostyle.regional import RegionalRenderer
+
+    r = RegionalRenderer()
+    img = torch.rand(2, 3, 24, 32)
+    assert torch.allclose(r(img, torch.zeros(2, r.num_params)), img, atol=1e-5)
+    p = (0.05 * torch.randn(1, r.num_params)).requires_grad_()
+    r(img[:1], p).sum().backward()
+    q = r.unpack(p.grad)
+    for k in ("grad", "tone", "sky"):
+        assert q[k].abs().sum() > 0, k
+
+
+def test_sky_probability_prefers_blue_top():
+    from photostyle.regional import sky_probability
+
+    img = torch.zeros(1, 3, 40, 40)
+    img[:, :, :20] = torch.tensor([0.45, 0.6, 0.9]).view(1, 3, 1, 1)   # blue sky
+    img[:, :, 20:] = torch.tensor([0.2, 0.35, 0.15]).view(1, 3, 1, 1)  # green ground
+    p = sky_probability(img)
+    assert p[0, 0, :15].mean() > 0.6 and p[0, 0, 25:].mean() < 0.2
+
+
+def test_lut_renderer_identity_and_learnable():
+    from photostyle.lut import LUTRenderer
+
+    r = LUTRenderer()
+    img = torch.rand(2, 3, 16, 16)
+    assert torch.allclose(r(img, torch.zeros(2, r.num_params)), img, atol=1e-5)
+    p = torch.zeros(2, r.num_params)
+    loss = (r(img, p) - img.flip(1)).abs().mean() + r.regularizer()
+    loss.backward()
+    assert r.bases.grad.abs().sum() > 0
