@@ -40,7 +40,7 @@ from pathlib import Path
 from PIL import Image, ImageCms, ImageOps
 
 sys.path.insert(0, str(Path(__file__).parent))
-from collect_style_set import colour_stats  # noqa: E402
+from collect_style_set import colour_stats, regime_of  # noqa: E402
 
 ROOT = Path("data/owner")
 FIELDS = ["id", "source_name", "width", "height", "icc", "regime",
@@ -91,7 +91,7 @@ def ingest(files: list[Path], rows: dict[str, dict]) -> None:
                              "pair_of": "", "notes": ""})
         row.update({
             "id": pid, "source_name": src.name, "width": srgb.width, "height": srgb.height,
-            "icc": icc, "regime": "night" if st["L_p50"] < 35 else "day",
+            "icc": icc, "regime": regime_of(st),
             **{k: round(v, 2) for k, v in st.items() if k in FIELDS},
         })
         rows[pid] = row

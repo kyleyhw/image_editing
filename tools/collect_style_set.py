@@ -333,6 +333,7 @@ def colour_stats(img: Image.Image) -> dict[str, float]:
         "L_p50": float(np.percentile(L, 50)),
         "L_p99": float(np.percentile(L, 99)),
         "shadow_frac": float(shadows.mean()),
+        "high_frac": float(highs.mean()),
         "shadow_a": masked_mean(a, shadows),
         "shadow_b": masked_mean(b, shadows),
         "mid_a": masked_mean(a, mids),
@@ -342,6 +343,15 @@ def colour_stats(img: Image.Image) -> dict[str, float]:
         "sat_mean": float(hsv[..., 1].mean()),
         "chroma_mean": float(np.hypot(a, b).mean()),
     }
+
+
+def regime_of(stats: dict[str, float]) -> str:
+    """Night = dark median AND little bright area.
+
+    The median alone misclassifies dark-foliage daytime scenes (a red maple
+    against a bright sky has median L* ~33 but ~30 % of pixels above L* 70).
+    """
+    return "night" if stats["L_p50"] < 35 and stats["high_frac"] < 0.12 else "day"
 
 
 def score(stats: dict[str, float], profile: dict[str, tuple]) -> float:
@@ -466,7 +476,7 @@ def main() -> None:
                     stats_log["has_person"] += 1
                     continue
                 person = people[0][0] if people else 0.0
-                regime = "night" if st["L_p50"] < 35 else "day"
+                regime = regime_of(st)
                 gates = profile.gates.get(regime, {})
                 if any(not (lo <= st[k] <= hi) for k, (lo, hi) in gates.items()):
                     stats_log["gated"] += 1
