@@ -9,9 +9,9 @@ colorspace = color_settings.rgb()
 
 
 def load_image(filename, filetype='jpeg', test=True):
-    image_directory = './images/original/'
+    image_directory = '../../images/original/'
     if test:
-        image_directory = './images/test_images/'
+        image_directory = '../../images/test_images/'
     image_dir = os.path.join(image_directory, f'{filename}.{filetype}')
     image = ski.io.imread(image_dir)
     if image.shape[-1] == 4:
