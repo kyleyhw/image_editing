@@ -40,13 +40,13 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from PIL import Image
 
 from bench.metrics import all_metrics
 from photostyle.features import FEATURE_DIM, FeatureExtractor
 from photostyle.head import Head, Preset
 from photostyle.render import GlobalRenderer
+from photostyle.train import align_pair, shrink  # noqa: F401  (re-exported for bench scripts)
 
 TRAIN_EDGE = 256
 
@@ -59,43 +59,6 @@ def seed_all(seed: int) -> None:
 
 def to_tensor(img: Image.Image) -> torch.Tensor:
     return torch.from_numpy(np.asarray(img.convert("RGB"), dtype=np.float32) / 255.0).permute(2, 0, 1)
-
-
-def shrink(t: torch.Tensor, edge: int) -> torch.Tensor:
-    _, h, w = t.shape
-    s = edge / max(h, w)
-    if s >= 1:
-        return t
-    return F.interpolate(t[None], size=(round(h * s), round(w * s)), mode="bilinear",
-                         antialias=True, align_corners=False)[0]
-
-
-def align_pair(src: torch.Tensor, tgt: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor] | None:
-    """Make an (original, expert) pair pixel-aligned, or return None.
-
-    In the FiveK mirror some originals are stored unrotated while the expert
-    retouch is rotated (e.g. 512x340 vs 341x512), and independent resizing
-    leaves 1-2 px size differences. We try the original's 0/90/180/270 degree
-    rotations, keep the one whose shape is within 2 px of the target and whose
-    content matches best on a thumbnail, then resample the target to the
-    original's exact size. Pairs that cannot be matched (e.g. crops) are dropped.
-    """
-    best, best_err = None, float("inf")
-    for k in range(4):
-        cand = torch.rot90(src, k, dims=(1, 2))
-        if abs(cand.shape[1] - tgt.shape[1]) > 2 or abs(cand.shape[2] - tgt.shape[2]) > 2:
-            continue
-        t = F.interpolate(tgt[None], size=cand.shape[1:], mode="bilinear", align_corners=False)[0]
-        a = F.adaptive_avg_pool2d(cand.mean(0, keepdim=True)[None], 16)
-        b = F.adaptive_avg_pool2d(t.mean(0, keepdim=True)[None], 16)
-        # compare structure, not brightness: the edit changes tone, not layout
-        a, b = (a - a.mean()) / (a.std() + 1e-6), (b - b.mean()) / (b.std() + 1e-6)
-        err = float((a - b).abs().mean())
-        if err < best_err:
-            best, best_err = (cand.contiguous(), t), err
-    if best is None or best_err > 0.5:
-        return None
-    return best
 
 
 def as_u8(t: torch.Tensor) -> torch.Tensor:
