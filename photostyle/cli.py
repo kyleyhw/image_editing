@@ -108,7 +108,7 @@ def cmd_style(args) -> None:
     from photostyle import newstyle as ns
 
     if args.step == "new":
-        p = ns.new(args.name, args.describe, args.query, args.mono)
+        p = ns.new(args.name, args.describe, args.query, args.mono, args.overwrite)
         print(f"style project {p.name!r}: queries {p.queries}")
         print(f"next: photostyle style search {p.name}")
     elif args.step == "search":
@@ -160,6 +160,7 @@ def main(argv: list[str] | None = None) -> None:
     x.add_argument("--describe", required=True, help='the idea in words, e.g. "neon cyberpunk night city"')
     x.add_argument("--query", action="append", help="search query (repeatable); default: from --describe")
     x.add_argument("--mono", action="store_true", help="a black-and-white look")
+    x.add_argument("--overwrite", action="store_true", help="replace an existing project of that name")
     x = ss.add_parser("search", help="find openly licensed candidate photos")
     x.add_argument("name")
     x.add_argument("--pages", type=int, default=3)

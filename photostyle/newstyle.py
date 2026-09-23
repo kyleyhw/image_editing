@@ -95,9 +95,13 @@ class Project:
 # --------------------------------------------------------------------------- idea
 
 
-def new(name: str, describe: str, queries: list[str] | None = None, mono: bool = False) -> Project:
+def new(name: str, describe: str, queries: list[str] | None = None, mono: bool = False,
+        overwrite: bool = False) -> Project:
     if not name.replace("_", "").isalnum():
         raise SystemExit("style names use letters, digits and underscores")
+    if (ROOT / name / "project.json").exists() and not overwrite:
+        raise SystemExit(f"style project {name!r} already exists (its candidates and picks would be lost); "
+                         "choose another name or pass --overwrite")
     q = queries or [describe, f"{describe} landscape", f"{describe} city street"]
     p = Project(name=name, description=describe, queries=q, mono=mono)
     p.save()

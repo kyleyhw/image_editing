@@ -335,7 +335,10 @@ def style_new(body: dict):
     from photostyle import newstyle as ns
 
     queries = [q.strip() for q in body.get("queries", []) if q.strip()] or None
-    p = ns.new(_safe_name(body["name"]).replace("-", "_"), body["describe"], queries, bool(body.get("mono")))
+    try:
+        p = ns.new(_safe_name(body["name"]).replace("-", "_"), body["describe"], queries, bool(body.get("mono")))
+    except SystemExit as e:                      # e.g. the name is taken
+        raise HTTPException(409, str(e)) from None
     return _project_payload(p)
 
 

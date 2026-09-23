@@ -188,6 +188,8 @@ def test_newstyle_pick_exclude_offline(tmp_path, monkeypatch):
     monkeypatch.setattr(ns, "ROOT", tmp_path / "styles")
     monkeypatch.setattr(ns, "MANIFESTS", tmp_path / "manifests")
     p = ns.new("look", "a test look")
+    with pytest.raises(SystemExit):
+        ns.new("look", "again")                # never silently replaces a project
     rng = np.random.default_rng(0)
     cands = []
     for i in range(12):                        # 6 bluish + 6 reddish photos
