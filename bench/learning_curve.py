@@ -70,6 +70,34 @@ def shrink(t: torch.Tensor, edge: int) -> torch.Tensor:
                          antialias=True, align_corners=False)[0]
 
 
+def align_pair(src: torch.Tensor, tgt: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor] | None:
+    """Make an (original, expert) pair pixel-aligned, or return None.
+
+    In the FiveK mirror some originals are stored unrotated while the expert
+    retouch is rotated (e.g. 512x340 vs 341x512), and independent resizing
+    leaves 1-2 px size differences. We try the original's 0/90/180/270 degree
+    rotations, keep the one whose shape is within 2 px of the target and whose
+    content matches best on a thumbnail, then resample the target to the
+    original's exact size. Pairs that cannot be matched (e.g. crops) are dropped.
+    """
+    best, best_err = None, float("inf")
+    for k in range(4):
+        cand = torch.rot90(src, k, dims=(1, 2))
+        if abs(cand.shape[1] - tgt.shape[1]) > 2 or abs(cand.shape[2] - tgt.shape[2]) > 2:
+            continue
+        t = F.interpolate(tgt[None], size=cand.shape[1:], mode="bilinear", align_corners=False)[0]
+        a = F.adaptive_avg_pool2d(cand.mean(0, keepdim=True)[None], 16)
+        b = F.adaptive_avg_pool2d(t.mean(0, keepdim=True)[None], 16)
+        # compare structure, not brightness: the edit changes tone, not layout
+        a, b = (a - a.mean()) / (a.std() + 1e-6), (b - b.mean()) / (b.std() + 1e-6)
+        err = float((a - b).abs().mean())
+        if err < best_err:
+            best, best_err = (cand.contiguous(), t), err
+    if best is None or best_err > 0.5:
+        return None
+    return best
+
+
 def as_u8(t: torch.Tensor) -> torch.Tensor:
     return (t * 255).round().to(torch.uint8)
 
@@ -86,20 +114,23 @@ class Pairs:
         with (root / "meta.csv").open() as f:
             meta = list(csv.DictReader(f))
         self.items = []
+        self.dropped = 0
         for m in meta:
             o = root / "original" / m["file"]
             e = root / f"expert_{expert}" / m["file"]
             if not (o.exists() and e.exists()):
                 continue
-            src, tgt = to_tensor(Image.open(o)), to_tensor(Image.open(e))
-            if src.shape != tgt.shape:
+            pair = align_pair(to_tensor(Image.open(o)), to_tensor(Image.open(e)))
+            if pair is None:
+                self.dropped += 1
                 continue
+            src, tgt = pair
             full = m["split"] in full_splits
             self.items.append({
                 "file": m["file"], "split": m["split"], "meta": m,
                 "src": src if full else None, "tgt": tgt if full else None,
                 "src_s8": as_u8(shrink(src, TRAIN_EDGE)), "tgt_s8": as_u8(shrink(tgt, TRAIN_EDGE)),
-                "feat": fx.cached(src, f"{o}|{o.stat().st_mtime}"),
+                "feat": fx.cached(src, f"{o}|{o.stat().st_mtime}|{tuple(src.shape)}"),
             })
 
     def split(self, name: str) -> list[dict]:
@@ -232,10 +263,12 @@ def main() -> None:
     rng = random.Random(1234)
     rng.shuffle(pool)
     val, pool = pool[: args.val], pool[args.val:]
-    print(f"pool={len(pool)} val={len(val)} test={len(test)}  (loaded in {time.time() - t0:.0f}s)", flush=True)
+    print(f"pool={len(pool)} val={len(val)} test={len(test)} dropped={data.dropped} "
+          f"(loaded in {time.time() - t0:.0f}s)", flush=True)
 
     results = {"config": {k: str(v) for k, v in vars(args).items()},
-               "counts": {"pool": len(pool), "val": len(val), "test": len(test)}, "runs": []}
+               "counts": {"pool": len(pool), "val": len(val), "test": len(test),
+                          "dropped_unalignable": data.dropped}, "runs": []}
 
     # --- Non-learned references ------------------------------------------------
     results["identity"] = evaluate([hwc(it["src"]) for it in test], test)
