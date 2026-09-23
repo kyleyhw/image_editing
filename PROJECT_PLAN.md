@@ -773,7 +773,7 @@ Interaction details
 | **Synthetic fixed-function styles** (existing generators) | Paired | Unlimited | Unit/sanity tests of renderer and training | Content-independent by construction |
 | **Unedited photo pool** (picsum / Unsplash / COCO) | Inputs only | 1–10K | Inputs for unpaired training; OOD calibration | |
 | **Clean Cool landscape set** *(A2)* | Unpaired, openly licensed, gated on the split tone | ~100–150 | Pilot A style set (landscapes) | `data/manifests/clean_cool_landscape.csv` |
-| **FiveK landscape subset** *(A2)* | Paired, experts A–E | ~60 % of the mirror (~430 of ~730 pairs per expert) | Paired landscape benchmark | Filter `location=outdoor`, `subject∈{man_made,nature}`; the mirror is not the full 5,000 |
+| **FiveK landscape subset** *(A2)* | Paired, experts A–E | ≈ 55 % of FiveK (≈ 2,700 pairs per expert) | Paired landscape benchmark | `tools/download_fivek_landscapes.py`; filter `location=outdoor`, `subject∈{man_made,nature}`; the mirror is the full FiveK (corrected) |
 | **Neon Street Portrait stand-in set** *(A1; deferred portrait track)* | Unpaired, openly licensed (CC0 / PDM / BY / BY-SA) via Openverse | ~100–150 | Pilot A style set | Collected by `tools/collect_style_set.py`; manifest + attribution in `data/manifests/neon_street_portrait.csv` |
 
 Rules
@@ -1196,10 +1196,13 @@ photographer is credited only as inspiration in research notes.
       a `license` field (Adobe / AdobeMIT). Select
       `location = outdoor` and `subject ∈ {man_made, nature}`; this is about
       60 % of images in a 240-image sample.
-  - Caveat: the mirror has only ~250 / 231 / 251 train / test / validation
-    pairs per expert, not the full 5,000. Phase 7's comparison with published
-    numbers (480p protocol) needs the official full FiveK or Zeng et al.'s
-    480p release. The mirror is sufficient for the pilot.
+  - *Correction (2026-09-23):* the mirror is the **full** FiveK: 44 / 7 / 13
+    train / validation / test parquet shards of 77 rows, about 3,400 / 500 /
+    1,000 pairs per expert, ~123 GB at full resolution. An earlier count of
+    ~730 came from a truncated dataset-viewer summary. The landscape subset
+    is therefore ≈ 2,700 pairs per expert. Its split differs from the 480p
+    protocol's 4,500 / 500, so our numbers are close to, but not identical
+    with, published ones.
   - Night is rare in FiveK (~3 % of the sample), so night evaluation relies
     on the unpaired set.
 - [ ] Input pool (photos to be edited): FiveK *original* renders of

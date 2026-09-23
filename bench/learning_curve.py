@@ -70,10 +70,19 @@ def shrink(t: torch.Tensor, edge: int) -> torch.Tensor:
                          antialias=True, align_corners=False)[0]
 
 
-class Pairs:
-    """In-memory paired dataset with cached features."""
+def as_u8(t: torch.Tensor) -> torch.Tensor:
+    return (t * 255).round().to(torch.uint8)
 
-    def __init__(self, root: Path, expert: str, fx: FeatureExtractor):
+
+class Pairs:
+    """In-memory paired dataset with cached features.
+
+    To fit ~2,700 pairs in RAM, training-size copies are stored as uint8 and
+    full-size (512 px) copies are kept only for ``full_splits``.
+    """
+
+    def __init__(self, root: Path, expert: str, fx: FeatureExtractor,
+                 full_splits: tuple[str, ...] = ("test",)):
         with (root / "meta.csv").open() as f:
             meta = list(csv.DictReader(f))
         self.items = []
@@ -85,10 +94,11 @@ class Pairs:
             src, tgt = to_tensor(Image.open(o)), to_tensor(Image.open(e))
             if src.shape != tgt.shape:
                 continue
+            full = m["split"] in full_splits
             self.items.append({
                 "file": m["file"], "split": m["split"], "meta": m,
-                "src": src, "tgt": tgt,
-                "src_s": shrink(src, TRAIN_EDGE), "tgt_s": shrink(tgt, TRAIN_EDGE),
+                "src": src if full else None, "tgt": tgt if full else None,
+                "src_s8": as_u8(shrink(src, TRAIN_EDGE)), "tgt_s8": as_u8(shrink(tgt, TRAIN_EDGE)),
                 "feat": fx.cached(src, f"{o}|{o.stat().st_mtime}"),
             })
 
@@ -96,13 +106,17 @@ class Pairs:
         return [it for it in self.items if it["split"] == name]
 
 
-def render_items(model, renderer, items, small=False):
+def small(it: dict, key: str) -> torch.Tensor:
+    return it[key + "_s8"].float() / 255.0
+
+
+def render_items(model, renderer, items, small_size=False):
     feats = torch.stack([it["feat"] for it in items])
     with torch.no_grad():
         theta = model(feats)
     outs = []
     for it, th in zip(items, theta):
-        img = it["src_s"] if small else it["src"]
+        img = small(it, "src") if small_size else it["src"]
         outs.append(renderer(img[None], th[None])[0])
     return outs, theta
 
@@ -112,11 +126,13 @@ def l1_loss(model, renderer, items) -> torch.Tensor:
     theta = model(feats)
     loss = 0.0
     for it, th in zip(items, theta):
-        loss = loss + (renderer(it["src_s"][None], th[None])[0] - it["tgt_s"]).abs().mean()
+        loss = loss + (renderer(small(it, "src")[None], th[None])[0] - small(it, "tgt")).abs().mean()
     return loss / len(items) + 1e-4 * theta.pow(2).mean()
 
 
-def train(model, renderer, train_items, val_items, steps=600, batch=8, lr=1e-3, eval_every=25):
+def train(model, renderer, train_items, val_items, steps=None, batch=8, lr=1e-3, eval_every=25):
+    if steps is None:  # longer budget for larger training sets; early stopping still applies
+        steps = 600 if len(train_items) <= 100 else 2000
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     best, best_state, bad = float("inf"), None, 0
     for step in range(1, steps + 1):
@@ -147,7 +163,7 @@ def oracle_params(renderer, it, steps=200, lr=0.03) -> torch.Tensor:
     theta = torch.zeros(1, renderer.num_params, requires_grad=True)
     opt = torch.optim.Adam([theta], lr=lr)
     for _ in range(steps):
-        loss = (renderer(it["src_s"][None], theta)[0] - it["tgt_s"]).abs().mean()
+        loss = (renderer(small(it, "src")[None], theta)[0] - small(it, "tgt")).abs().mean()
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -157,7 +173,7 @@ def oracle_params(renderer, it, steps=200, lr=0.03) -> torch.Tensor:
 def mean_target_cdf(items, bins=256) -> np.ndarray:
     acc = np.zeros((3, bins))
     for it in items:
-        t = it["tgt_s"].numpy()
+        t = small(it, "tgt").numpy()
         for c in range(3):
             h, _ = np.histogram(t[c], bins=bins, range=(0, 1))
             acc[c] += np.cumsum(h) / h.sum()
@@ -195,7 +211,9 @@ def main() -> None:
     ap.add_argument("--data", type=Path, default=Path("data/fivek_landscape_c"))
     ap.add_argument("--expert", default="c")
     ap.add_argument("--out", type=Path, default=Path("bench/results/phase7_fivek_landscape_c"))
-    ap.add_argument("--sizes", default="10,25,50,100,200,all")
+    ap.add_argument("--sizes", default="10,25,50,100,250,500,1000,all")
+    ap.add_argument("--test", type=int, default=200, help="Fixed random test subset size.")
+    ap.add_argument("--oracle", type=int, default=100, help="Test images used for the oracle ceiling.")
     ap.add_argument("--seeds", default="0,1,2")
     ap.add_argument("--renderers", default="shared,per_channel")
     ap.add_argument("--val", type=int, default=30)
@@ -209,6 +227,7 @@ def main() -> None:
     data = Pairs(args.data, args.expert, fx)
     pool = data.split("train") + data.split("validation")
     test = data.split("test")
+    test = random.Random(99).sample(test, min(args.test, len(test)))
     rng = random.Random(1234)
     rng.shuffle(pool)
     val, pool = pool[: args.val], pool[args.val:]
@@ -223,8 +242,9 @@ def main() -> None:
     results["histmatch"] = evaluate([hist_match(it["src"], cdf) for it in test], test)
     for rname in args.renderers.split(","):
         r = GlobalRenderer(rname)
-        outs = [r(it["src"][None], oracle_params(r, it))[0] for it in test]
-        results[f"oracle/{rname}"] = evaluate([hwc(o) for o in outs], test)
+        otest = test[: args.oracle]
+        outs = [r(it["src"][None], oracle_params(r, it))[0] for it in otest]
+        results[f"oracle/{rname}"] = evaluate([hwc(o) for o in outs], otest)
         print(f"oracle/{rname}: {summarise(results[f'oracle/{rname}'])}", flush=True)
     for k in ("identity", "histmatch"):
         print(f"{k}: {summarise(results[k])}", flush=True)
