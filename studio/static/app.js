@@ -232,18 +232,22 @@ async function predict() {
   S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.knots = null; S.strength = 1; S.undo = []; S.redo = []; S._last = snap();
   syncControls(); showParamsInfo(); render();
 }
+let stripGen = 0;
 async function styleStrip() {
+  const gen = ++stripGen;   // a newer call (another photo, a new style) supersedes this one
   const strip = $("#styleStrip"); strip.innerHTML = "";
   const w = 140, h = Math.round(w * S.img.naturalHeight / S.img.naturalWidth);
   thumbCanvas.width = w; thumbCanvas.height = h; setImage(thumbR, S.img);
   const items = [{ name: "original" }, ...S.styles];
   for (const [i, st] of items.entries()) {
+    if (gen !== stripGen) return;
     const div = document.createElement("div"); div.className = "thumb" + (st.name === S.style ? " sel" : "");
     const c = document.createElement("canvas"); c.width = w; c.height = h; div.append(c);
     const lab = document.createElement("span"); lab.textContent = `${i ? i + " · " : ""}${st.name}`; div.append(lab);
     strip.append(div);
     if (st.name === "original") { c.getContext("2d").drawImage(S.img, 0, 0, w, h); div.onclick = () => { S.mode = "before"; render(); }; continue; }
     const p = await (await api("/api/predict", { id: S.id, style: st.name })).json();
+    if (gen !== stripGen) return;
     const saved = [S.params, S.knots, S.d, S.strength];
     S.params = p; S.knots = null; S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.strength = 1;
     draw(thumbR, effective(), p.knots, 2); c.getContext("2d").drawImage(thumbCanvas, 0, 0);
