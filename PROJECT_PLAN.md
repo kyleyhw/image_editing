@@ -21,7 +21,9 @@ Rationale and literature review:
 > Phase 16 (graduated filter, sky and range masks), and re-scopes Phase 18
 > to depth-aware atmosphere. Amendment A3 adds the owner's own photos as test
 > inputs and, once originals are supplied, as paired data for an
-> "owner look". Precedence: A3 > A2 > A1 > earlier text.
+> "owner look". Amendment A4 records every phase gate outcome from the
+> execution run and the decisions waiting on the owner.
+> Precedence: A4 > A3 > A2 > A1 > earlier text.
 
 ---
 
@@ -43,7 +45,7 @@ Rationale and literature review:
 14. [Non-goals](#14-non-goals)
 15. [Open questions for the project owner](#15-open-questions-for-the-project-owner)
 16. [Backlog and housekeeping](#16-backlog-and-housekeeping)
-17. [Amendments](#17-amendments) — **A1:** style-data policy, capture emulation · **A2:** landscapes first · **A3:** owner's own photos
+17. [Amendments](#17-amendments) — **A1:** style-data policy, capture emulation · **A2:** landscapes first · **A3:** owner's own photos · **A4:** execution results, course corrections, owner decisions
 
 ---
 
@@ -365,11 +367,11 @@ Tasks
   - validation split (10 % of train) + early stopping on val PSNR;
   - aspect-preserving resize (short side 256 for features; loss at 480p);
   - global seed control (`torch`, `numpy`, `random`), deterministic loaders.
-- [ ] **Learning curve.** 25 / 50 / 100 / 250 / 500 / 1,000 / 4,500 pairs × 3
+- [x] **Learning curve.** 25 / 50 / 100 / 250 / 500 / 1,000 / 4,500 pairs × 3
       seeds; plot PSNR vs. log(#pairs) with baselines and oracle as lines.
 - [ ] **Loss ablation.** L1 only vs. L1 + CDF vs. full composite (VGG is
       expensive on CPU; keep only if it helps).
-- [ ] **Report.** `tests/reports/phase7_learning_curve.md` with figure.
+- [x] **Report.** `tests/reports/phase7_learning_curve.md` with figure.
 
 Deliverables: `bench/` harness, `photostyle bench` command, learning-curve
 figure, report.
@@ -878,11 +880,11 @@ Rules
 ## 16. Backlog and housekeeping
 
 Immediate (fold into Phase 8)
-- [ ] Remove PyCharm stub `main.py`, matplotlib demo `test.py`, print in
+- [x] Remove PyCharm stub `main.py`, matplotlib demo `test.py`, print in
       `misc_funcs.py`.
-- [ ] Move the legacy 7-D Fujifilm architecture to `legacy/`.
-- [ ] Replace square resize with aspect-preserving resize.
-- [ ] Add `tests/` unit tests (currently only reports live there).
+- [x] Move the legacy 7-D Fujifilm architecture to `legacy/`.
+- [x] Replace square resize with aspect-preserving resize.
+- [x] Add `tests/` unit tests (currently only reports live there).
 
 Ideas parking lot (not scheduled)
 - Hue-vs-saturation and hue-vs-luminance curves (CURL-style) as an HSL panel.
@@ -1398,3 +1400,95 @@ and preset were used. A consistent preset gives a cleaner training signal.
   without explicit per-photo approval.
 - Faces and licence plates in owner photos are not used for any identity
   task, as with the stand-in sets.
+
+---
+
+### A4 — Execution results and course corrections
+
+*Adopted 2026-09-23 after running the plan end to end on a 4-core CPU.
+Status: active. Precedence: A4 > A3 > A2 > A1 > earlier text.* Each phase
+report is in `tests/reports/`; raw results are in `bench/results/`.
+
+#### A4.1 Gate outcomes
+
+| phase | gate | outcome | report |
+|---|---|---|---|
+| 7 learning curve | accuracy rises with data | **pass**: head 20.6 → 22.2 dB from 10 to 1,882 pairs; static preset flat at about 21.1; oracle ceiling 27.2 | `phase7_learning_curve.md` |
+| 7b shrinkage (new) | fix small-n instability | **adopted**: worst seed at 25 pairs 18.8 → 20.8 dB; α = 1 from 100 pairs | same |
+| 8 engineering | tests, CI, package | done: 15 tests, CI, `photostyle` package + CLI | — |
+| Pilot A Clean Cool | head beats hand-made preset per cell, fidelity kept | **pass** (4/4 cells); visual caveat: day skies and saturated colour over-muted; v2 chroma-keep only partly fixes it | `pilotA_clean_cool_landscapes.md` |
+| 16 regional | +0.5 dB over global | **fail** (+0.13 at 250, −0.01 at all; oracle headroom only +0.19): regional stays as **manual tools** | `phase16_regional.md` |
+| 9 renderer | basis-LUT > curves by 0.3 dB | **fail** (all within 0.4 dB): keep **per-channel curves** | `phase9_renderers.md` |
+| 10 conditioning | joint ≥ separate; 20-shot within 1 dB | **pass both**: joint +0.7 dB; 20-pair embedding beats a full separate head | `phase10_conditioning.md` |
+| 11 unpaired | simplest loss within 0.5 dB of best | **pseudo-pairs only** at all n; SWD without a profile homogenises tones and is unstable | `phase11_unpaired.md` |
+| 18 atmosphere | behaves as specified, fast enough | **pass** after two fixes (dehaze scaled by the dark-channel haze estimate; fast sky mask); depth 1 s, 12 MP edit 6–7 s | `phase18_atmosphere.md` |
+| 12–15 engine, Studio, wizard, personalisation | E2E works | built; Studio E2E + WebGL golden test (max diff 1/255) | `docs/user_guide.md` |
+| 17 release | owner approval | **waiting on the owner** (see A4.4) | — |
+
+#### A4.2 What the results change
+
+1. **The bottleneck is prediction, not rendering.**
+   - The per-image oracle reaches 27.2 dB with the same curves renderer.
+     The best learned model reaches 22.2 dB.
+   - Richer renderers (Phase 9) and regional stages (Phase 16) add
+     ≤ 0.2 dB.
+   - Effort moves to **conditioning and data**: Phase 10's shared head,
+     more pairs per style, a stronger or fine-tuned backbone. Renderer v2
+     work stops.
+2. **Styles are codes on a shared head** (Phase 10). A new style with
+   about 20 pairs is an embedding fit, not a new model.
+   - *Backlog:* train a joint base head on FiveK A–E landscapes.
+   - *Backlog:* switch Studio's wizard and `photostyle learn --pairs` to
+     embedding fits on that base.
+3. **Pairs beat examples.** Unpaired learning (Phase 11) reaches about
+   +0.3–0.9 dB over identity, and 0.3–0.7 dB below paired learning at the
+   same n.
+   - For the owner's look, the pairs route in A3.2 is the priority.
+   - The encoder gives an instant preview from 5 edited photos.
+4. **Sky handling needs a learned segmenter.** The heuristic mask
+   (Phase 16 audit) confuses snow, blue flowers and calm water with sky.
+   It also misses pale hazy skies, which is why Clean Cool v2 still greys
+   them. The heuristic stays for manual tools only.
+5. **Small data needs shrinkage.** `calibrate_shrinkage` is on in
+   `learn_paired` and in the pack builder.
+
+#### A4.3 Engineering fixes made during the run
+
+| fix | detail |
+|---|---|
+| FiveK downloader | streams image columns in small batches (whole-column reads were OOM-killed) |
+| box filter | separable (O(r) per pixel), and the sky mask runs on a proxy for large images: 12 MP from many minutes to 5 s |
+| unpaired SWD | per image, not pooled over the batch (pooled SWD let the batch pair very dark and very bright outputs) |
+| unpaired vignette | off by default |
+| old checkpoints | load without the new shrinkage buffers |
+
+#### A4.4 Decisions for the owner
+
+These are collected at the end of the run; the defaults in brackets are
+in effect until then.
+
+1. **Which of your photos are already edited?** Four are suspected (see
+   `data/owner/manifest.csv`, private). Supplying originals via "Export
+   Unmodified Original" would give pairs. [default: treat the suspected
+   ones as edited, exclude them from tests]
+2. **Clean Cool day look:** keep the muted v1, use v2 (keeps more colour,
+   slight pink in bright clouds), or make the look less muted?
+   [default: v1, strength 0.7 suggested]
+3. **First built-in style:** Clean Cool, or your own look once 20+ pairs
+   exist? [default: Clean Cool until pairs exist]
+4. **Sky segmenter licence:** add a learned sky/semantic segmenter, e.g.
+   an Apache-2.0 or MIT model; the options need checking. [default: none;
+   the heuristic is used for manual tools only]
+5. **FiveK style pack:** the `fivek_c_landscape` pack is trained on
+   research-licence data. Keep it local only, or remove it from the
+   release? [default: local only, not published]
+6. **PPR10K** (portrait data, research licence): acceptable for the later
+   portrait phase? [default: not used]
+7. **Release** (Phase 17): open-source the code? Public demo? [default:
+   private branch, nothing published]
+8. **Front-end stack:** keep the built FastAPI + vanilla JS + WebGL2
+   Studio, or move to Svelte/React? [default: keep]
+9. **Stock-photo API key (Unsplash or Pexels)** for bigger openly licensed
+   style sets? [default: Openverse only, 200 requests/day]
+10. **Preference tests** with people (the success metrics in §4 need
+    them): who, and how many? [default: not run]
