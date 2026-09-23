@@ -25,7 +25,7 @@ from photostyle.engine import save_stylepack  # noqa: E402
 from photostyle.features import FEATURE_DIM, FeatureExtractor  # noqa: E402
 from photostyle.head import Head  # noqa: E402
 from photostyle.render import GlobalRenderer  # noqa: E402
-from photostyle.train import fit, paired_loss  # noqa: E402
+from photostyle.train import calibrate_shrinkage, fit, paired_loss  # noqa: E402
 
 
 def main() -> None:
@@ -71,6 +71,7 @@ def main() -> None:
         head.set_norm(torch.stack([it["feat"] for it in items]))
         torch.manual_seed(0)
         info = fit(head, r, tr, val, paired_loss)
+        info["shrinkage_alpha"] = calibrate_shrinkage(head, r, tr, val)
         save_stylepack(args.out / "fivek_c_landscape", "fivek_c_landscape", head, r,
                        torch.stack([it["feat"] for it in tr]), {
             "source": "paired",
