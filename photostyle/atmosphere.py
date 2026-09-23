@@ -95,13 +95,17 @@ def apply_scene(img: torch.Tensor, p: SceneParams, near: torch.Tensor | None = N
     far = 1 - near
     x = img
     if abs(p.haze) > 1e-6:
-        # Atmospheric light: bright end of the farthest pixels, tinted by haze_warmth.
-        w = (far > torch.quantile(far.flatten(), 0.9)).float()
-        A = (x * w).sum((2, 3), keepdim=True) / w.sum().clamp_min(1)
-        A = A.mean(1, keepdim=True).expand(1, 3, 1, 1).clone()
+        # Atmospheric light: a bright (95th percentile) grey from the farthest pixels,
+        # tinted by haze_warmth. Sky is left mostly alone: dehazing it only clips it
+        # to white, and hazing it just greys it.
+        w = far > torch.quantile(far.flatten(), 0.9)
+        y = x.mean(1, keepdim=True)
+        a = torch.quantile(y[w], 0.95) if w.any() else y.max()
+        A = a.view(1, 1, 1, 1).expand(1, 3, 1, 1).clone()
         A[:, 0] += 0.04 * p.haze_warmth
         A[:, 2] -= 0.04 * p.haze_warmth
-        t = far ** p.falloff
+        s_ = sky if sky is not None else sky_probability(img)
+        t = far ** p.falloff * (1 - (0.7 if p.haze > 0 else 1.0) * s_)
         if p.haze > 0:
             x = x * (1 - p.haze * t) + A * p.haze * t
         else:

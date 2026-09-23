@@ -172,3 +172,30 @@ def lab_pixels(img: torch.Tensor, n: int = 2048) -> torch.Tensor:
     lab = rgb_to_lab(img).permute(0, 2, 3, 1).reshape(-1, 3) / torch.tensor([100.0, 60.0, 60.0])
     idx = torch.randint(0, lab.shape[0], (n,))
     return lab[idx]
+
+
+def _chroma(img: torch.Tensor) -> torch.Tensor:
+    lab = rgb_to_lab(img)
+    return (lab[:, 1] ** 2 + lab[:, 2] ** 2 + 1e-6).sqrt()
+
+
+def _keep_weight(ref: torch.Tensor) -> torch.Tensor:
+    """Pixels whose colour a muted look should still respect: sky and strongly coloured subjects."""
+    from photostyle.regional import sky_probability
+
+    return (sky_probability(ref)[:, 0] + torch.sigmoid((_chroma(ref) - 30) / 5)).clamp(max=1)
+
+
+def chroma_keep_loss(out: torch.Tensor, ref: torch.Tensor, keep: float = 0.6) -> torch.Tensor:
+    """Penalise sky / saturated-subject chroma falling below ``keep`` x the input's (Lab units / 10)."""
+    with torch.no_grad():
+        w, c_ref = _keep_weight(ref), _chroma(ref)
+    drop = torch.relu(keep * c_ref - _chroma(out))
+    return ((drop * w).sum() / w.sum().clamp_min(1.0)) / 10
+
+
+@torch.no_grad()
+def chroma_retention(out: torch.Tensor, ref: torch.Tensor) -> float:
+    """Chroma of the edit / chroma of the input, over sky and strongly coloured pixels (1 = kept)."""
+    w = _keep_weight(ref)
+    return float((_chroma(out) * w).sum() / (_chroma(ref) * w).sum().clamp_min(1e-6))

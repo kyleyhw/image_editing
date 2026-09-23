@@ -45,6 +45,8 @@ from photostyle.features import FEATURE_DIM, FeatureExtractor
 from photostyle.head import Head, Preset
 from photostyle.looks import (
     CLEAN_COOL,
+    chroma_keep_loss,
+    chroma_retention,
     clip_fraction,
     detail_similarity,
     fidelity_loss,
@@ -111,7 +113,7 @@ def no_vignette(theta: torch.Tensor) -> torch.Tensor:
     return torch.cat([theta[:, :-1], torch.zeros_like(theta[:, -1:])], 1)
 
 
-def train(model, r, inputs, seed, pseudo, steps, lr=3e-3, w=(1.0, 0.5, 2.0, 1.0)):
+def train(model, r, inputs, seed, pseudo, steps, lr=3e-3, w=(1.0, 0.5, 2.0, 1.0), keep_chroma=0.0):
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     seed_pix = {g: torch.cat([lab_pixels(s["img"][None], 4096) for s in seed if s["regime"] == g])
                 for g in ("night", "day")}
@@ -125,6 +127,8 @@ def train(model, r, inputs, seed, pseudo, steps, lr=3e-3, w=(1.0, 0.5, 2.0, 1.0)
         lp = sum(profile_loss(o, [b["regime"]], CLEAN_COOL, ref=x)
                  for o, b, x in zip(outs, batch, srcs)) / len(batch)
         lf = sum(fidelity_loss(o, x) for o, x in zip(outs, srcs)) / len(batch)
+        if keep_chroma:
+            lf = lf + keep_chroma * sum(chroma_keep_loss(o, x) for o, x in zip(outs, srcs)) / len(batch)
         ls = 0.0
         for g in ("night", "day"):
             og = [o for o, b in zip(outs, batch) if b["regime"] == g]
@@ -160,7 +164,8 @@ def evaluate(name, theta, r, test, results):
         src = it["src"][None]
         row = {"file": it["file"], "regime": it["regime"], "subject": it["meta"]["subject"],
                "new_clip": float(clip_fraction(out[None]) - clip_fraction(src)),
-               "detail": float(detail_similarity(out[None], src))}
+               "detail": float(detail_similarity(out[None], src)),
+               "chroma_kept": chroma_retention(out[None], src)}
         ref_regions = regions(it["src"])
         for rg, im in regions(out).items():
             d = profile_distance(im, it["regime"], CLEAN_COOL, ref=ref_regions[rg])
@@ -178,10 +183,11 @@ def evaluate(name, theta, r, test, results):
                     "n": len(sel), **{f"dist_{rg}": float(np.mean([x[f"dist_{rg}"] for x in sel]))
                                       for rg in ("all", "top", "bottom")},
                     "new_clip": float(np.mean([x["new_clip"] for x in sel])),
-                    "detail": float(np.mean([x["detail"] for x in sel]))}
+                    "detail": float(np.mean([x["detail"] for x in sel])),
+                    "chroma_kept": float(np.mean([x["chroma_kept"] for x in sel]))}
     results["cells"][name] = cells
     print(f"{name:10s} " + "  ".join(f"{c}: {v['dist_all']:.2f} (clip {v['new_clip']:+.3f}, "
-                                     f"detail {v['detail']:.2f})" for c, v in cells.items()), flush=True)
+                                     f"detail {v['detail']:.2f}, chroma {v['chroma_kept']:.2f})" for c, v in cells.items()), flush=True)
 
 
 def effect_sizes(theta: torch.Tensor, groups: list[str], a: str, b: str) -> list[float]:
@@ -228,6 +234,9 @@ def main() -> None:
     ap.add_argument("--test", type=int, default=160)
     ap.add_argument("--steps", type=int, default=1200)
     ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--keep-chroma", type=float, default=0.0,
+                    help="weight of the sky / saturated-subject chroma floor (v2); 0 = the original pilot")
+    ap.add_argument("--tag", default="", help="suffix for the checkpoint name")
     args = ap.parse_args()
     torch.set_num_threads(args.threads)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -274,7 +283,7 @@ def main() -> None:
         if kind == "head":
             m.set_norm(torch.stack([it["feat"] for it in pool]))
         print(f"training {kind} ...", flush=True)
-        results["train_log"][kind] = train(m, r, pool, seed, pseudo, args.steps)
+        results["train_log"][kind] = train(m, r, pool, seed, pseudo, args.steps, keep_chroma=args.keep_chroma)
         with torch.no_grad():
             theta = no_vignette(m(feats_test))
         evaluate(kind, theta, r, test, results)
@@ -305,7 +314,7 @@ def main() -> None:
     print("gate:", gate, flush=True)
 
     torch.save({"state_dict": models["head"][0].state_dict(), "renderer": "per_channel", "look": "clean_cool"},
-               Path("checkpoints") / "pilot_a_clean_cool_head.pt")
+               Path("checkpoints") / f"pilot_a_clean_cool_head{args.tag}.pt")
     write_cube(bake_lut(r, theta.mean(0)), args.out / "clean_cool_average.cube", title="Clean Cool (average)")
     write_cube(bake_lut(r, hm[0]), args.out / "clean_cool_handmade.cube", title="Clean Cool (hand-made)")
 

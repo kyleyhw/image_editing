@@ -3,6 +3,7 @@
 There is no ground truth for "right amount of haze", so this is a
 behavioural check plus a demo, not a learning benchmark:
 
+  clipping     largest increase in clipped pixels per preset (target <= 1 %)
   identity     all strengths 0 returns the input bit-exactly
   direction    +haze lowers far-region local contrast more than near-region;
                dehaze raises far-region contrast; clarity_near raises near
@@ -36,6 +37,7 @@ import torch.nn.functional as F
 from bench.pilot_a import grid
 from photostyle.atmosphere import SceneParams, apply_scene, depth_map
 from photostyle.io import load_image
+from photostyle.looks import clip_fraction
 from photostyle.regional import box_filter
 from photostyle.train import shrink
 
@@ -99,12 +101,13 @@ def main() -> None:
             rec[f"edit_s_{name}"] = time.time() - t
             c = (local_contrast(o, nm), local_contrast(o, fm))
             rec[f"contrast_ratio_{name}"] = {"near": c[0] / max(base[0], 1e-6), "far": c[1] / max(base[1], 1e-6)}
+            rec[f"new_clip_{name}"] = float(clip_fraction(o) - clip_fraction(img))
             outs[name] = o[0]
         t = time.time()
         big = full[None]
         near_big = F.interpolate(near, size=big.shape[2:], mode="bilinear", align_corners=False)
         apply_scene(big, PRESETS["+haze"], near=near_big)
-        rec["edit_s_full_haze"] = time.time() - t
+        rec["edit_s_native_haze"] = time.time() - t
         res["images"].append(rec)
         print(f"{m['file']} depth {rec['depth_s_1024']:.1f}s rho={rec['spearman_model_vs_fallback']:.2f} "
               + " ".join(f"{k}:{v['near']:.2f}/{v['far']:.2f}" for k, v in rec.items()
@@ -125,8 +128,19 @@ def main() -> None:
         "n": len(ims), "identity_exact": res["identity_exact"], **checks,
         "spearman_median": float(np.median([r["spearman_model_vs_fallback"] for r in ims])),
         "depth_s_median": float(np.median([r["depth_s_1024"] for r in ims])),
-        "edit_s_full_haze_median": float(np.median([r["edit_s_full_haze"] for r in ims])),
+        **{f"new_clip_max_{k}": float(max(r[f"new_clip_{k}"] for r in ims)) for k in PRESETS},
+        "edit_s_native_haze_median": float(np.median([r["edit_s_native_haze"] for r in ims])),
     }
+    # 12 MP runtime (the FiveK copies here are 512 px): depth on the 1024 px proxy, edit at full size.
+    big = torch.rand(1, 3, 3000, 4000)
+    t = time.time()
+    near = depth_map(shrink(big[0], 1024)[None])
+    res["summary"]["depth_s_12mp_proxy"] = time.time() - t
+    near = F.interpolate(near, size=big.shape[2:], mode="bilinear", align_corners=False)
+    for name, p in PRESETS.items():
+        t = time.time()
+        apply_scene(big, p, near=near)
+        res["summary"][f"edit_s_12mp_{name}"] = time.time() - t
     (args.out / "results.json").write_text(json.dumps(res, indent=1))
     grid(rows, ["input (FiveK, AdobeMIT)", "nearness", *PRESETS], args.out / "phase18_grid.jpg", tw=260)
     print("summary:", res["summary"], flush=True)
