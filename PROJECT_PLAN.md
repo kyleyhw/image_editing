@@ -14,7 +14,12 @@ Rationale and literature review:
 > **Amended.** Amendment A1 (§17, 2026-09-23) adds the first target look
 > (*Neon Street Portrait*, a pilot run right after Phase 7), a new
 > Phase 18 for depth-of-field and light-shaping emulation, and a
-> project-wide style-data policy. Where A1 and earlier text disagree, A1 wins.
+> project-wide style-data policy.
+>
+> **Amended again.** Amendment A2 (§17) puts **urban and natural landscapes
+> first**. It re-targets Pilot A to the *Clean Cool* landscape look, promotes
+> Phase 16 (graduated filter, sky and range masks), and re-scopes Phase 18
+> to depth-aware atmosphere. Precedence: A2 > A1 > earlier text.
 
 ---
 
@@ -36,7 +41,7 @@ Rationale and literature review:
 14. [Non-goals](#14-non-goals)
 15. [Open questions for the project owner](#15-open-questions-for-the-project-owner)
 16. [Backlog and housekeeping](#16-backlog-and-housekeeping)
-17. [Amendments](#17-amendments) — **A1: first target look, capture emulation, style-data policy**
+17. [Amendments](#17-amendments) — **A1:** style-data policy, capture emulation · **A2:** landscapes first
 
 ---
 
@@ -103,6 +108,7 @@ fast but single-style and not packaged for people. The gap is an
 | **The hobbyist** | Shoots on phone or mirrorless, edits occasionally | "Make my photos look like *that*" without learning curves | A few Pinterest / Instagram images of a look |
 | **The working photographer** | Weddings, events, portraits; edits thousands of photos | Their *own* look applied consistently to a whole shoot, then fine-tune | Hundreds of before/after pairs in Lightroom |
 | **The colourist / video editor** | Uses Resolve / Premiere | A per-shot adaptive LUT that drops into their grading pipeline | Stills from reference films, `.cube` workflows |
+| **The landscape & travel photographer** *(A2)* | Shoots cities and nature, often on trips | A consistent look across a trip; quick sky and haze control | Hundreds of landscape photos, a few reference looks |
 | **The researcher / student** | Studies learned enhancement | A clean, CPU-friendly codebase with honest baselines | FiveK / PPR10K, experiment ideas |
 
 ### Core use cases
@@ -319,12 +325,12 @@ L ≈ 3–6 weeks (part-time pace).
 | 13 | P | Studio v1 (web app) | L | 12 | Core use cases 1, 5 usable end to end |
 | 14 | P/R | Style creation wizard & personal styles | L | 10, 11, 13 | Use cases 2, 3 usable; held-out preview shown |
 | 15 | P/R | Personalisation loop, series consistency, blending | L | 14 | Measurable gain from user corrections |
-| 16 | R | Regional edits (conditional) | L | 7–11 | Only if oracle gap shows local structure |
+| 16 | R | Regional edits *(A2: no longer conditional; graduated filter, sky mask, range masks)* | L | Pilot A | Per-region gain over global-only; horizon halo audit |
 | 17 | I/P | Packaging, docs, release | M | 13 | Installable release + public demo |
-| **A** | R | **Pilot: Neon Street Portrait look** *(A1)* | M | 7 (8 helpful) | Adaptive beats fixed preset; night/day parameter spread > 0 |
-| **18** | R/E/P | **Capture emulation: depth of field + light shaping** *(A1)* | L | A, 12 | Preference ≥ 60 % vs. no-DoF; halo-free in ≥ 80 % |
+| **A** | R | **Pilot: Clean Cool landscapes** *(A2; was Neon Street Portrait in A1)* | M | 7 (8 helpful) | Beats static preset per region in all night/day × urban/nature cells; ≥ 60 % preference |
+| **18** | R/E/P | **Capture emulation** *(A1, re-scoped by A2)*: depth-aware atmosphere and scene light first; DoF/bokeh later | L | A, 16, 12 | Preference ≥ 60 %; halo-free in ≥ 80 % |
 
-Suggested sequencing (amended by A1): **7 ∥ 8 → Pilot A → 9 → (10 ∥ 12) →
+~~Suggested sequencing (amended by A1):~~ *Superseded by A2.6.* **7 ∥ 8 → Pilot A → 9 → (10 ∥ 12) →
 11 ∥ 13 → 18 → 14 → 15 → 17**, with 16 decided after 11. Phase 18 can be
 prototyped in the research lab straight after Pilot A.
 
@@ -764,7 +770,9 @@ Interaction details
 | **Unpaired style sets** (cyberpunk, film, matte…) | Unpaired | ~300 per style | Phase 11 | Use CC-licensed sources (Openverse, Wikimedia Commons, Unsplash licence); record licences in a manifest |
 | **Synthetic fixed-function styles** (existing generators) | Paired | Unlimited | Unit/sanity tests of renderer and training | Content-independent by construction |
 | **Unedited photo pool** (picsum / Unsplash / COCO) | Inputs only | 1–10K | Inputs for unpaired training; OOD calibration | |
-| **Neon Street Portrait stand-in set** *(A1)* | Unpaired, openly licensed (CC0 / PDM / BY / BY-SA) via Openverse | ~100–150 | Pilot A style set | Collected by `tools/collect_style_set.py`; manifest + attribution in `data/manifests/neon_street_portrait.csv` |
+| **Clean Cool landscape set** *(A2)* | Unpaired, openly licensed, gated on the split tone | ~100–150 | Pilot A style set (landscapes) | `data/manifests/clean_cool_landscape.csv` |
+| **FiveK landscape subset** *(A2)* | Paired, experts A–E | ~60 % of the mirror (~430 of ~730 pairs per expert) | Paired landscape benchmark | Filter `location=outdoor`, `subject∈{man_made,nature}`; the mirror is not the full 5,000 |
+| **Neon Street Portrait stand-in set** *(A1; deferred portrait track)* | Unpaired, openly licensed (CC0 / PDM / BY / BY-SA) via Openverse | ~100–150 | Pilot A style set | Collected by `tools/collect_style_set.py`; manifest + attribution in `data/manifests/neon_street_portrait.csv` |
 
 Rules
 - Every dataset gets a **manifest** (file list, hashes, licence, source
@@ -853,9 +861,9 @@ Rules
    Phase 13 against the current renderer.
 2. **Front-end stack**: FastAPI + Svelte/React + WebGL (recommended), stay
    on Streamlit, or a desktop app (Tauri)?
-3. ~~**Which looks matter most?**~~ *Answered in A1:* first look is a
-   night/day street-portrait look inspired by the photographer Bleg
-   (Neon Street Portrait). Others remain open.
+3. ~~**Which looks matter most?**~~ *Answered in A1, revised in A2:* the
+   first look is **Clean Cool** (the grade from the Bleg style study) on
+   **urban and natural landscapes**. Portraits come later.
 4. **Real Fujifilm data**: do you have access to a Fujifilm (or other)
    camera for RAW+JPEG pairs?
 5. **Datasets**: is PPR10K's licence acceptable for your use?
@@ -937,6 +945,8 @@ These rules apply to every style from now on, built-in or experimental.
   short notice in the style-creation wizard.
 
 #### A1.2 Pilot A: *Neon Street Portrait* (runs right after Phase 7)
+
+> **Superseded by A2.2** (landscapes first). Kept for the deferred portrait track.
 
 **Goal.** A first end-to-end result on the chosen look, using the Phase 7
 harness and the smallest renderer upgrade that can express the look. It
@@ -1026,6 +1036,8 @@ unchanged.
 
 #### A1.3 New Phase 18: Capture emulation — depth of field and light shaping  *(R/E/P, L)*
 
+> **Re-scoped by A2.4:** atmosphere and scene light come first; portrait depth of field is deferred.
+
 **Goal.** Emulate the capture side of the look with *parametric, editable*
 spatial operations, without generating new content.
 
@@ -1113,3 +1125,185 @@ Studio (§9) additions:
 | Depth or matte errors cause halos around hair and glasses | High | Medium | Guided upsampling; matting refinement; user brush; the halo audit gate |
 | Synthetic bokeh looks fake (no highlight bloom, wrong occlusion) | Medium | Medium | Linear-light highlight boost; layered occlusion-aware compositing; grain matching |
 | Style is perceived as a copy of a living artist | Low | High | A1.1 naming and data rules; no artist images in training; attribution only as inspiration |
+
+### A2 — Landscapes first (urban and natural)
+
+*Adopted 2026-09-23. Status: active. Supersedes A1.2 and re-scopes A1.3.
+A1.1 (style-data policy) is unchanged.*
+
+**Why.** The owner's priority is **urban and natural landscapes**, not
+portraits. The owner also judged, and the data agrees, that the portrait
+stand-in set did not look like the reference style:
+
+1. **Wrong grade.** Warm, sodium-lit nights (shadow b\* +2.9, highlight b\*
+   +10.8) instead of cool shadows and neutral highlights.
+2. **Wrong era and finish.** Older Flickr-era snapshots with heavy
+   vignettes, HDR processing and dated framing. The reference look is
+   clean, modern and restrained.
+3. **The selection score was too lenient.** It averaged soft per-statistic
+   matches, so an image could fail the split tone badly and still pass on
+   black point and key.
+
+A2 moves the first target domain to landscapes and fixes the selection
+method. The *portrait* work (subject matte, bokeh around people, skin
+handling) is deferred, not deleted.
+
+#### A2.1 Domain priority
+
+| Priority | Domain | Examples | Status |
+|---|---|---|---|
+| **1** | **Urban landscapes** | streets and alleys at night and by day, neon, rain reflections, skylines, blue hour, architecture | first target |
+| **1** | **Natural landscapes** | mountains, mist and forest, lakes, coast, snow, cherry blossom, desert | first target |
+| 2 | Street portraits | Pilot A as specified in A1.2 | deferred; the portrait stand-in set is kept as-is |
+| 3 | Other (indoor, events, products) | — | not planned |
+
+Everything in the plan stays domain-agnostic in *code*. The priority
+decides which data, evaluation sets and features come first.
+
+#### A2.2 Pilot A (re-targeted): *Clean Cool* landscapes
+
+**The look.** The grade measured in the style study, applied to scenes
+instead of people:
+- deep, true blacks with no matte lift;
+- cool shadows and neutral highlights;
+- **night:** low-key, with saturated but clean neon and street light;
+  mixed light is neutralised toward cool rather than left sodium-orange;
+- **day:** airy, soft, restrained saturation, pale highlights and skies.
+
+Style name: **Clean Cool** (descriptive, per A1.1). The reference
+photographer is credited only as inspiration in research notes.
+
+**Data**
+- [x] `clean_cool_landscape` profile in `tools/collect_style_set.py`:
+  - scene subject mode (rejects images where a person covers > 5 % of the
+    frame);
+  - **hard gates** on the split tone (shadow b\* ≤ −2; highlight b\* within
+    ±5–6; black point) in addition to the soft score;
+  - a cap of 10 images per creator.
+- [ ] Hand-review the collected set on contact sheets. Reject the
+      Flickr-era finish too: HDR halos, heavy vignettes, over-sharpening,
+      tilted horizons, watermarks. Target ≥ 100 kept, split night/day and
+      urban/nature.
+- [ ] **Paired landscape benchmark from FiveK.** The Hugging Face mirror
+      carries per-image labels (`location`, `time`, `light`, `subject`) and
+      a `license` field (Adobe / AdobeMIT). Select
+      `location = outdoor` and `subject ∈ {man_made, nature}`; this is about
+      60 % of images in a 240-image sample.
+  - Caveat: the mirror has only ~250 / 231 / 251 train / test / validation
+    pairs per expert, not the full 5,000. Phase 7's comparison with published
+    numbers (480p protocol) needs the official full FiveK or Zeng et al.'s
+    480p release. The mirror is sufficient for the pilot.
+  - Night is rare in FiveK (~3 % of the sample), so night evaluation relies
+    on the unpaired set.
+- [ ] Input pool (photos to be edited): FiveK *original* renders of
+      landscapes, plus the owner's own landscape photos. Hold out 20 %.
+
+**Target and losses.** The same hybrid as the A1.2 update:
+- the **grade** is matched to the look-profile statistics (banded chroma
+  per luminance range, black point, key, saturation), per regime;
+- distribution losses against the gated landscape set cover what it
+  shares; the gates make it much closer to the profile than the portrait
+  set was;
+- plus the identity anchor and distort-and-recover pseudo-pairs.
+
+**Landscape-specific evaluation**
+- Grade metrics **per region**: sky vs. ground, using the sky mask from
+  A2.3. A look that turns the sky cyan but leaves the ground warm fails even
+  if the global averages match.
+- **Parameter spread** across night/day **and** urban/nature (four cells).
+- **Baselines:** identity; a hand-built static Clean Cool preset;
+  histogram matching.
+- **Preference test** (≥ 5 people × 30 images) against the static preset.
+
+**Gate.** Beat the static preset on per-region colour-statistics distance in
+all four cells and win ≥ 60 % of preference trials.
+
+**Deliverables**
+- `tests/reports/pilotA_clean_cool_landscapes.md` (attributed figures only).
+- The `clean_cool` style card.
+- An average `.cube`.
+
+#### A2.3 Phase 16 promoted: regional edits for landscapes  *(R, L — no longer conditional)*
+
+Landscape editing is dominated by sky-vs-ground and luminance-range work,
+so the regional tools move from "conditional" to **planned, straight after
+Pilot A**. They are ordered by editability:
+
+- [ ] **Graduated filter** (angle, position, feather): exposure, white
+      balance and saturation offsets applied to the sky side. This is the
+      single most common landscape adjustment; the parameters are predictable
+      and exportable as numbers.
+- [ ] **Sky mask** from a pretrained segmenter, refined with a guided
+      filter at the horizon. Per-mask offsets for curves and colour.
+  - Model selection is gated by licence: many ADE20K-trained checkpoints
+    (e.g. NVIDIA SegFormer) are non-commercial. Candidates must be Apache,
+    MIT or BSD licensed, as for Depth Anything V2 Small in A1.3.
+- [ ] **Luminance range masks** (shadows / mids / highlights, smooth): the
+      split tone becomes explicit and slider-editable.
+- [ ] **Horizon halo audit**: manual review of 50 images at 100 % around
+      skylines, tree lines and mountain ridges. Pass if ≥ 80 % show no
+      halo.
+- [ ] Head predicts the regional parameters jointly with the global
+      ones.
+- [ ] Export: global stage → `.cube`; regional stage → `EditParams` JSON
+      plus a 16-bit mask PNG. Studio renders both.
+
+Gate: a per-region grade-metric gain over global-only on the landscape
+evaluation, with the halo audit passing.
+
+#### A2.4 Phase 18 re-scoped: atmosphere and light for scenes
+
+The Phase 18 building blocks from A1.3 (monocular depth from Depth Anything
+V2 Small, guided upsampling) are kept. The first features become:
+
+- [ ] **Depth-aware atmosphere (aerial perspective):** controls that add or
+      reduce haze with distance. Parameters: haze amount, haze colour
+      (cool by default for Clean Cool), depth falloff. The operation blends
+      each pixel toward the haze colour by depth; it re-weights existing
+      pixels and generates nothing.
+- [ ] **Depth-aware local contrast:** a separate clarity strength for near
+      and far regions, e.g. keeping distant mountains soft while adding
+      crispness to the foreground.
+- [ ] **Light shaping for scenes:** sky vs. ground exposure/warmth (shares
+      the sky mask from A2.3) and an optional directional gradient for
+      sun direction.
+- [ ] **Night-city glow (optional):** a highlight bloom around light sources
+      (threshold, radius, strength). Bokeh and synthetic depth of field
+      are useful only for urban night scenes with a near foreground, so
+      they move to the end of Phase 18.
+- [ ] Deferred to the portrait track: subject matte and person-centred
+      depth of field.
+
+Evaluation: halo audit at depth edges (skylines, trees); a preference test
+of grade + atmosphere vs. grade only; performance under 3 s per 12 MP on CPU.
+
+#### A2.5 Studio (§9) changes
+
+- **Sky panel:** a graduated-filter handle drawn on the canvas, sky-mask
+  overlay with refine brush, and sky exposure / warmth / saturation.
+- **Atmosphere panel:** haze amount and colour, depth falloff, near/far
+  clarity, and a depth-overlay toggle.
+- **Tone panel:** shadows / mids / highlights colour wheels, from the
+  luminance range masks.
+- Style strip defaults show landscape-relevant looks first.
+
+#### A2.6 Other changes made by A2
+
+- **§7 roadmap:** Pilot A re-targeted; Phase 16 no longer conditional
+  and placed after Pilot A; Phase 18 re-scoped. New sequencing:
+  **7 ∥ 8 → Pilot A (landscapes) → 16 (graduated filter, sky mask, range
+  masks) → 9 → (10 ∥ 12) → 18 (atmosphere) → 11 ∥ 13 → 14 → 15 → 17**, with
+  the portrait track afterwards.
+- **§3 personas:** adds a *landscape and travel photographer*, who shoots
+  cities and nature, wants a consistent look across a trip, and edits skies
+  constantly.
+- **§10 data:** adds the landscape style set and the FiveK landscape subset.
+- **§15 Q3:** updated (landscapes first).
+- **§14 non-goals:** *sky replacement* stays a non-goal. Sky *editing* via
+  masks is in scope, because it only adjusts existing pixels.
+
+| Risk (added by A2) | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| Openly licensed landscapes also carry dated Flickr-era finishes | High | Medium | Hard gates plus explicit hand-review criteria for finish; add Wikimedia Commons "Quality/Featured pictures" and owner photos |
+| Sky masks fail on complex skylines, trees and haze | Medium | Medium | Guided refinement; the graduated filter as a mask-free fallback; user brush |
+| Too few night landscapes in FiveK for paired evaluation | High | Low | Night is evaluated on unpaired metrics; the owner can contribute night shots |

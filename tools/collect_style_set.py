@@ -9,8 +9,10 @@ photographer's own (copyrighted) images:
   2. Download each candidate at <= 1024 px (search responses and images are
      cached under data/cache/openverse/, so re-filtering costs no API calls),
      deduplicate by perceptual hash, crop letterbox bars, drop monochrome.
-  3. Keep only images with one or two people, one of them prominent
-     (torchvision Faster R-CNN, COCO "person" class).
+  3. Subject filter (torchvision Faster R-CNN, COCO "person" class):
+     portrait profiles keep images with one or two people, one of them
+     prominent; scene profiles (landscapes) reject images where a person is
+     prominent.
   4. Measure CIELAB colour statistics plus a depth-of-field proxy (subject vs.
      background sharpness), score each image against a target look profile
      (see LOOK_PROFILES), and keep the best matches per regime (night / day).
@@ -62,6 +64,12 @@ class LookProfile:
     night: dict[str, tuple]
     day: dict[str, tuple]
     notes: str = ""
+    # "portrait": require a prominent person; "scene": reject prominent people.
+    subject: str = "portrait"
+    # Hard pass/fail bounds per regime: {"night": {"shadow_b": (lo, hi)}, ...}.
+    # Unlike the soft score, a single failed gate rejects the image, so a
+    # candidate cannot trade a wrong colour cast for a good black point.
+    gates: dict[str, dict[str, tuple[float, float]]] = field(default_factory=dict)
     extra: dict = field(default_factory=dict)
 
 
@@ -116,6 +124,59 @@ LOOK_PROFILES: dict[str, LookProfile] = {
             "dof_log_ratio": (1.0, 0.8, ">="),
         },
         notes="Stand-in for the look studied in research_notes/styles/bleg.md",
+    ),
+    # Amendment A2: the same clean, cool-shadow grade, applied to urban and
+    # natural landscapes (no people). Gates enforce the split tone that the
+    # portrait stand-in set failed to match.
+    "clean_cool_landscape": LookProfile(
+        queries=[
+            # urban, night
+            "city night neon street",
+            "tokyo street night",
+            "seoul street night",
+            "hong kong street night neon",
+            "city blue hour skyline",
+            "rainy street night reflections",
+            "alley neon night",
+            "osaka dotonbori night",
+            # urban, day
+            "city street architecture daylight",
+            "tokyo street day",
+            "cherry blossom street city",
+            "minimal urban architecture",
+            # nature
+            "mountain landscape blue hour",
+            "misty forest",
+            "lake mountains morning",
+            "coastal cliffs",
+            "snow mountains landscape",
+            "cherry blossom park",
+            "misty mountains",
+            "fjord landscape",
+            "desert landscape dusk",
+        ],
+        night={
+            "L_p01": (1.0, 2.0),
+            "L_p50": (18.0, 10.0),
+            "shadow_b": (-7.0, 4.0),
+            "high_b": (0.0, 5.0),
+            "sat_mean": (0.45, 0.15),
+        },
+        day={
+            "L_p01": (3.0, 3.0),
+            "L_p50": (55.0, 15.0),
+            "shadow_b": (-8.0, 4.0),
+            "mid_b": (-2.0, 6.0),
+            "high_b": (1.0, 4.0),
+            "sat_mean": (0.25, 0.10),
+        },
+        subject="scene",
+        gates={
+            "night": {"shadow_b": (-99.0, -2.0), "high_b": (-8.0, 6.0), "L_p01": (0.0, 4.0)},
+            "day": {"shadow_b": (-99.0, -2.0), "high_b": (-6.0, 5.0), "L_p01": (0.0, 8.0),
+                    "sat_mean": (0.0, 0.45)},
+        },
+        notes="Clean cool-shadow grade on urban and natural landscapes (amendment A2).",
     ),
 }
 
@@ -321,6 +382,10 @@ def main() -> None:
                     help="Total images kept, split evenly between night and day where possible.")
     ap.add_argument("--min-chroma", type=float, default=6.0,
                     help="Reject near-monochrome images (mean CIELAB chroma).")
+    ap.add_argument("--max-scene-person", type=float, default=0.05,
+                    help="Scene profiles: reject if the largest person covers more than this.")
+    ap.add_argument("--max-per-creator", type=int, default=10,
+                    help="Cap images per creator in the final selection (diversity).")
     ap.add_argument("--max-people", type=int, default=2,
                     help="Reject crowds: max people with area >= 3%% of the frame.")
     ap.add_argument("--cache", type=Path, default=Path("data/cache/openverse"))
@@ -353,7 +418,8 @@ def main() -> None:
     seen_hashes: list[int] = []
     rows: list[dict] = []
     stats_log = {"candidates": 0, "download_failed": 0, "too_small": 0, "duplicate": 0,
-                 "monochrome": 0, "no_person": 0, "crowd": 0, "low_score": 0}
+                 "monochrome": 0, "no_person": 0, "has_person": 0, "crowd": 0,
+                 "gated": 0, "low_score": 0}
 
     for query in profile.queries:
         for page in range(1, args.pages + 1):
@@ -388,17 +454,24 @@ def main() -> None:
                     stats_log["monochrome"] += 1
                     continue
                 people = detector.people(img)
-                if not people or people[0][0] < args.min_person:
-                    stats_log["no_person"] += 1
+                if profile.subject == "portrait":
+                    if not people or people[0][0] < args.min_person:
+                        stats_log["no_person"] += 1
+                        continue
+                    if sum(a >= 0.03 for a, _ in people) > args.max_people:
+                        stats_log["crowd"] += 1
+                        continue
+                    st["dof_log_ratio"] = dof_log_ratio(img, people[0][1])
+                elif people and people[0][0] > args.max_scene_person:
+                    stats_log["has_person"] += 1
                     continue
-                if sum(a >= 0.03 for a, _ in people) > args.max_people:
-                    stats_log["crowd"] += 1
-                    continue
-                person = people[0][0]
-                st["dof_log_ratio"] = dof_log_ratio(img, people[0][1])
-                s_night, s_day = score(st, profile.night), score(st, profile.day)
+                person = people[0][0] if people else 0.0
                 regime = "night" if st["L_p50"] < 35 else "day"
-                s = s_night if regime == "night" else s_day
+                gates = profile.gates.get(regime, {})
+                if any(not (lo <= st[k] <= hi) for k, (lo, hi) in gates.items()):
+                    stats_log["gated"] += 1
+                    continue
+                s = score(st, profile.night if regime == "night" else profile.day)
                 if s < args.min_score:
                     stats_log["low_score"] += 1
                     continue
@@ -416,8 +489,18 @@ def main() -> None:
                 })
             print(f"[{query!r} p{page}] kept so far: {len(rows)}  {stats_log}", flush=True)
 
-    # Balance regimes: take the best of each, then fill any shortfall.
+    # Cap images per creator (keep each creator's best), then balance regimes:
+    # take the best of each, then fill any shortfall.
     rows.sort(key=lambda r: r["score"], reverse=True)
+    per_creator: dict[str, int] = {}
+    capped = []
+    for r in rows:
+        c = r.get("creator") or "unknown"
+        if per_creator.get(c, 0) < args.max_per_creator:
+            per_creator[c] = per_creator.get(c, 0) + 1
+            capped.append(r)
+    stats_log["creator_capped"] = len(rows) - len(capped)
+    rows = capped
     half = args.max_keep // 2
     night = [r for r in rows if r["regime"] == "night"][:half]
     day = [r for r in rows if r["regime"] == "day"][: args.max_keep - len(night)]
