@@ -1576,7 +1576,7 @@ data.
 | style | references | recipe | result |
 |---|---|---|---|
 | `natural` | the owner's gallery row 1 (4 picks) + 36 closest, 5 dropped on review | `instant` (base encoder) | neutral, subtle clean-up. `gentle` was tried and rejected: pink cast on neutral greys |
-| `cyberpunk` | 6 real neon/rain street photos picked (digital renders avoided) + closest, 5 dropped | `strong` | see `tests/reports/new_style_pipeline.md` |
+| `cyberpunk` | 6 real neon/rain street photos picked (digital renders avoided) + closest, 5 dropped | `strong` (307 openly licensed inputs, 196 s) | teal shadows and water, magenta-pink on bright surfaces and skies, deeper blacks; default 80 %. Day photos take the look's colour but gain no neon (no generated content) |
 
 #### A5.5 Limits met during the run
 

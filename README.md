@@ -30,10 +30,19 @@ open decision is in **amendment A4**. Highlights, on FiveK landscapes:
   scenes can come out over-muted, which is an open decision for the owner.
 - **Depth-aware haze / dehaze / clarity**: Depth Anything V2 Small, about
   1 s per photo.
-- **Studio:** a local web app with WebGL preview (matches the Python
-  renderer to 1/255), curves, style strip, batch, create-a-style,
+- **Studio v2:** a local web app (Svelte) with WebGL preview (matches the
+  Python renderer to 1/255), customisable panels, curves, a Scene panel
+  (haze, clarity, sky light), style strip, batch, create-a-style,
   personalisation, and `.cube` / XMP / JPEG export. See the
   [user guide](docs/user_guide.md).
+- **New styles from an idea:** `photostyle style …` (or Studio → Create
+  style → An idea). Describe a look, pick openly licensed photos that have
+  it, and get a trained style with attribution. Placeholder styles
+  `natural` and `cyberpunk` were made this way
+  ([report](tests/reports/new_style_pipeline.md)).
+- **Shared style base:** one model for many styles. A new style is a small
+  code: fitted on 20 before/after pairs, or read instantly from example
+  photos.
 
 Phase reports are in [`tests/reports/`](tests/reports/). The research
 direction is summarised in
