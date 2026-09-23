@@ -1519,3 +1519,71 @@ in effect until then.
   (research-use images). Check before commercial use.
 - Depth Anything V2 **Small** is Apache-2.0 and fine. Base, Large and
   Giant are non-commercial and excluded.
+
+---
+
+### A5 — The new-style pipeline, the shared base, and Studio v2
+
+*Adopted 2026-09-23 on the owner's instruction: "use natural and cyberpunk
+as placeholders, implement the rest of the plan, then streamline the
+pipeline for creating a new style". Status: active. Precedence:
+A5 > A4 > … .*
+
+#### A5.1 Creating a style, end to end
+
+One resumable pipeline, available as `photostyle style …` on the command
+line and as **+ Create style → An idea** in Studio
+(`photostyle/newstyle.py`; guide in `docs/user_guide.md`):
+
+| step | what happens | owner input |
+|---|---|---|
+| 1. idea | name + a sentence describing the look (+ optional search queries) | the idea |
+| 2. search | Openverse, CC0 / PDM / CC BY / CC BY-SA only. Letterbox crop, dedupe, colour/mono check, and a person filter (scenes, not portraits). Numbered contact sheets | — |
+| 3. pick | "these have the look": the reference set becomes the picks plus the closest candidates by CIELAB colour statistics (nearest pick), so selection follows the look, not the subject | a few numbers |
+| 4. review | drop any reference that doesn't belong (renders, captions, off-look); the set refills | optional numbers |
+| 5. train | recipe `gentle` (pseudo-pairs), `strong` (+ per-image SWD + fidelity on a pool of openly licensed inputs), `instant` (the shared base's encoder, no training), or `paired` (your before/after edits; a code on the shared base) | recipe |
+| 6. preview | before/after sheet on the owner's unedited photos (private) at 70 % and 100 % | look and judge |
+| 7. pack | a style pack with default strength, a description, and `ATTRIBUTION.csv` of every reference | default strength |
+
+Every project keeps its state in `data/styles/<name>/project.json`, and
+its reference manifest in `data/manifests/<name>.csv` (committed).
+
+#### A5.2 The shared style base (Phase 10 in production)
+
+`tools/build_base.py` trains one `StyleHead` + `StyleEncoder` on FiveK
+experts A–E (landscapes, up to 400 pairs each). A style can then be stored
+as a **code on the base** (`CodedHead`):
+- a code fitted on ≥ 5 pairs (`paired`);
+- or read from example photos by the encoder (`instant`).
+
+Test PSNR per expert: A 20.6, B 22.8, C 21.7, D 20.2, E 21.9 dB. The base is
+FiveK-derived, so it and every coded pack are **personal-use only** (the
+pack card says so). `gentle` and `strong` packs use only openly licensed
+data.
+
+#### A5.3 Studio v2
+
+- Svelte 5 front end (`studio/web` → `studio/dist`, committed).
+- A panel registry: reorder, collapse or hide panels.
+- A Scene panel: haze, near/far clarity and sky light, on the original
+  before the grade, carried into exports via `EditParams.scene`.
+- The Create-style flow above.
+- The WebGL golden test still passes (max difference 1/255). CI runs
+  `svelte-check` and checks that the committed build is current.
+
+#### A5.4 Placeholder styles
+
+| style | references | recipe | result |
+|---|---|---|---|
+| `natural` | the owner's gallery row 1 (4 picks) + 36 closest, 5 dropped on review | `instant` (base encoder) | neutral, subtle clean-up. `gentle` was tried and rejected: pink cast on neutral greys |
+| `cyberpunk` | 6 real neon/rain street photos picked (digital renders avoided) + closest, 5 dropped | `strong` | see `tests/reports/new_style_pipeline.md` |
+
+#### A5.5 Limits met during the run
+
+- **Openverse allows 200 anonymous requests/day.** One style costs about
+  15–30 (3 queries × 2–3 pages + the input pool once). The pipeline keeps
+  what it has when the limit hits, and the input pool reuses photos
+  already downloaded. An API key raises the limit (decision below).
+- **Search results include digital art.** "Cyberpunk" returns many
+  renders. The person filter can't see that, so the review step matters.
+  A photo-vs-render classifier is in the backlog.
