@@ -19,7 +19,9 @@ Rationale and literature review:
 > **Amended again.** Amendment A2 (§17) puts **urban and natural landscapes
 > first**. It re-targets Pilot A to the *Clean Cool* landscape look, promotes
 > Phase 16 (graduated filter, sky and range masks), and re-scopes Phase 18
-> to depth-aware atmosphere. Precedence: A2 > A1 > earlier text.
+> to depth-aware atmosphere. Amendment A3 adds the owner's own photos as test
+> inputs and, once originals are supplied, as paired data for an
+> "owner look". Precedence: A3 > A2 > A1 > earlier text.
 
 ---
 
@@ -41,7 +43,7 @@ Rationale and literature review:
 14. [Non-goals](#14-non-goals)
 15. [Open questions for the project owner](#15-open-questions-for-the-project-owner)
 16. [Backlog and housekeeping](#16-backlog-and-housekeeping)
-17. [Amendments](#17-amendments) — **A1:** style-data policy, capture emulation · **A2:** landscapes first
+17. [Amendments](#17-amendments) — **A1:** style-data policy, capture emulation · **A2:** landscapes first · **A3:** owner's own photos
 
 ---
 
@@ -1312,3 +1314,84 @@ of grade + atmosphere vs. grade only; performance under 3 s per 12 MP on CPU.
 | Openly licensed landscapes also carry dated Flickr-era finishes | High | Medium | Hard gates plus explicit hand-review criteria for finish; add Wikimedia Commons "Quality/Featured pictures" and owner photos |
 | Sky masks fail on complex skylines, trees and haze | Medium | Medium | Guided refinement; the graduated filter as a mask-free fallback; user brush |
 | Too few night landscapes in FiveK for paired evaluation | High | Low | Night is evaluated on unpaired metrics; the owner can contribute night shots |
+
+### A3 — The owner's own photos
+
+*Adopted 2026-09-23. Status: active. Extends A2; A1.1 applies (the owner's
+own data may be stored and trained on, but stays local).*
+
+**Why.** The owner has started contributing photos: urban day and night
+scenes in Japan, shot on iPhone. Some are unedited camera output and some
+are already edited. The two kinds serve different purposes, and the
+already-edited ones make the most valuable data type possible.
+
+#### A3.1 Roles of owner photos
+
+| Kind | Role | Value |
+|---|---|---|
+| **Unedited** (camera output) | *Inputs*: the photos the model learns to edit; also the realistic test set for Pilot A | High, since they are exactly the target domain (modern phone captures of Japanese cities and landscapes) |
+| **Edited, original unavailable** | Unpaired examples of the **owner's own look** | Medium |
+| **Edited + unedited original** | **Paired** (before, after) examples of the owner's look | **Highest**: this is the supervised setting where the architecture is strongest (A2 research: paired beats unpaired by more than 2 dB) |
+
+The first two edited photos share the Clean Cool traits: crushed true
+blacks, cool shadows (shadow b\* −11 and −8), and a faded, filmic finish. So
+**the owner's own look may be the most natural first style**, taking over
+from the photographer-inspired profile. It needs no stand-in data and raises
+no licensing question.
+
+#### A3.2 Getting pairs cheaply
+
+Most phone and desktop editors are non-destructive, so the original of an
+edited photo can still be retrieved:
+- **Apple Photos:** *File → Export → Export Unmodified Original* (or "Revert
+  to Original" on a duplicate).
+- **Lightroom / Lightroom Mobile:** export the original, or the DNG/HEIC
+  master.
+- **VSCO, Snapseed, etc.:** the camera-roll original usually still exists.
+
+Ask the owner for **originals of every edited photo**, and note which app
+and preset were used. A consistent preset gives a cleaner training signal.
+
+#### A3.3 Intake pipeline
+
+- [x] `tools/ingest_owner_photos.py` does the following:
+  - copies photos to `data/owner/originals/` (gitignored), named by content
+    hash;
+  - converts from the embedded ICC profile to sRGB. iPhone photos are
+    **Display P3**, and statistics computed without conversion are wrong,
+    especially saturation;
+  - measures the look statistics;
+  - maintains `data/owner/manifest.csv` with labels the owner confirms:
+    `edited`, `edited_source` (suspected/confirmed), `scene`, `pair_of`,
+    `notes`.
+- [x] First batch of 5 ingested: 2 suspected edited, 3 suspected unedited,
+      all urban.
+- [ ] Owner confirms the labels and supplies originals for edited photos,
+      linked via `pair_of`.
+- **Metadata:** chat uploads strip EXIF (no camera, date or software), so
+  whether a photo was edited must come from the owner. Location metadata is
+  never read or stored.
+- **Pipeline requirement brought forward:** colour management (ICC → sRGB
+  working space) moves from Phase 12 into Phase 7, because every statistic
+  and loss depends on it.
+
+#### A3.4 Effect on Pilot A
+
+- **Test inputs:** the owner's unedited photos become the primary
+  *evaluation inputs*: held out, never trained on, and shown in the pilot
+  report after the owner approves which photos may appear.
+- **Owner-look track:** with **≥ 20 pairs**, add a parallel "owner look"
+  track. Train *paired* on the owner's edits, few-shot as in Phase 10's
+  protocol (b), and compare against the unpaired Clean Cool model on the
+  owner's held-out photos. The success criterion becomes: *the owner prefers
+  the model's edit to the camera output, and it is closer to their own
+  edit than the static preset.*
+- **Next style:** if the owner-look track wins, it becomes the first
+  built-in style and Clean Cool becomes the second.
+
+#### A3.5 Privacy
+
+- Owner photos and their manifest never enter git, reports or public demos
+  without explicit per-photo approval.
+- Faces and licence plates in owner photos are not used for any identity
+  task, as with the stand-in sets.
