@@ -36,6 +36,7 @@ jobs:
         working-directory: studio/web
         run: |
           npm ci
+          npm run check
           npm run build
       - name: Committed build is up to date
         run: git diff --exit-code -- studio/dist

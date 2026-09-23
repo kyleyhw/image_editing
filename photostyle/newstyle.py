@@ -4,7 +4,7 @@
     photostyle style search  NAME [--pages 3]          openly licensed candidates + numbered sheets
     photostyle style pick    NAME 3 7 12 ...           your picks -> "more like these" -> reference set
     photostyle style exclude NAME 5 9 ...              drop references you do not want
-    photostyle style train   NAME [--recipe gentle|strong] [--pairs BEFORE AFTER]
+    photostyle style train   NAME [--recipe gentle|strong|instant|paired] [--pairs BEFORE AFTER]
     photostyle style preview NAME                      before/after on your photos and public samples
     photostyle style pack    NAME [--strength 0.8]     write the style pack (with licences/attribution)
     photostyle style status  NAME
@@ -28,8 +28,12 @@ Design notes (see PROJECT_PLAN A5):
     and fidelity terms for looks far from natural (e.g. cyberpunk). It needs
     input photos: an openly licensed generic-scene pool is used, so a pack
     does not depend on research-licence data.
-  - Paired: with before/after pairs (``--pairs``), paired learning with
-    shrinkage (``learn_paired``).
+  - Instant (Phase 10): no training. The shared base's encoder reads a
+    style code from the references. It only covers looks within the span of
+    the base's training styles.
+  - Paired: with before/after pairs (``--pairs``). A code fitted on the
+    shared base (Phase 10: 20 pairs beat a separate model on 132); without
+    a base, a separate head with shrinkage (Phase 7b).
 """
 
 from __future__ import annotations
@@ -104,7 +108,7 @@ def new(name: str, describe: str, queries: list[str] | None = None, mono: bool =
 
 
 def _collect(queries: list[str], pages: int, mono: bool | None, out: Path, max_person: float = 0.04,
-             min_side: int = 320) -> list[dict]:
+             min_side: int = 320, progress=None) -> list[dict]:
     """Search, download, clean and describe candidates. ``mono`` None keeps both colour and B&W."""
     s = ov.session()
     det = ov.PersonDetector()
@@ -142,12 +146,14 @@ def _collect(queries: list[str], pages: int, mono: bool | None, out: Path, max_p
                               "source": item.get("source"), "landing_url": item.get("foreign_landing_url"),
                               "attribution": ov.attribution(item)})
         print(f"  {q!r}: {len(cands)} candidates so far", flush=True)
+        if progress:
+            progress(queries.index(q) + 1, len(queries), len(cands))
     return cands
 
 
-def search(name: str, pages: int = 3) -> Project:
+def search(name: str, pages: int = 3, progress=None) -> Project:
     p = Project.load(name)
-    p.candidates = _collect(p.queries, pages, p.mono, p.dir / "candidates")
+    p.candidates = _collect(p.queries, pages, p.mono, p.dir / "candidates", progress=progress)
     p.picks, p.refs, p.excluded = [], [], []
     p.save()
     sheets = contact_sheets(p, list(range(len(p.candidates))), "candidates")
@@ -277,19 +283,56 @@ def input_pool(pages: int = 2) -> list[Path]:
 
 
 def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = None, steps: int = 1200,
-          seed: int = 0) -> Project:
+          seed: int = 0, progress=None) -> Project:
+    """Recipes:
+    gentle   unpaired, pseudo-pairs only (Phase 11 default; looks near natural)
+    strong   unpaired, pseudo-pairs + per-image SWD + fidelity (looks far from natural)
+    instant  no training: the shared base's encoder reads a style code from the references
+             (Phase 10; needs checkpoints/base_stylehead.pt)
+    paired   ``pairs=(before_dir, after_dir)``: a code fitted on the shared base if present
+             (Phase 10: 20 pairs suffice), else a separate head with shrinkage (Phase 7b)
+    """
+    from photostyle.condition import CodedHead, fit_code, load_base
     from photostyle.features import FeatureExtractor
-    from photostyle.train import learn_paired, learn_unpaired
+    from photostyle.render import GlobalRenderer
+    from photostyle.train import TRAIN_EDGE, align_pair, learn_paired, learn_unpaired, shrink
 
     p = Project.load(name)
     fx = FeatureExtractor(cache_dir=Path("data/cache/features"))
     t0 = time.time()
-    if pairs:
+    base = load_base()
+    kind, extra = "head", {}
+    if pairs or recipe == "paired":
+        if not pairs:
+            raise SystemExit("--recipe paired needs --pairs BEFORE_DIR AFTER_DIR")
         before, after = pairs
         names = sorted(f.name for f in before.iterdir() if (after / f.name).exists())
         pr = [(_tensor(before / n), _tensor(after / n)) for n in names]
-        head, r, feats, info = learn_paired(pr, fx, seed=seed)
-        mode = "paired"
+        if base is not None and len(pr) >= 5:
+            sh, _, binfo = base
+            r = GlobalRenderer("per_channel")
+            items = []
+            for a, b in pr:
+                al = align_pair(a, b)
+                if al is not None:
+                    items.append({"feat": fx(al[0]), "src_t": shrink(al[0], TRAIN_EDGE), "tgt_t": shrink(al[1], TRAIN_EDGE)})
+            code = fit_code(sh, r, items, seed=seed)
+            head, feats, kind = CodedHead(sh, code), torch.stack([it["feat"] for it in items]), "coded"
+            info, mode = {"n_pairs": len(items)}, "paired/base-code"
+            extra = {"base_n_styles": sh.embed.weight.shape[0], "base": binfo.get("licence", "")}
+        else:
+            head, r, feats, info = learn_paired(pr, fx, seed=seed, progress=progress)
+            mode = "paired"
+    elif recipe == "instant":
+        if base is None:
+            raise SystemExit("recipe 'instant' needs the shared base: uv run python tools/build_base.py")
+        sh, enc, binfo = base
+        tf = torch.stack([fx(_tensor(p.candidates[i]["file"])) for i in p.refs])
+        with torch.no_grad():
+            code = enc(tf)
+        r = GlobalRenderer("per_channel")
+        head, feats, kind, info, mode = CodedHead(sh, code), tf, "coded", {"n_refs": len(p.refs)}, "instant/base-encoder"
+        extra = {"base_n_styles": sh.embed.weight.shape[0], "base": binfo.get("licence", "")}
     else:
         if not p.refs:
             raise SystemExit("no references yet: run search and pick first")
@@ -299,10 +342,10 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
             pool = input_pool()
             ins = [_tensor(f) for f in random.Random(seed).sample(pool, min(300, len(pool)))]
         kw = dict(use_pseudo=True, use_swd=recipe == "strong", use_fidelity=recipe == "strong")
-        head, r, feats, info = learn_unpaired(ex, ins, fx, steps=steps, seed=seed, **kw)
+        head, r, feats, info = learn_unpaired(ex, ins, fx, steps=steps, seed=seed, progress=progress, **kw)
         mode = f"unpaired/{recipe}"
     ck = p.dir / "head.pt"
-    torch.save({"state_dict": head.state_dict(), "renderer": r.kind, "feats": feats}, ck)
+    torch.save({"kind": kind, "state_dict": head.state_dict(), "renderer": r.kind, "feats": feats, **extra}, ck)
     p.train = {"mode": mode, "recipe": recipe, "n_refs": len(p.refs), "steps": steps, "seed": seed,
                "seconds": round(time.time() - t0), **{k: v for k, v in info.items() if isinstance(v, int | float)}}
     p.save()
@@ -318,10 +361,16 @@ def _load_head(p: Project):
 
     ck = torch.load(p.dir / "head.pt", map_location="cpu", weights_only=False)
     r = GlobalRenderer(ck["renderer"])
-    head = Head(FEATURE_DIM, r.num_params)
+    if ck.get("kind") == "coded":
+        from photostyle.condition import CodedHead, StyleHead
+
+        sh = StyleHead(FEATURE_DIM, r.num_params, n_styles=ck["base_n_styles"])
+        head = CodedHead(sh, torch.zeros(sh.embed.weight.shape[1]))
+    else:
+        head = Head(FEATURE_DIM, r.num_params)
     head.load_state_dict(ck["state_dict"])
     head.eval()
-    return head, r, ck["feats"]
+    return head, r, ck["feats"], ck
 
 
 # --------------------------------------------------------------------------- preview / pack
@@ -333,7 +382,7 @@ def preview(name: str, photos: list[Path] | None = None, strengths: tuple[float,
     from photostyle.features import FeatureExtractor
 
     p = Project.load(name)
-    head, r, _ = _load_head(p)
+    head, r, _, _ = _load_head(p)
     fx = FeatureExtractor(cache_dir=None)
     if photos is None:
         man = Path("data/owner/manifest.csv")
@@ -376,17 +425,21 @@ def pack(name: str, strength: float = 1.0, out_root: Path = Path("stylepacks")) 
     from photostyle.engine import save_stylepack
 
     p = Project.load(name)
-    head, r, feats = _load_head(p)
+    head, r, feats, ck = _load_head(p)
     lic = sorted({f"{p.candidates[i]['license']}" for i in p.refs}) if p.refs else []
     card = {
         "source": p.train.get("mode", "unknown"),
         "description": p.description,
         "default_strength": strength,
         "references": f"{len(p.refs)} openly licensed photos ({', '.join(lic)}); attribution in ATTRIBUTION.csv",
-        "training_data": "openly licensed references (and inputs) only; no research-licence data",
+        "training_data": ("openly licensed references (and inputs) only; no research-licence data"
+                          if ck.get("kind") != "coded" else
+                          "a code on the shared base, which is MIT-Adobe FiveK derived: research / personal use only"),
         "pipeline": "photostyle style (photostyle/newstyle.py)",
         "train": p.train,
     }
+    if ck.get("kind") == "coded":
+        card.update(head_type="coded", base_n_styles=ck["base_n_styles"])
     folder = save_stylepack(out_root / name, name, head, r, feats, card)
     if p.refs:
         man = _write_manifest(p)

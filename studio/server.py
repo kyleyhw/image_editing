@@ -312,6 +312,97 @@ def job(job_id: str):
     return jobs[job_id]
 
 
+# --------------------------------------------------------------------------- new-style pipeline
+# The same steps as `photostyle style ...` (photostyle/newstyle.py), for Studio's Create-style dialog.
+
+
+def _project(name: str):
+    from photostyle import newstyle as ns
+
+    return ns.Project.load(_safe_name(name))
+
+
+def _project_payload(p) -> dict:
+    return {"name": p.name, "description": p.description, "queries": p.queries,
+            "candidates": [{"n": i + 1, "title": c.get("title"), "creator": c.get("creator"),
+                            "license": c.get("license")} for i, c in enumerate(p.candidates)],
+            "picks": [i + 1 for i in p.picks], "refs": [i + 1 for i in p.refs],
+            "excluded": [i + 1 for i in p.excluded], "train": p.train}
+
+
+@app.post("/api/style/new")
+def style_new(body: dict):
+    from photostyle import newstyle as ns
+
+    queries = [q.strip() for q in body.get("queries", []) if q.strip()] or None
+    p = ns.new(_safe_name(body["name"]).replace("-", "_"), body["describe"], queries, bool(body.get("mono")))
+    return _project_payload(p)
+
+
+@app.get("/api/style/{name}")
+def style_get(name: str):
+    return _project_payload(_project(name))
+
+
+@app.get("/api/style/{name}/image/{n}")
+def style_image(name: str, n: int, edge: int = 240):
+    p = _project(name)
+    if not 1 <= n <= len(p.candidates):
+        raise HTTPException(404)
+    img = Image.open(p.candidates[n - 1]["file"])
+    img.thumbnail((edge, edge))
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, "JPEG", quality=85)
+    return Response(buf.getvalue(), media_type="image/jpeg")
+
+
+def _job(fn) -> dict:
+    job_id = uuid.uuid4().hex[:8]
+    with _lock:
+        jobs[job_id] = {"status": "running", "step": 0, "total": 1}
+    threading.Thread(target=_run_job, args=(job_id, fn), daemon=True).start()
+    return {"job": job_id}
+
+
+@app.post("/api/style/search")
+def style_search(body: dict):
+    from photostyle import newstyle as ns
+
+    name = _project(body["name"]).name
+    return _job(lambda progress: ns.search(name, int(body.get("pages", 2)),
+                                           progress=lambda i, n, c: progress(i, n, c)))
+
+
+@app.post("/api/style/pick")
+def style_pick(body: dict):
+    from photostyle import newstyle as ns
+
+    return _project_payload(ns.pick(_project(body["name"]).name, [int(n) for n in body["numbers"]],
+                                    int(body.get("n_refs", 40))))
+
+
+@app.post("/api/style/exclude")
+def style_exclude(body: dict):
+    from photostyle import newstyle as ns
+
+    return _project_payload(ns.exclude(_project(body["name"]).name, [int(n) for n in body["numbers"]]))
+
+
+@app.post("/api/style/train")
+def style_train(body: dict):
+    """Train, then write the style pack straight away so it appears in the style strip to try out."""
+    from photostyle import newstyle as ns
+
+    name, recipe = _project(body["name"]).name, body.get("recipe", "gentle")
+    if recipe not in ("gentle", "strong", "instant"):
+        raise HTTPException(400, "recipe: gentle, strong or instant (pairs: use 'My before/after edits')")
+
+    def run(progress):
+        ns.train(name, recipe, progress=progress)
+        ns.pack(name, float(body.get("strength", 1.0)), STYLE_ROOT)
+    return _job(run)
+
+
 @app.post("/api/remember")
 def remember(body: dict):
     """Store a user correction: (photo, final params) becomes a training example (Phase 15)."""

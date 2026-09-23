@@ -172,8 +172,9 @@ def main(argv: list[str] | None = None) -> None:
     x.add_argument("numbers", nargs="+", type=int)
     x = ss.add_parser("train")
     x.add_argument("name")
-    x.add_argument("--recipe", choices=["gentle", "strong"], default="gentle",
-                   help="gentle: close to natural looks; strong: looks far from natural (e.g. cyberpunk)")
+    x.add_argument("--recipe", choices=["gentle", "strong", "instant", "paired"], default="gentle",
+                   help="gentle: looks near natural; strong: looks far from natural (e.g. cyberpunk); "
+                        "instant: no training, via the shared base's encoder; paired: with --pairs")
     x.add_argument("--pairs", nargs=2, metavar=("BEFORE_DIR", "AFTER_DIR"), help="train on your before/after pairs")
     x.add_argument("--steps", type=int, default=1200)
     x = ss.add_parser("preview")

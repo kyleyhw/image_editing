@@ -2,6 +2,7 @@
   import { S, applyScene, commit, ZERO_SCENE } from "../lib/studio.svelte.js";
   // Depth-aware (Depth Anything V2 Small) and sky-aware (learned segmenter) tools, rendered by the
   // server on the original before the grade. Values are -100..100 (%), mapped to SceneParams.
+  /** @type {Array<[string, string, string, number]>} */
   const CONTROLS = [
     ["haze", "Haze", "+ adds distance haze, − removes it", 1],
     ["clarity_near", "Clarity (near)", "local contrast in the foreground", 1],

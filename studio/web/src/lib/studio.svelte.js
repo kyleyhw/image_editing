@@ -26,7 +26,7 @@ export function initGL(canvas) {
   view.main = makeGL(canvas);
   view.thumbCanvas = document.createElement("canvas");
   view.thumb = makeGL(view.thumbCanvas);
-  window.__studio = { S, effective, exportParams, draw, get main() { return view.main; } };   // automated tests
+  /** @type {any} */ (window).__studio = { S, effective, exportParams, draw, get main() { return view.main; } };   // automated tests
 }
 
 export const effective = () => effectiveFrom(S.params, S.strength, S.d, S.knots);

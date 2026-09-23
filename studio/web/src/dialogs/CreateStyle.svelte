@@ -1,5 +1,6 @@
 <script>
   import Modal from "./Modal.svelte";
+  import IdeaFlow from "./IdeaFlow.svelte";
   import { pollJob } from "../lib/api.js";
   import { S, loadStyles } from "../lib/studio.svelte.js";
   let { open = $bindable(false) } = $props();
@@ -32,12 +33,16 @@
 </script>
 
 <Modal bind:open title="Create a style">
-  <label>Name <input bind:value={name} placeholder="my_look" /></label>
   <fieldset>
     <legend>What do you have?</legend>
+    <label><input type="radio" bind:group={mode} value="idea" /> An idea: find openly licensed reference photos for me</label>
     <label><input type="radio" bind:group={mode} value="paired" /> My before/after edits (best)</label>
     <label><input type="radio" bind:group={mode} value="unpaired" /> Photos in a style I like</label>
   </fieldset>
+  {#if mode === "idea"}
+    <IdeaFlow />
+  {:else}
+  <label>Name <input bind:value={name} placeholder="my_look" /></label>
   {#if mode === "paired"}
     <label>Before (originals) <input type="file" multiple accept="image/*" onchange={(e) => (before = e.currentTarget.files)} /></label>
     <label>After (your edits, same file names) <input type="file" multiple accept="image/*" onchange={(e) => (after = e.currentTarget.files)} /></label>
@@ -49,5 +54,6 @@
   {/if}
   <p class="muted small">{check}</p>
   {#if prog}<progress value={prog.value} max={prog.max}></progress>{/if}
-  {#snippet footer()}<button class="btn primary" onclick={train} disabled={!!prog}>Train</button>{/snippet}
+  <button class="btn primary" onclick={train} disabled={!!prog}>Train</button>
+  {/if}
 </Modal>

@@ -1,1 +1,1 @@
-{ "compilerOptions": { "moduleResolution": "bundler", "target": "ES2022", "module": "ESNext", "checkJs": true, "strict": false, "types": ["svelte"] }, "include": ["src/**/*"] }
+{ "compilerOptions": { "moduleResolution": "bundler", "target": "ES2022", "module": "ESNext", "checkJs": true, "strict": false, "types": ["svelte"] }, "include": ["src/**/*", "src/global.d.ts"] }

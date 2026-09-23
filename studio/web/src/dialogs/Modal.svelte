@@ -1,5 +1,6 @@
 <script>
-  let { open = $bindable(false), title, children, footer } = $props();
+  /** @type {{ open?: boolean, title: string, children?: import('svelte').Snippet, footer?: import('svelte').Snippet }} */
+  let { open = $bindable(false), title, children = undefined, footer = undefined } = $props();
   let dlg;
   $effect(() => { if (!dlg) return; if (open && !dlg.open) dlg.showModal(); else if (!open && dlg.open) dlg.close(); });
 </script>

@@ -9,7 +9,7 @@
 </select>
 <label class="row">Strength
   <input id="strength" type="range" min="0" max="150" value={pct}
-         oninput={(e) => (S.strength = e.currentTarget.value / 100)} onchange={commit} />
+         oninput={(e) => (S.strength = Number(e.currentTarget.value) / 100)} onchange={commit} />
   <output>{pct}%</output>
 </label>
 {#if S.params?.ood_score > 1.5}
