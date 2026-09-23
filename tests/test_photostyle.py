@@ -145,3 +145,14 @@ def test_engine_round_trip(tmp_path):
     p.to_cube(tmp_path / "x.cube")
     p.to_xmp(tmp_path / "x.xmp")
     assert "ToneCurvePV2012Red" in (tmp_path / "x.xmp").read_text()
+
+
+def test_style_head_identity_and_encoder_shape():
+    from photostyle.condition import StyleEncoder, StyleHead
+
+    h = StyleHead(1280, 40, n_styles=3)
+    f = torch.randn(4, 1280)
+    h.set_norm(f)
+    assert torch.count_nonzero(h(f, h.embed.weight[0].expand(4, -1))) == 0   # identity at init
+    enc = StyleEncoder(1280)
+    assert enc(torch.randn(7, 1280)).shape == (32,)
