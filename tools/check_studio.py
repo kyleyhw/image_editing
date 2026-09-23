@@ -94,6 +94,19 @@ def main() -> None:
         page.screenshot(path=str(args.out / "studio_edit.png"))
         report["interactions"] = {"curve_edit": edited, "undo": undone}
 
+        # scene tools (v2 only): dehaze is rendered by the server and must change the picture
+        if page.locator("text=Haze").count():
+            before = page.evaluate("() => { const c = window.__studio.main.canvas; return c.toDataURL().length; }")
+            page.evaluate("() => { window.__studio.S.scene.haze = -0.5; }")
+            page.evaluate("""() => { const i = [...document.querySelectorAll('label')].find(l => l.textContent.trim().startsWith('Haze'))
+                                     .querySelector('input'); i.value = -50; i.dispatchEvent(new Event('input', {bubbles: true})); }""")
+            page.wait_for_function("window.__studio.S.sceneBusy === true", timeout=10_000)
+            page.wait_for_function("window.__studio.S.sceneBusy === false", timeout=180_000)
+            page.wait_for_timeout(300)
+            after = page.evaluate("() => { const c = window.__studio.main.canvas; return c.toDataURL().length; }")
+            page.screenshot(path=str(args.out / "studio_scene.png"))
+            report["scene"] = {"dehaze_changed_picture": before != after}
+
         # exports
         for fmt in ("cube", "jpg"):
             page.select_option("#exportFmt", fmt)

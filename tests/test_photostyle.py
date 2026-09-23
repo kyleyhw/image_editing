@@ -160,3 +160,19 @@ def test_style_head_identity_and_encoder_shape():
     assert torch.count_nonzero(h(f, h.embed.weight[0].expand(4, -1))) == 0   # identity at init
     enc = StyleEncoder(1280)
     assert enc(torch.randn(7, 1280)).shape == (32,)
+
+
+def test_scene_in_edit_params_reaches_the_render():
+    from PIL import Image
+
+    from photostyle.engine import EditParams, Engine
+
+    img = Image.fromarray((np.random.default_rng(1).random((48, 64, 3)) * 255).astype("uint8"))
+    r = GlobalRenderer("per_channel")
+    p = EditParams(style="t", renderer="per_channel", knots=r.K, theta=[0.0] * r.num_params)
+    eng = Engine.__new__(Engine)                      # render() needs no style packs
+    same = eng.render(img, p)
+    hazy = eng.render(img, EditParams(**{**p.__dict__, "scene": {"clarity_near": 0.8}}))
+    assert np.abs(np.asarray(same, float) - np.asarray(img, float)).max() <= 2
+    assert np.abs(np.asarray(hazy, float) - np.asarray(img, float)).mean() > 0.5
+    assert EditParams.from_json(p.to_json()).scene == {}

@@ -40,13 +40,14 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from PIL import Image
 
 from photostyle.engine import EditParams, Engine, save_stylepack
-from photostyle.io import load_image, save_image, to_tensor
+from photostyle.io import load_image, save_image, to_pil, to_tensor
 from photostyle.train import learn_paired, learn_unpaired
 
 ROOT = Path(os.environ.get("PHOTOSTYLE_STUDIO_DATA", "data/studio"))
 UPLOADS = ROOT / "uploads"
 STYLE_ROOT = Path(os.environ.get("PHOTOSTYLE_STYLES", "stylepacks"))
 STATIC = Path(__file__).parent / "static"
+DIST = Path(__file__).parent / "dist"
 
 app = FastAPI(title="photostyle Studio")
 engine = Engine(roots=[STYLE_ROOT])
@@ -101,7 +102,22 @@ def explain(p: EditParams) -> str:
 
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
+    """Studio v2 (Svelte, built into studio/dist); falls back to the legacy page if not built."""
+    page = DIST / "index.html"
+    return (page if page.exists() else STATIC / "index.html").read_text()
+
+
+@app.get("/legacy", response_class=HTMLResponse)
+def legacy() -> str:
     return (STATIC / "index.html").read_text()
+
+
+@app.get("/assets/{name}")
+def assets(name: str):
+    f = (DIST / "assets" / name).resolve()
+    if not f.is_relative_to((DIST / "assets").resolve()) or not f.exists():
+        raise HTTPException(404)
+    return FileResponse(f)
 
 
 @app.get("/static/{name}")
@@ -157,6 +173,38 @@ def predict(body: dict):
     d = _photo_dir(body["id"])
     p = engine.predict(Image.open(d / "srgb.jpg"), body["style"], strength=body.get("strength"))
     return _params_payload(p)
+
+
+def _scene_maps(d: Path) -> tuple[torch.Tensor, torch.Tensor]:
+    """Depth (nearness) and sky masks for the 1600 px preview, computed once per photo."""
+    cache = d / "scene_maps.pt"
+    if cache.exists():
+        m = torch.load(cache)
+        return m["near"], m["sky"]
+    from photostyle.atmosphere import depth_map
+    from photostyle.sky import sky_mask
+
+    x = to_tensor(Image.open(d / "preview.jpg").convert("RGB"))[None]
+    near, sky = depth_map(x), sky_mask(x)
+    torch.save({"near": near, "sky": sky}, cache)
+    return near, sky
+
+
+@app.post("/api/scene")
+def scene(body: dict):
+    """Preview of the photo with scene tools applied (haze, clarity, sky light), before any grade.
+    The browser renders the grade on top with WebGL, as for the plain photo."""
+    from photostyle.atmosphere import SceneParams, apply_scene
+
+    d = _photo_dir(body["id"])
+    sp = SceneParams(**{k: float(v) for k, v in body.get("scene", {}).items() if k in SceneParams.__dataclass_fields__})
+    img = Image.open(d / "preview.jpg").convert("RGB")
+    if not sp.is_identity():
+        near, sky = _scene_maps(d)
+        img = to_pil(apply_scene(to_tensor(img)[None], sp, near=near, sky=sky)[0])
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=92)
+    return Response(buf.getvalue(), media_type="image/jpeg")
 
 
 @app.post("/api/batch_predict")

@@ -42,3 +42,7 @@ images/styled/
 
 # Built style packs (FiveK-derived, research licence): rebuild with tools/build_stylepacks.py
 stylepacks/
+
+# Studio front-end build tooling (the built studio/dist is committed)
+node_modules/
+!studio/dist/

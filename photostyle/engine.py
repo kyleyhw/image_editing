@@ -49,6 +49,7 @@ class EditParams:
     overrides: dict = field(default_factory=dict)    # UI edits: {field: values}
     ood_score: float = 0.0
     version: int = 1
+    scene: dict = field(default_factory=dict)        # SceneParams fields (Phase 18), applied before the grade
 
     def vector(self) -> torch.Tensor:
         """Effective parameters: model prediction x strength, then user overrides."""
@@ -160,7 +161,13 @@ class StylePack:
         card = json.loads((folder / "style.json").read_text())
         ck = torch.load(folder / "head.pt", map_location="cpu", weights_only=False)
         r = GlobalRenderer(card["renderer"], card.get("knots", 9))
-        head = Head(FEATURE_DIM, r.num_params, **card.get("head_kwargs", {}))
+        if card.get("head_type") == "coded":        # a style on the shared base (Phase 10)
+            from photostyle.condition import CodedHead, StyleHead
+
+            sh = StyleHead(FEATURE_DIM, r.num_params, n_styles=card["base_n_styles"])
+            head = CodedHead(sh, torch.zeros(sh.embed.weight.shape[1]))
+        else:
+            head = Head(FEATURE_DIM, r.num_params, **card.get("head_kwargs", {}))
         head.load_state_dict(ck["state_dict"])
         head.eval()
         return StylePack(card["name"], card, head, r, ck["feat_mean"], ck["feat_std"], ck["ood_ref"])
@@ -238,6 +245,12 @@ class Engine:
         th = params.vector()
         lut = bake_lut(r, th[0], lut_size)
         t = to_tensor(img)[None]
+        if params.scene:
+            from photostyle.atmosphere import SceneParams, apply_scene
+
+            sp = SceneParams(**{k: v for k, v in params.scene.items() if k in SceneParams.__dataclass_fields__})
+            if not sp.is_identity():
+                t = apply_scene(t, sp)
         out = torch.cat([apply_lut(t[..., i:i + 512, :], lut) for i in range(0, t.shape[2], 512)], 2)
         out = _vignette(out, r.unpack(th)["vignette"])
         return to_pil(out[0])
