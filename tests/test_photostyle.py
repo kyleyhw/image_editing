@@ -176,3 +176,33 @@ def test_scene_in_edit_params_reaches_the_render():
     assert np.abs(np.asarray(same, float) - np.asarray(img, float)).max() <= 2
     assert np.abs(np.asarray(hazy, float) - np.asarray(img, float)).mean() > 0.5
     assert EditParams.from_json(p.to_json()).scene == {}
+
+
+def test_newstyle_pick_exclude_offline(tmp_path, monkeypatch):
+    """Pipeline bookkeeping without network: picks -> 'more like these' -> exclude -> manifest."""
+    from PIL import Image
+
+    from photostyle import newstyle as ns
+    from photostyle.stats import colour_stats
+
+    monkeypatch.setattr(ns, "ROOT", tmp_path / "styles")
+    monkeypatch.setattr(ns, "MANIFESTS", tmp_path / "manifests")
+    p = ns.new("look", "a test look")
+    rng = np.random.default_rng(0)
+    cands = []
+    for i in range(12):                        # 6 bluish + 6 reddish photos
+        base = np.array([40, 60, 200]) if i < 6 else np.array([200, 60, 40])
+        arr = np.clip(base + rng.normal(0, 20, (40, 60, 3)), 0, 255).astype("uint8")
+        f = tmp_path / f"c{i}.jpg"
+        Image.fromarray(arr).save(f)
+        cands.append({"id": f"id{i}", "file": str(f), "stats": colour_stats(Image.open(f)), "license": "cc0",
+                      "license_version": "1.0", "creator": f"c{i}", "title": "t", "source": "s",
+                      "landing_url": "u", "attribution": "a"})
+    p.candidates = cands
+    p.save()
+    q = ns.pick("look", [1], n_refs=4)         # pick a blue one: the refs should be blue ones
+    assert q.refs[0] == 0 and all(i < 6 for i in q.refs)
+    q = ns.exclude("look", [q.refs[1] + 1])
+    assert len(q.refs) == 4 and q.excluded and all(i < 6 for i in q.refs)
+    assert (tmp_path / "manifests" / "look.csv").read_text().count("\n") == 5
+    assert ns.status("look")["references"] == 4

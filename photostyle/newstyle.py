@@ -203,7 +203,7 @@ def rank_like(cands: list[dict], picks: list[int]) -> list[int]:
     P = z[picks]
     # distance to the nearest pick (a look can have a few "modes", e.g. night and day)
     d = np.sqrt(((z[:, None, :] - P[None]) ** 2).mean(-1)).min(1)
-    return list(np.argsort(d))
+    return [int(i) for i in np.argsort(d)]
 
 
 def pick(name: str, numbers: list[int], n_refs: int = 40) -> Project:
