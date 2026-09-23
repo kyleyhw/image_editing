@@ -163,25 +163,36 @@ def download(item: dict, session: requests.Session, cache: Path) -> Image.Image 
     return img
 
 
-def crop_letterbox(img: Image.Image, thresh: float = 0.04) -> Image.Image:
-    """Remove near-black, near-uniform bars on any edge (letterbox/pillarbox)."""
+def crop_letterbox(img: Image.Image, thresh: float = 0.03) -> Image.Image:
+    """Remove near-black bars on any edge (letterbox/pillarbox).
+
+    A row/column counts as bar if >= 90 % of its pixels are near-black, which
+    tolerates the caption text often printed inside the bar. A bar is only
+    cropped if it ends in a sharp edge (the first photo row/column is mostly
+    not black), so genuinely dark night skies are left alone.
+    """
     g = np.asarray(img.convert("L"), dtype=np.float64) / 255.0
-    rows = (g.mean(1) < thresh) & (g.std(1) < 0.02)
-    cols = (g.mean(0) < thresh) & (g.std(0) < 0.02)
+    dark = g < thresh
+    row_frac, col_frac = dark.mean(1), dark.mean(0)
 
-    def span(mask: np.ndarray) -> tuple[int, int]:
-        lo, hi = 0, len(mask)
-        while lo < hi and mask[lo]:
-            lo += 1
-        while hi > lo and mask[hi - 1]:
-            hi -= 1
-        return lo, hi
+    def edge(frac: np.ndarray, from_start: bool) -> int:
+        n = len(frac)
+        idx = range(n) if from_start else range(n - 1, -1, -1)
+        k = 0
+        for i in idx:
+            if frac[i] < 0.9:
+                break
+            k += 1
+        if k < 3 or k >= n // 2:
+            return 0
+        first_photo = frac[k] if from_start else frac[n - 1 - k]
+        return k if first_photo < 0.6 else 0
 
-    top, bottom = span(rows)
-    left, right = span(cols)
-    if (bottom - top) < 0.5 * len(rows) or (right - left) < 0.5 * len(cols):
+    top, bottom = edge(row_frac, True), edge(row_frac, False)
+    left, right = edge(col_frac, True), edge(col_frac, False)
+    if top == bottom == left == right == 0:
         return img
-    return img.crop((left, top, right, bottom))
+    return img.crop((left, top, img.width - right, img.height - bottom))
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +315,8 @@ def main() -> None:
     ap.add_argument("--min-person", type=float, default=0.06,
                     help="Minimum area fraction of the largest detected person.")
     ap.add_argument("--min-score", type=float, default=0.35)
+    ap.add_argument("--min-side", type=int, default=320,
+                    help="Minimum short side in px after letterbox cropping.")
     ap.add_argument("--max-keep", type=int, default=150,
                     help="Total images kept, split evenly between night and day where possible.")
     ap.add_argument("--min-chroma", type=float, default=6.0,
@@ -311,6 +324,9 @@ def main() -> None:
     ap.add_argument("--max-people", type=int, default=2,
                     help="Reject crowds: max people with area >= 3%% of the frame.")
     ap.add_argument("--cache", type=Path, default=Path("data/cache/openverse"))
+    ap.add_argument("--exclude", type=Path, default=None,
+                    help="Hand-review exclusion list: one '<openverse_id> # reason' per line. "
+                         "Default: data/manifests/<profile>.exclude.txt if it exists.")
     args = ap.parse_args()
 
     profile = LOOK_PROFILES[args.profile]
@@ -321,6 +337,14 @@ def main() -> None:
         stale.unlink()
     manifest.parent.mkdir(parents=True, exist_ok=True)
 
+    exclude_file = args.exclude or Path("data/manifests") / f"{args.profile}.exclude.txt"
+    excluded: set[str] = set()
+    if exclude_file.exists():
+        for line in exclude_file.read_text().splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                excluded.add(line)
+
     session = requests.Session()
     session.headers["User-Agent"] = USER_AGENT
     detector = PersonDetector()
@@ -328,7 +352,7 @@ def main() -> None:
     seen_ids: set[str] = set()
     seen_hashes: list[int] = []
     rows: list[dict] = []
-    stats_log = {"candidates": 0, "download_failed": 0, "duplicate": 0,
+    stats_log = {"candidates": 0, "download_failed": 0, "too_small": 0, "duplicate": 0,
                  "monochrome": 0, "no_person": 0, "crowd": 0, "low_score": 0}
 
     for query in profile.queries:
@@ -341,15 +365,18 @@ def main() -> None:
             if not results:
                 break
             for item in results:
-                if item["id"] in seen_ids:
+                if item["id"] in seen_ids or item["id"] in excluded:
                     continue
                 seen_ids.add(item["id"])
                 stats_log["candidates"] += 1
                 img = download(item, session, args.cache)
                 if img is not None:
                     img = crop_letterbox(img)
-                if img is None or min(img.size) < 400:
+                if img is None:
                     stats_log["download_failed"] += 1
+                    continue
+                if min(img.size) < args.min_side:
+                    stats_log["too_small"] += 1
                     continue
                 h = dhash(img)
                 if any(bin(h ^ s).count("1") <= 6 for s in seen_hashes):

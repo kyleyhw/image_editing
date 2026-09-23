@@ -1,17 +1,20 @@
 {
   "profile": "neon_street_portrait",
-  "kept": 150,
-  "night": 47,
-  "day": 103,
+  "kept": 142,
+  "night": 71,
+  "day": 71,
   "licenses": {
-    "by": 121,
-    "by-sa": 22,
-    "cc0": 4,
-    "pdm": 3
+    "by": 89,
+    "by-sa": 44,
+    "cc0": 8,
+    "pdm": 1
   },
-  "candidates": 573,
-  "download_failed": 30,
-  "duplicate": 1,
-  "no_person": 137,
-  "low_score": 71
+  "candidates": 871,
+  "download_failed": 9,
+  "too_small": 29,
+  "duplicate": 2,
+  "monochrome": 223,
+  "no_person": 215,
+  "crowd": 97,
+  "low_score": 62
 }

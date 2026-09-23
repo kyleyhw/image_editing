@@ -1,0 +1,76 @@
+# Hand-review exclusions for the neon_street_portrait style set.
+# Format: <openverse_id>  # reason. Reviewed 2026-09-23 from contact sheets.
+f146af5c-7f08-4888-88b4-d2b72c3612f1  # night 0011: light-painting artwork, not a portrait
+88a58a37-3b77-47ca-b9f2-850a1fb21271  # night 0052: poster/cut-out
+acc53924-5332-4a49-8f2a-20c686eb7ef7  # night 0054: no clear subject
+874d6c32-24eb-40d7-a76a-b92dd8f1e355  # night 0081: neon art installation
+bb0f5335-5afd-4f85-8411-db70a4fdbcaa  # night 0087: advertising poster
+4b6b107d-13a5-48ba-b24c-a52b84c50ed3  # night 0099: crowd at stall, subject small
+5679ac54-d29f-4ce9-8b0b-df5ad653b9f3  # night 0104: motion-blurred group
+11e8e4e9-3206-4ffe-8308-8b69b6bdf5a3  # night 0108: back view in crowd
+1c9b0282-9b99-4d72-828b-c43a4140afaf  # night 0109: subject tiny
+6c2b1db8-a840-4236-ae28-5fd35b7f8efc  # night 0117: back view
+a5e4a0a8-bec6-4ab0-8a1d-b8c996290a0e  # night 0120: glamour pose, off-genre
+cb47bce8-badf-4956-a2ad-85e71f71ba22  # night 0125: subject small, graffiti focus
+9a91846e-97e8-423f-a232-74bd7f909f00  # night 0127: subject tiny
+5a2d9ec4-022a-4269-ba29-45a48c6410cb  # night 0129: silhouettes
+55afc2e3-4999-4b35-9e13-da1dce4c2d25  # night 0145: welding sparks, no portrait
+9df6541a-fac7-4d68-91d8-7454461f3e19  # night 0146: statue
+d514610d-0fd7-4cd8-8665-c0718ecd8b5b  # night 0148: daytime umbrellas, mis-regimed
+6585aa9f-7cb2-4164-80d0-9e4b194a6b15  # night 0149: back view
+3489750c-0368-4e36-8ec2-cfe847aa28d9  # night 0124: pin-up pose, off-genre
+107fd736-4eff-4e6f-ae78-7f89013d4ae1  # night 0105: pin-up pose, off-genre
+522b0a35-a4f8-42c6-8894-529f67e4c224  # night 0008: back of head
+ca5ee84a-cdbe-44f1-9a39-4e9c1b2a94df  # night 0139: subject tiny
+b37b70f9-4370-4870-bb4c-f78efa0c4baa  # day 0009: back of head
+738e93ea-5405-43eb-8319-702dfc48b11a  # day 0010: selfie
+bd84f8a9-542c-4cd2-9cce-46658b73bff6  # day 0018: hands/kids snapshot
+f83913ce-c633-44bb-8d48-22e22dcc0b74  # day 0019: selfie
+4a8da277-4baf-4de4-9424-5d328d5947a2  # day 0025: snapshot, subject small
+66153486-7ff5-4567-b293-6ae526979d86  # day 0029: zombie make-up
+e007ede7-ab77-4851-a207-313204536082  # day 0044: cosplay
+31d8eecc-b03d-4640-b01a-4bc313dc6167  # day 0047: tourist snapshot
+8247108e-68ab-47b8-9bc7-cd34df52ab54  # day 0050: subjects behind fence
+ff95c8a1-8ba3-4846-8023-2c9974e02114  # day 0058: odd street performance
+f74b5161-2dbc-4cb0-8e89-d7e6a34f08b1  # day 0060: family snapshot
+97cb18f5-2826-4458-a8f7-47e897f969a6  # day 0062: cosplay
+866faff8-b86b-4ec4-b178-8e30a9679c63  # day 0070: subject tiny
+90b04131-2b36-4ee1-a77c-c29d321dc32d  # day 0075: subject small, walking
+1662ba45-94f3-4573-a7a8-a6232398b896  # day 0077: snapshot on exercise machine
+87c43dae-3749-478c-91ee-2579a14a96fd  # day 0084: subjects small
+fdab9903-b788-4301-8ee2-b42256ce6185  # day 0086: mannequin
+48679ec0-6473-4f18-9254-8133a3eb6fd6  # day 0088: diptych
+58a455b0-02cd-43ba-bff8-b40e76f81e28  # day 0092: cyclist motion blur
+25a0bab8-8c76-4879-9bfe-3e81e22a331d  # night 0126: daytime mountain cyclist, mis-regimed
+16fbc8be-29ed-493e-817c-91433905474d  # night 0125: daytime street, mis-regimed
+e86bb28a-1344-43e5-b643-4aed87eb7d5d  # night 0119: subject small, snapshot
+2b81965e-6119-4a70-a1bc-9e82651d86f1  # night 0129: horror make-up
+98563884-977b-4553-b982-571a812b2e75  # night 0132: subject barely visible
+74ca9b92-471d-4220-ab63-c0c4c16cd665  # night 0146: subject small, bar interior
+22e6145e-dcc4-4bee-9dfb-d0573ce0d9a7  # night 0036: pin-up pose, off-genre
+84ebdff7-863d-4d12-9472-cbb7ccf56e6f  # night 0135: pin-up pose, off-genre
+76f6a2d4-cfc7-4528-a09b-06d7587f8941  # day 0070: back view
+324c1b6a-0133-4d37-904d-2fec22763df2  # day 0075: subject behind fence
+a5a9030b-ac9d-4a80-a8f2-8392759bb3c3  # day 0076: back view
+e8a8a260-db63-4376-8535-89162ce11ba3  # day 0085: no clear subject
+d5781cde-54f5-453a-9308-f6f8ac68312c  # day 0088: speaker at podium
+fe2b06f8-7632-4849-9353-7ad0c0bd6a4a  # day 0101: subject small
+ef56e243-2122-4b5a-8b4f-52502e1e9741  # day 0103: odd mask/crop
+2b386474-98d2-47a0-912e-b22a9c47b5df  # day 0104: back views
+d424b921-d92d-414e-ba8d-1f469a942ced  # day 0110: subject small
+d2b279ae-4584-436f-85d8-8f3312bf9eb2  # night 0047: person lying on road, staged
+3428a3d0-fca0-4399-8acd-26ffd689c7b7  # night 0118: light-painting blur
+65625b10-bef6-4f68-be4e-8703816a8d6a  # night 0133: light-painting blur
+03310fc2-943c-4138-baf0-f80159d57984  # night 0135: motion blur, subject tiny
+f4544660-fab3-41ea-a445-67c0075771ae  # night 0137: mask artwork
+967d247f-37c1-4506-ad74-67c57907c8a1  # night 0138: neon art installation
+9a514958-b747-4414-9f61-19642818c477  # night 0148: tinted silhouettes
+0fbad22e-7c27-4fc3-8a9d-560fddf0a3dd  # night 0144: lying in snow, off-genre
+e3c0ee92-472f-4209-aa5a-d371199f0c19  # night 0110: daytime, mis-regimed
+d95dd551-07bd-4feb-a683-5736d7e83e3c  # night 0132: daytime garden, mis-regimed
+56d4b3f7-821d-4c47-b4bf-4cbb84b4fdbd  # day 0045: fisheye distortion
+5bb56bde-7a5b-4c59-939f-4a5895a96a2a  # day 0060: hands/shoes, no portrait
+58c9da13-c86a-4d89-b714-8c1e0b2149bc  # night 0145: reflection, subject unclear
+2f15f05c-9fef-42d9-8e72-55613a431640  # night 0146: indoor dance, off-genre
+54cc778b-7807-4748-9a1d-799057d7d785  # night 0148: subject tiny
+c415e136-db14-4446-a7af-63868c749810  # night 0149: no clear subject

@@ -957,12 +957,35 @@ model.
       main subject and scores each image against the look's colour profile.
       Manifest: `data/manifests/neon_street_portrait.csv`; images in
       `data/styles/neon_street_portrait/` (gitignored).
-- [ ] Hand-review the set: drop off-look images, check night/day balance,
-      aim for ≥ 100 kept.
+- [x] Hand-review the set: drop off-look images, check night/day balance,
+      aim for ≥ 100 kept. **Done:** 142 kept (71 night / 71 day), 74
+      exclusions with reasons. Datasheet:
+      [`data/manifests/neon_street_portrait.md`](data/manifests/neon_street_portrait.md).
 - [ ] Input pool (the photos to be edited): FiveK *original* renders, plus a
       disjoint set of openly licensed, un-stylised night street photos.
       Night coverage matters, because FiveK has few night scenes.
 - [ ] Hold out 20 % of both sets for evaluation.
+
+**Update after data collection (2026-09-23).** The stand-in set matches the
+reference look on black point, tonal key, saturation, framing and shallow
+depth of field. It does **not** match the split tone: its night images are
+warm (median shadow b\* +2.9, highlight b\* +10.8), while the reference
+look has cool shadows (b\* −4 to −10) and neutral highlights. The pilot
+therefore uses a **hybrid target**:
+- the **grade** (banded chroma per luminance range, black point, key,
+  saturation) is matched to the *look profile*: per-regime target
+  statistics taken from the style study. This is the "goal-based" route from
+  §1, without copying any image;
+- the **stand-in set** provides realistic night and day inputs,
+  distribution-level supervision only for the attributes it shares (L\*
+  distribution, saturation, DoF statistics for Phase 18), and held-out
+  evaluation images;
+- profile targets are stored in the style card and exposed as editable
+  numbers, so the look can be tuned without new data.
+
+Collection follow-ups: cap images per creator at ~10 (two creators supply
+32 %), add Wikimedia Commons as a second source for night scenes, and use the
+owner's own night photos as inputs.
 
 **Model** (minimum viable): the Phase 7 fixed trainer, frozen cached
 features, and the current renderer with **per-channel curves** brought
@@ -970,7 +993,8 @@ forward from Phase 9 (the split tone needs them). No 3D LUT yet.
 
 **Losses** (unpaired, from Phase 11):
 - a luminance-conditioned colour-statistics loss: chroma means and
-  variances in shadow, mid and highlight bands, matched to the style set;
+  variances in shadow, mid and highlight bands, matched to the **look
+  profile** targets (see the update above);
 - a batch CDF / sliced-Wasserstein loss on Lab;
 - an identity anchor on structure;
 - distort-and-recover pseudo-pairs built from style-set images.

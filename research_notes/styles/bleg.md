@@ -68,11 +68,12 @@ like a Fujifilm X100-series.
 
 ## Implications for training
 
-- This is an **unpaired style** (no before/after pairs). Collect ~100–300 of
-  his published stills for private research use only and don't redistribute.
-  Train with the Phase 11 losses: luminance-conditioned colour statistics
-  are the key term, because the signature *is* "cool shadows / warm mids /
-  neutral highs".
+- This is an **unpaired style** (no before/after pairs). Per amendment A1.1
+  his images are **not** collected or trained on. Training uses an openly
+  licensed stand-in set (`data/manifests/neon_street_portrait.md`) plus the
+  summary statistics above as the grade target (Pilot A, PROJECT_PLAN §17).
+  Luminance-conditioned colour statistics are the key loss term, because the
+  signature *is* "cool shadows / warm mids / neutral highs".
 - Stratify the style set by **night vs. day** and check that predicted
   parameters differ between the two. That spread is the success metric.
 - A static baseline to beat: per-channel curves with a zero black point,
