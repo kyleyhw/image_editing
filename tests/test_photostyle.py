@@ -118,3 +118,30 @@ def test_lut_renderer_identity_and_learnable():
     loss = (r(img, p) - img.flip(1)).abs().mean() + r.regularizer()
     loss.backward()
     assert r.bases.grad.abs().sum() > 0
+
+
+def test_engine_round_trip(tmp_path):
+    from PIL import Image
+
+    from photostyle.engine import EditParams, Engine, save_stylepack
+    from photostyle.features import FEATURE_DIM
+
+    r = GlobalRenderer("per_channel")
+    head = Head(FEATURE_DIM, r.num_params)
+    feats = torch.randn(10, FEATURE_DIM)
+    head.set_norm(feats)
+    torch.nn.init.normal_(head.net[-1].weight, std=0.01)  # a non-identity style
+    save_stylepack(tmp_path / "packs" / "t", "t", head, r, feats, {"source": "test"})
+    eng = Engine(roots=[tmp_path / "packs"])
+    assert [c["name"] for c in eng.styles()] == ["t"]
+    img = Image.fromarray((np.random.default_rng(0).random((40, 60, 3)) * 255).astype("uint8"))
+    p = eng.predict(img, "t")
+    out = eng.render(img, p)
+    assert out.size == img.size
+    ident = eng.render(img, p.with_strength(0.0))
+    assert np.abs(np.asarray(ident, float) - np.asarray(img, float)).max() <= 2  # LUT + 8-bit rounding
+    p2 = EditParams.from_json(p.to_json())
+    assert p2.theta == p.theta
+    p.to_cube(tmp_path / "x.cube")
+    p.to_xmp(tmp_path / "x.xmp")
+    assert "ToneCurvePV2012Red" in (tmp_path / "x.xmp").read_text()
