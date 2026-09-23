@@ -1492,3 +1492,28 @@ in effect until then.
    style sets? [default: Openverse only, 200 requests/day]
 10. **Preference tests** with people (the success metrics in §4 need
     them): who, and how many? [default: not run]
+
+#### A4.5 Owner answers (2026-09-23)
+
+| # | decision | answer | effect |
+|---|---|---|---|
+| 1 | edited photos | 2, 3, 5, 7, 8, 9 are edited; 1, 4, 6, 10 are unedited; more unedited photos to follow | manifest updated. The re-sent photo was an exact duplicate of photo 1. Originals of the edited ones would give owner-look pairs |
+| 2 | Clean Cool day look | pending: comparison sheet sent (v1 / v2 at 100 % and 70 %) | — |
+| 3 | first built-in style | **Clean Cool** | unchanged |
+| 4 | learned sky segmenter | explained; pending | — |
+| 5 | FiveK pack | personal project for now; **flag if it ever goes commercial** | pack stays local; see the commercial checklist below |
+| 6 | PPR10K | undecided | not used (portraits are later anyway) |
+| 7 | release | **open source** | needs a licence file (owner to pick; MIT or Apache-2.0 recommended). Research-licence data and weights stay out of the repo |
+| 8 | front end | **most customisable + best UX** | recommendation: move Studio to Svelte (component UI), keep the FastAPI server and the WebGL renderer module. Planned as the next UI phase |
+| 9 | stock-photo API key | undecided | Openverse only |
+| 10 | preference tests | owner only, later | — |
+
+**Commercial checklist (flag before any commercial use):**
+- MIT-Adobe FiveK is research-only. This affects the `fivek_c_landscape`
+  pack, every head trained on FiveK pairs or inputs (including Clean
+  Cool's inputs), and the FiveK figures in reports.
+- PPR10K is research-only (if ever used).
+- Openverse seed images: CC BY / BY-SA need attribution (the manifests
+  carry it). BY-SA may impose share-alike on derived datasets.
+- Depth Anything V2 **Small** is Apache-2.0 and fine. Base, Large and
+  Giant are non-commercial and excluded.
