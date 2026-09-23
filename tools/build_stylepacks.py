@@ -2,8 +2,9 @@
 
     uv run python tools/build_stylepacks.py [--only clean_cool,fivek_c_landscape]
 
-clean_cool           Pilot A head (unpaired Clean Cool look, landscapes).
-                     Needs checkpoints/pilot_a_clean_cool_head.pt from bench/pilot_a.py.
+clean_cool           Pilot A v2 head (unpaired Clean Cool look, landscapes), default strength 0.7.
+                     Needs checkpoints/pilot_a_clean_cool_head_v2.pt from
+                     bench/pilot_a.py --keep-chroma 1.0 --tag _v2.
 fivek_c_landscape    Paired head trained here on the FiveK expert-C landscape pool.
                      Research-licence data (MIT-Adobe FiveK); see the style card.
 
@@ -43,7 +44,7 @@ def main() -> None:
     r = GlobalRenderer("per_channel")
 
     if "clean_cool" in want:
-        ck = torch.load("checkpoints/pilot_a_clean_cool_head.pt", map_location="cpu", weights_only=False)
+        ck = torch.load("checkpoints/pilot_a_clean_cool_head_v2.pt", map_location="cpu", weights_only=False)
         head = Head(FEATURE_DIM, r.num_params)
         head.load_state_dict(ck["state_dict"])
         feats = torch.stack([it["feat"] for it in random.Random(7).sample(pool, min(800, len(pool)))])
@@ -57,6 +58,8 @@ def main() -> None:
                              "(data/manifests/clean_cool_landscape.csv)",
             "report": "tests/reports/pilotA_clean_cool_landscapes.md",
             "note": "vignette is disabled for this look",
+            "version": "v2 (chroma-keep), chosen by the owner at 70 % strength (PROJECT_PLAN A4.5)",
+            "default_strength": 0.7,
         })
         print("clean_cool -> stylepacks/clean_cool")
 

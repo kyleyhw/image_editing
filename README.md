@@ -294,6 +294,15 @@ See [`docs/training_and_inference.md`](docs/training_and_inference.md)
 for all options and a multi-style reproduction recipe that matches the
 verification report.
 
+## Licence
+
+Code: [MIT](LICENSE). Datasets and model weights keep their own licences and are
+not in this repository. MIT-Adobe FiveK and anything trained on it (the
+`fivek_c_landscape` and `clean_cool` style packs) are for research and
+personal use only. The openly licensed style-seed images need the
+attribution recorded in `data/manifests/`. Depth Anything V2 Small is
+Apache-2.0. See `PROJECT_PLAN.md` A4.5 for the commercial-use checklist.
+
 ## References
 
 <span id="ref-he-2016">[1]</span> He, K., Zhang, X., Ren, S. & Sun, J. (2016). *Deep Residual Learning for Image Recognition.* CVPR. [Link](https://doi.org/10.1109/CVPR.2016.90)

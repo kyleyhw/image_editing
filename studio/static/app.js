@@ -229,7 +229,7 @@ async function selectPhoto(id) {
 async function predict() {
   if (!S.id || !S.style) return;
   S.params = await (await api("/api/predict", { id: S.id, style: S.style })).json();
-  S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.knots = null; S.strength = 1; S.undo = []; S.redo = []; S._last = snap();
+  S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.knots = null; S.strength = S.params.strength ?? 1; S.undo = []; S.redo = []; S._last = snap();
   syncControls(); showParamsInfo(); render();
 }
 let stripGen = 0;
@@ -249,7 +249,7 @@ async function styleStrip() {
     const p = await (await api("/api/predict", { id: S.id, style: st.name })).json();
     if (gen !== stripGen) return;
     const saved = [S.params, S.knots, S.d, S.strength];
-    S.params = p; S.knots = null; S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.strength = 1;
+    S.params = p; S.knots = null; S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.strength = p.strength ?? 1;
     draw(thumbR, effective(), p.knots, 2); c.getContext("2d").drawImage(thumbCanvas, 0, 0);
     [S.params, S.knots, S.d, S.strength] = saved;
     div.onclick = () => { S.style = st.name; $("#styleSel").value = st.name; $$(".thumb").forEach((t) => t.classList.remove("sel")); div.classList.add("sel"); S.mode = "split"; predict(); };
@@ -280,7 +280,7 @@ for (const k of ["warmth", "tint", "sat", "vig"]) $(`#${k}`).oninput = (e) => { 
 $$("#panel input[type=range]").forEach((i) => (i.onchange = commit));
 $$(".seg").forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; $$(".seg").forEach((x) => x.classList.toggle("on", x === b)); render(); }));
 $$(".tab").forEach((b) => (b.onclick = () => { S.ch = +b.dataset.ch; $$(".tab").forEach((x) => x.classList.toggle("on", x === b)); drawCurves(); }));
-$("#btnReset").onclick = () => { S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.knots = null; S.strength = 1; commit(); syncControls(); render(); };
+$("#btnReset").onclick = () => { S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.knots = null; S.strength = S.params.strength ?? 1; commit(); syncControls(); render(); };
 $("#btnExport").onclick = () => S.params && download($("#exportFmt").value);
 $("#btnRemember").onclick = async () => {
   if (!S.params) return;
@@ -376,7 +376,7 @@ async function batchPreview() {
     const img = new Image(); img.src = `/api/photo/${ph.id}?edge=400`; await img.decode();
     thumbCanvas.width = img.naturalWidth; thumbCanvas.height = img.naturalHeight; setImage(thumbR, img);
     const saved = [S.params, S.knots, S.d, S.strength];
-    S.params = ps[i]; S.knots = null; S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.strength = 1;
+    S.params = ps[i]; S.knots = null; S.d = { warmth: 0, tint: 0, sat: 0, vig: 0 }; S.strength = ps[i].strength ?? 1;
     draw(thumbR, effective(), ps[i].knots, 2);
     [S.params, S.knots, S.d, S.strength] = saved;
     const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
@@ -387,7 +387,7 @@ async function batchPreview() {
 $("#batchRun").onclick = batchPreview;
 $("#batchExport").onclick = async () => {
   const ps = await batchPreview();
-  for (const [i, ph] of S.photos.entries()) await download("jpg", ph.id, { ...ps[i], strength: 1, overrides: {} });
+  for (const [i, ph] of S.photos.entries()) await download("jpg", ph.id, { ...ps[i], overrides: {} });
 };
 
 (async () => { await loadStyles(); await loadPhotos(); if (S.photos.length) selectPhoto(S.photos[0].id); })();

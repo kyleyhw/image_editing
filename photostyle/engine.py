@@ -218,12 +218,15 @@ class Engine:
         return t
 
     @torch.no_grad()
-    def predict(self, image: str | Path | Image.Image, style: str, strength: float = 1.0) -> EditParams:
+    def predict(self, image: str | Path | Image.Image, style: str, strength: float | None = None) -> EditParams:
+        """Predict edit parameters. ``strength`` defaults to the pack's ``default_strength`` (else 1)."""
         img = load_image(image)[0] if not isinstance(image, Image.Image) else image
         pack = self.style(style)
         f = self.fx(self._proxy(img))
         theta = pack.head(f[None])[0]
         z = ((f - pack.feat_mean) / pack.feat_std).pow(2).mean().sqrt()
+        if strength is None:
+            strength = float(pack.card.get("default_strength", 1.0))
         return EditParams(style=style, renderer=pack.renderer.kind, knots=pack.renderer.K,
                           theta=theta.tolist(), strength=strength, ood_score=float(z / pack.ood_ref))
 

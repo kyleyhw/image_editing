@@ -3,6 +3,8 @@ name = "image-editing"
 version = "0.1.0"
 description = "Content-adaptive, editable photo styles: learn per-image parametric edits toward a target look from paired or unpaired examples."
 requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "datasets>=2.16",
     "fastapi>=0.141.1",

@@ -155,7 +155,7 @@ def photo(pid: str, edge: int = 1600):
 @app.post("/api/predict")
 def predict(body: dict):
     d = _photo_dir(body["id"])
-    p = engine.predict(Image.open(d / "srgb.jpg"), body["style"], strength=body.get("strength", 1.0))
+    p = engine.predict(Image.open(d / "srgb.jpg"), body["style"], strength=body.get("strength"))
     return _params_payload(p)
 
 

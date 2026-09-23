@@ -132,10 +132,14 @@ def test_engine_round_trip(tmp_path):
     head.set_norm(feats)
     torch.nn.init.normal_(head.net[-1].weight, std=0.01)  # a non-identity style
     save_stylepack(tmp_path / "packs" / "t", "t", head, r, feats, {"source": "test"})
+    save_stylepack(tmp_path / "packs" / "u", "u", head, r, feats, {"source": "test", "default_strength": 0.7})
     eng = Engine(roots=[tmp_path / "packs"])
-    assert [c["name"] for c in eng.styles()] == ["t"]
+    assert [c["name"] for c in eng.styles()] == ["t", "u"]
     img = Image.fromarray((np.random.default_rng(0).random((40, 60, 3)) * 255).astype("uint8"))
     p = eng.predict(img, "t")
+    assert p.strength == 1.0
+    assert eng.predict(img, "u").strength == 0.7            # the pack's own default
+    assert eng.predict(img, "u", strength=0.3).strength == 0.3
     out = eng.render(img, p)
     assert out.size == img.size
     ident = eng.render(img, p.with_strength(0.0))

@@ -91,7 +91,7 @@ def cmd_export_cube(args, eng) -> None:
     if not ps:
         sys.exit("no photos given: the average LUT is the mean edit over the photos you pass")
     mean = torch.tensor([p.theta for p in ps]).mean(0).tolist()
-    avg = EditParams(style=args.style, renderer=ps[0].renderer, knots=ps[0].knots, theta=mean)
+    avg = EditParams(style=args.style, renderer=ps[0].renderer, knots=ps[0].knots, theta=mean, strength=ps[0].strength)
     avg.to_cube(args.out, size=args.size)
     print(f"average of {len(ps)} edits -> {args.out}")
 
@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("action", choices=["list"])
     a = sub.add_parser("apply")
     a.add_argument("--style", required=True)
-    a.add_argument("--strength", type=float, default=1.0)
+    a.add_argument("--strength", type=float, default=None, help="default: the style's own default (usually 1)")
     a.add_argument("-o", "--out", default="out")
     a.add_argument("--cube", action="store_true")
     a.add_argument("--xmp", action="store_true")
