@@ -7,7 +7,8 @@ Parametric, editable operations that only re-weight existing pixels:
               and the inverse for h < 0 (dehaze): x' = (x - A |h| t) / (1 - |h| t)
   clarity     depth-weighted local contrast (unsharp mask), separately
               for near and far:  x' = x + (k_near n + k_far f) (x - blur(x))
-  sky light   exposure / warmth / saturation on the sky mask (Phase 16)
+  sky light   exposure / warmth / saturation on the sky mask (learned
+              segmenter, photostyle.sky; heuristic fallback offline)
 
 Depth: Depth Anything V2 **Small** (Apache-2.0; the Base/Large/Giant
 checkpoints are CC BY-NC 4.0 and excluded under A1.1), run on a <= 518 px
@@ -25,7 +26,8 @@ from dataclasses import asdict, dataclass
 import torch
 import torch.nn.functional as F
 
-from photostyle.regional import RegionalRenderer, box_filter, guided_filter, sky_probability
+from photostyle.regional import RegionalRenderer, box_filter, guided_filter
+from photostyle.sky import sky_mask
 
 MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 _model = None
@@ -104,7 +106,7 @@ def apply_scene(img: torch.Tensor, p: SceneParams, near: torch.Tensor | None = N
         A = a.view(1, 1, 1, 1).expand(1, 3, 1, 1).clone()
         A[:, 0] += 0.04 * p.haze_warmth
         A[:, 2] -= 0.04 * p.haze_warmth
-        s_ = sky if sky is not None else sky_probability(img)
+        s_ = sky if sky is not None else sky_mask(img)
         t = far ** p.falloff * (1 - (0.7 if p.haze > 0 else 1.0) * s_)
         if p.haze > 0:
             x = x * (1 - p.haze * t) + A * p.haze * t
@@ -115,13 +117,16 @@ def apply_scene(img: torch.Tensor, p: SceneParams, near: torch.Tensor | None = N
             dark = box_filter(x.min(1, keepdim=True).values, 3)
             present = (dark / A.mean().clamp_min(1e-3)).clamp(0, 1)
             k = (-p.haze * t * present).clamp(max=0.85)
-            x = (x - A * k) / (1 - k)
+            # Pixels brighter than A (white petals, snow) read as "haze" to the dark
+            # channel; dehazing would only push them into clipping. The formula gives
+            # exactly A at x = A, so leaving x > A untouched is continuous.
+            x = torch.where(x > A, x, (x - A * k) / (1 - k))
     if abs(p.clarity_near) > 1e-6 or abs(p.clarity_far) > 1e-6:
         r_ = max(2, min(x.shape[2], x.shape[3]) // 100)
         detail = x - box_filter(x, r_)
         x = x + (p.clarity_near * near + p.clarity_far * far) * 1.5 * detail
     if abs(p.sky_exposure) + abs(p.sky_warmth) + abs(p.sky_saturation) > 1e-6:
-        s = sky if sky is not None else sky_probability(img)
+        s = sky if sky is not None else sky_mask(img)
         one = torch.ones(1)
         x = RegionalRenderer._adjust(x, s, one * p.sky_exposure, one * p.sky_warmth, one * p.sky_saturation)
     return x.clamp(0, 1)

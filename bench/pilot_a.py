@@ -114,6 +114,7 @@ def no_vignette(theta: torch.Tensor) -> torch.Tensor:
 
 
 def train(model, r, inputs, seed, pseudo, steps, lr=3e-3, w=(1.0, 0.5, 2.0, 1.0), keep_chroma=0.0):
+    """Items may carry a precomputed training-size sky mask in "sky_s" (``--learned-sky``)."""
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     seed_pix = {g: torch.cat([lab_pixels(s["img"][None], 4096) for s in seed if s["regime"] == g])
                 for g in ("night", "day")}
@@ -128,7 +129,8 @@ def train(model, r, inputs, seed, pseudo, steps, lr=3e-3, w=(1.0, 0.5, 2.0, 1.0)
                  for o, b, x in zip(outs, batch, srcs)) / len(batch)
         lf = sum(fidelity_loss(o, x) for o, x in zip(outs, srcs)) / len(batch)
         if keep_chroma:
-            lf = lf + keep_chroma * sum(chroma_keep_loss(o, x) for o, x in zip(outs, srcs)) / len(batch)
+            lf = lf + keep_chroma * sum(chroma_keep_loss(o, x, sky=b.get("sky_s"))
+                                        for o, x, b in zip(outs, srcs, batch)) / len(batch)
         ls = 0.0
         for g in ("night", "day"):
             og = [o for o, b in zip(outs, batch) if b["regime"] == g]
@@ -166,6 +168,8 @@ def evaluate(name, theta, r, test, results):
                "new_clip": float(clip_fraction(out[None]) - clip_fraction(src)),
                "detail": float(detail_similarity(out[None], src)),
                "chroma_kept": chroma_retention(out[None], src)}
+        if "sky_full" in it:
+            row["sky_chroma_kept"] = chroma_retention(out[None], src, sky=it["sky_full"], sky_only=True)
         ref_regions = regions(it["src"])
         for rg, im in regions(out).items():
             d = profile_distance(im, it["regime"], CLEAN_COOL, ref=ref_regions[rg])
@@ -185,6 +189,8 @@ def evaluate(name, theta, r, test, results):
                     "new_clip": float(np.mean([x["new_clip"] for x in sel])),
                     "detail": float(np.mean([x["detail"] for x in sel])),
                     "chroma_kept": float(np.mean([x["chroma_kept"] for x in sel]))}
+                if "sky_chroma_kept" in sel[0]:
+                    cells[f"{reg}/{sub}"]["sky_chroma_kept"] = float(np.nanmean([x["sky_chroma_kept"] for x in sel]))
     results["cells"][name] = cells
     print(f"{name:10s} " + "  ".join(f"{c}: {v['dist_all']:.2f} (clip {v['new_clip']:+.3f}, "
                                      f"detail {v['detail']:.2f}, chroma {v['chroma_kept']:.2f})" for c, v in cells.items()), flush=True)
@@ -237,6 +243,8 @@ def main() -> None:
     ap.add_argument("--keep-chroma", type=float, default=0.0,
                     help="weight of the sky / saturated-subject chroma floor (v2); 0 = the original pilot")
     ap.add_argument("--tag", default="", help="suffix for the checkpoint name")
+    ap.add_argument("--learned-sky", action="store_true",
+                    help="use the learned sky segmenter (photostyle.sky) for the chroma floor and sky metrics (v3)")
     args = ap.parse_args()
     torch.set_num_threads(args.threads)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -250,6 +258,14 @@ def main() -> None:
     test = random.Random(8).sample(data.split("test"), args.test)
     for it in pool + test:
         it["regime"] = regime_t(small(it, "src"))
+    if args.learned_sky:
+        from photostyle.sky import sky_mask
+
+        for it in pool:
+            it["sky_s"] = sky_mask(small(it, "src")[None])
+        for it in test:
+            it["sky_full"] = sky_mask(it["src"][None])
+        print(f"sky masks for {len(pool) + len(test)} images [{time.time() - t0:.0f}s]", flush=True)
     seed = load_seed(args.seed_dir)
     r = GlobalRenderer("per_channel")
     pseudo = pseudo_pairs(seed, r, fx, k=16, rng=torch.Generator().manual_seed(0))

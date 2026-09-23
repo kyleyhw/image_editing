@@ -179,23 +179,33 @@ def _chroma(img: torch.Tensor) -> torch.Tensor:
     return (lab[:, 1] ** 2 + lab[:, 2] ** 2 + 1e-6).sqrt()
 
 
-def _keep_weight(ref: torch.Tensor) -> torch.Tensor:
-    """Pixels whose colour a muted look should still respect: sky and strongly coloured subjects."""
-    from photostyle.regional import sky_probability
+def _keep_weight(ref: torch.Tensor, sky: torch.Tensor | None = None) -> torch.Tensor:
+    """Pixels whose colour a muted look should still respect: sky and strongly coloured subjects.
 
-    return (sky_probability(ref)[:, 0] + torch.sigmoid((_chroma(ref) - 30) / 5)).clamp(max=1)
+    ``sky`` (B, 1, H, W) is a precomputed sky mask (e.g. ``photostyle.sky.sky_mask``);
+    without it the heuristic ``regional.sky_probability`` is used."""
+    if sky is None:
+        from photostyle.regional import sky_probability
+
+        sky = sky_probability(ref)
+    return (sky[:, 0] + torch.sigmoid((_chroma(ref) - 30) / 5)).clamp(max=1)
 
 
-def chroma_keep_loss(out: torch.Tensor, ref: torch.Tensor, keep: float = 0.6) -> torch.Tensor:
+def chroma_keep_loss(out: torch.Tensor, ref: torch.Tensor, keep: float = 0.6,
+                     sky: torch.Tensor | None = None) -> torch.Tensor:
     """Penalise sky / saturated-subject chroma falling below ``keep`` x the input's (Lab units / 10)."""
     with torch.no_grad():
-        w, c_ref = _keep_weight(ref), _chroma(ref)
+        w, c_ref = _keep_weight(ref, sky), _chroma(ref)
     drop = torch.relu(keep * c_ref - _chroma(out))
     return ((drop * w).sum() / w.sum().clamp_min(1.0)) / 10
 
 
 @torch.no_grad()
-def chroma_retention(out: torch.Tensor, ref: torch.Tensor) -> float:
-    """Chroma of the edit / chroma of the input, over sky and strongly coloured pixels (1 = kept)."""
-    w = _keep_weight(ref)
+def chroma_retention(out: torch.Tensor, ref: torch.Tensor, sky: torch.Tensor | None = None,
+                     sky_only: bool = False) -> float:
+    """Chroma of the edit / chroma of the input, over sky and strongly coloured pixels (1 = kept).
+    With ``sky_only`` (needs ``sky``), over the sky alone."""
+    w = sky[:, 0] if sky_only else _keep_weight(ref, sky)
+    if sky_only and float(w.mean()) < 0.02:  # (almost) no sky in this photo
+        return float("nan")
     return float((_chroma(out) * w).sum() / (_chroma(ref) * w).sum().clamp_min(1e-6))

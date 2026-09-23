@@ -26,9 +26,9 @@ fallback is used (vertical position + dark channel).
 | +haze lowers far contrast more than near contrast | 12/12 (far ×0.62 median, near ×0.96) |
 | dehaze raises far contrast | 12/12 |
 | near clarity / far softening: near contrast rises more than far | 12/12 (near ×1.5, far ×0.66) |
-| new clipped pixels, worst image | +haze 1.2 %, near/far clarity 1.9 %, dehaze 4.2 % (one image; 11 of 12 are ≤ 3 % and most ≈ 0) |
+| new clipped pixels, worst image | +haze 0.6 %, near/far clarity 1.9 %, **dehaze 0 %** (after fix 3) |
 | depth model vs fallback agreement (Spearman) | median 0.76; negative on 2 images (close-ups, where "lower = nearer" is wrong) |
-| runtime, 4-core CPU under load, 1 thread | depth 1.0 s at 1024 px (1.6 s for a 12 MP proxy); edit at 12 MP 6–7 s |
+| runtime, 4-core CPU (4 threads, idle machine) | depth 0.24 s at 1024 px (0.4 s for a 12 MP proxy); sky mask about 0.5 s; edit at 12 MP 1–3 s. Under load with 1 thread: depth 1.0 s, edit 6–7 s |
 
 ![Phase 18 grid](assets/phase18_grid.jpg)
 
@@ -47,6 +47,14 @@ fallback is used (vertical position + dark channel).
    pixel. It is now separable (output identical to 1e-6), and large images
    use a 1024 px proxy: **5 s at 12 MP on one thread**, down from many
    minutes.
+
+3. **Learned sky mask** (owner decision A4.5 #4, `photostyle/sky.py`; see
+   `sky_audit.md`). Haze and sky-light now use it. It correctly treats a
+   white macro flower as not-sky, which exposed a dehaze bug the heuristic
+   had hidden: bright whites read as haze to the dark channel and were
+   pushed into clipping (11 %). Pixels brighter than the atmospheric
+   light are now left untouched. The formula gives exactly A at x = A, so
+   this is continuous, and new clipping is 0 %.
 
 ## Limits and follow-ups
 
