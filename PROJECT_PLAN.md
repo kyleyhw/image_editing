@@ -11,6 +11,11 @@ Rationale and literature review:
 [`reports/Content adaptive photo edit models.md`](reports/Content%20adaptive%20photo%20edit%20models.md)
 (full comparison of 18 methods). Source notes are in [`research_notes/`](research_notes/).
 
+> **Amended.** Amendment A1 (§17, 2026-09-23) adds the first target look
+> (*Neon Street Portrait*, a pilot run right after Phase 7), a new
+> Phase 18 for depth-of-field and light-shaping emulation, and a
+> project-wide style-data policy. Where A1 and earlier text disagree, A1 wins.
+
 ---
 
 ## Contents
@@ -22,7 +27,7 @@ Rationale and literature review:
 5. [Status: Phases 1–6 (groundwork, complete)](#5-status-phases-16-groundwork-complete)
 6. [Target system architecture](#6-target-system-architecture)
 7. [Roadmap overview](#7-roadmap-overview)
-8. [Detailed phases (7–17)](#8-detailed-phases)
+8. [Detailed phases (7–17)](#8-detailed-phases) — Pilot A and Phase 18 are specified in §17 (A1)
 9. [UI / UX specification](#9-ui--ux-specification)
 10. [Data strategy](#10-data-strategy)
 11. [Evaluation protocol](#11-evaluation-protocol)
@@ -31,6 +36,7 @@ Rationale and literature review:
 14. [Non-goals](#14-non-goals)
 15. [Open questions for the project owner](#15-open-questions-for-the-project-owner)
 16. [Backlog and housekeeping](#16-backlog-and-housekeeping)
+17. [Amendments](#17-amendments) — **A1: first target look, capture emulation, style-data policy**
 
 ---
 
@@ -315,9 +321,12 @@ L ≈ 3–6 weeks (part-time pace).
 | 15 | P/R | Personalisation loop, series consistency, blending | L | 14 | Measurable gain from user corrections |
 | 16 | R | Regional edits (conditional) | L | 7–11 | Only if oracle gap shows local structure |
 | 17 | I/P | Packaging, docs, release | M | 13 | Installable release + public demo |
+| **A** | R | **Pilot: Neon Street Portrait look** *(A1)* | M | 7 (8 helpful) | Adaptive beats fixed preset; night/day parameter spread > 0 |
+| **18** | R/E/P | **Capture emulation: depth of field + light shaping** *(A1)* | L | A, 12 | Preference ≥ 60 % vs. no-DoF; halo-free in ≥ 80 % |
 
-Suggested sequencing: **7 ∥ 8 → 9 → (10 ∥ 12) → 11 ∥ 13 → 14 → 15 → 17**,
-with 16 decided after 11.
+Suggested sequencing (amended by A1): **7 ∥ 8 → Pilot A → 9 → (10 ∥ 12) →
+11 ∥ 13 → 18 → 14 → 15 → 17**, with 16 decided after 11. Phase 18 can be
+prototyped in the research lab straight after Pilot A.
 
 ---
 
@@ -755,6 +764,7 @@ Interaction details
 | **Unpaired style sets** (cyberpunk, film, matte…) | Unpaired | ~300 per style | Phase 11 | Use CC-licensed sources (Openverse, Wikimedia Commons, Unsplash licence); record licences in a manifest |
 | **Synthetic fixed-function styles** (existing generators) | Paired | Unlimited | Unit/sanity tests of renderer and training | Content-independent by construction |
 | **Unedited photo pool** (picsum / Unsplash / COCO) | Inputs only | 1–10K | Inputs for unpaired training; OOD calibration | |
+| **Neon Street Portrait stand-in set** *(A1)* | Unpaired, openly licensed (CC0 / PDM / BY / BY-SA) via Openverse | ~100–150 | Pilot A style set | Collected by `tools/collect_style_set.py`; manifest + attribution in `data/manifests/neon_street_portrait.csv` |
 
 Rules
 - Every dataset gets a **manifest** (file list, hashes, licence, source
@@ -821,7 +831,12 @@ Rules
 
 ## 14. Non-goals
 
-- Generative editing (adding/removing objects, relighting, sky replacement).
+- Generative editing (adding/removing objects, generative relighting, sky
+  replacement). *A1 clarification:* parametric, mask-based light shaping and
+  synthetic depth of field (Phase 18) are in scope, because they only
+  re-weight and blur existing pixels.
+- Training on an identifiable artist's copyrighted work without licence or
+  consent, or scraping platforms against their terms (A1 policy).
 - Geometry changes (crop, rotate, lens correction, perspective).
 - Denoising, sharpening, super-resolution (LUTs amplify noise; out of scope
   except the grain slider).
@@ -838,8 +853,9 @@ Rules
    Phase 13 against the current renderer.
 2. **Front-end stack**: FastAPI + Svelte/React + WebGL (recommended), stay
    on Streamlit, or a desktop app (Tauri)?
-3. **Which looks matter most?** (Film emulations, cyberpunk, a specific
-   photographer, your own edits?) This decides the Phase 11 style sets.
+3. ~~**Which looks matter most?**~~ *Answered in A1:* first look is a
+   night/day street-portrait look inspired by the photographer Bleg
+   (Neon Street Portrait). Others remain open.
 4. **Real Fujifilm data**: do you have access to a Fujifilm (or other)
    camera for RAW+JPEG pairs?
 5. **Datasets**: is PPR10K's licence acceptable for your use?
@@ -869,3 +885,207 @@ Ideas parking lot (not scheduled)
   checker and a skin-tone ramp.
 - Style marketplace/sharing format with signed style cards.
 - Temporal smoothing of θ for video sequences.
+
+---
+
+## 17. Amendments
+
+### A1 — First target look, capture emulation, and style-data policy
+
+*Adopted 2026-09-23. Status: active.*
+
+**Why.** The project owner chose a first concrete look: the night/day
+street-portrait style of the photographer **Bleg** (Bleg Bayraktar,
+@itsbleg), studied in [`research_notes/styles/bleg.md`](research_notes/styles/bleg.md).
+Three consequences did not fit the plan as written:
+
+1. The look is only available as finished photos (no before/after pairs),
+   and those photos are the photographer's copyrighted work.
+2. Much of the look comes from capture, not grading: shallow depth of field
+   with neon bokeh, and a subject that is brighter and warmer than a darker,
+   cooler background. The plan had no place for these.
+3. The plan front-loaded research gates and gave no early, visible end-to-end
+   result on a look the owner actually cares about.
+
+A1 answers each in turn.
+
+#### A1.1 Style-data policy (project-wide)
+
+These rules apply to every style from now on, built-in or experimental.
+
+- **Only openly licensed or consented data is stored or trained on.**
+  Allowed licences: CC0, Public Domain Mark, CC BY, CC BY-SA. Also allowed:
+  data the user owns, or data with the author's written permission. NC and
+  ND licences are excluded, so built-in styles stay redistributable.
+- **No scraping against platform terms** (e.g. Instagram), and no bulk
+  downloading of an identifiable artist's portfolio.
+- **Reference artists may be studied, not copied.** Looking at a small
+  number of publicly published images and recording *summary statistics*
+  (black point, split-tone direction, saturation) is allowed; these numbers
+  guide data selection. Their images are not stored in the repo or used as
+  training data.
+- **Descriptive names.** Styles are named after what they look like
+  (*Neon Street Portrait*), not after people. An artist's name may appear
+  only in research notes as "inspired by", unless the artist has consented.
+- **Manifests are mandatory.** Every image has a row with licence, creator,
+  source URL, attribution text and SHA-256 in `data/manifests/`. Built-in
+  styles ship with a style card that lists the attributions.
+- **Takedown.** A creator's request removes their images from the manifest,
+  and any affected style is retrained.
+- **Users' own data** (their photos, or images they save themselves for
+  private study) stays local and is their responsibility. The app shows a
+  short notice in the style-creation wizard.
+
+#### A1.2 Pilot A: *Neon Street Portrait* (runs right after Phase 7)
+
+**Goal.** A first end-to-end result on the chosen look, using the Phase 7
+harness and the smallest renderer upgrade that can express the look. It
+also serves as an early rehearsal of Phase 11.
+
+**The look, as a target** (from the style study):
+- deep, true blacks (L\* p1 ≈ 1) with no matte lift;
+- cool shadows (b\* −4 to −10), warm skin and midtones, neutral highlights;
+- **night:** low-key (median L\* ≈ 15–18) with saturated, glowing neon;
+- **day:** airy, soft, low saturation, almost-white highlights.
+
+The night/day contrast is the reason this look needs a *content-adaptive*
+model.
+
+**Data**
+- [x] Style set: openly licensed night and day street portraits from
+      Openverse. `tools/collect_style_set.py` filters for a person as the
+      main subject and scores each image against the look's colour profile.
+      Manifest: `data/manifests/neon_street_portrait.csv`; images in
+      `data/styles/neon_street_portrait/` (gitignored).
+- [ ] Hand-review the set: drop off-look images, check night/day balance,
+      aim for ≥ 100 kept.
+- [ ] Input pool (the photos to be edited): FiveK *original* renders, plus a
+      disjoint set of openly licensed, un-stylised night street photos.
+      Night coverage matters, because FiveK has few night scenes.
+- [ ] Hold out 20 % of both sets for evaluation.
+
+**Model** (minimum viable): the Phase 7 fixed trainer, frozen cached
+features, and the current renderer with **per-channel curves** brought
+forward from Phase 9 (the split tone needs them). No 3D LUT yet.
+
+**Losses** (unpaired, from Phase 11):
+- a luminance-conditioned colour-statistics loss: chroma means and
+  variances in shadow, mid and highlight bands, matched to the style set;
+- a batch CDF / sliced-Wasserstein loss on Lab;
+- an identity anchor on structure;
+- distort-and-recover pseudo-pairs built from style-set images.
+
+**Baselines**
+- (i) identity;
+- (ii) a **hand-built static preset**: black point to 0, blue-lifted shadow
+  curve, warm mid matrix;
+- (iii) per-channel histogram matching to the style set's mean CDF.
+
+**Metrics**
+- Colour-statistics distance to the held-out style set, reported separately
+  for night and day.
+- **Parameter spread**: predicted θ must differ between night and day
+  inputs (effect size > 0.8 on at least 3 parameters).
+- A small blind preference test (≥ 5 people × 30 images) against baseline
+  (ii).
+
+**Gate.** The adaptive model beats the static preset on colour-statistics
+distance in **both** regimes, and is preferred in ≥ 60 % of trials. If it
+fails, the result still informs Phase 11's loss choice, and Phase 9 proceeds
+unchanged.
+
+**Deliverables**
+- `tests/reports/pilotA_neon_street_portrait.md` with before/after grids
+  (openly licensed images only).
+- A `neon_street_portrait` style card.
+- An exported average `.cube`.
+
+#### A1.3 New Phase 18: Capture emulation — depth of field and light shaping  *(R/E/P, L)*
+
+**Goal.** Emulate the capture side of the look with *parametric, editable*
+spatial operations, without generating new content.
+
+Building blocks (pretrained, frozen, used at inference and for training
+targets):
+- [ ] **Monocular depth**: Depth Anything V2 **Small** (Apache-2.0; the
+      Base/Large/Giant checkpoints are CC BY-NC 4.0, so they are excluded
+      by A1.1).
+      Run at ≤ 518 px and upsample with an edge-aware (guided) filter.
+- [ ] **Subject matte**: person segmentation plus a matting refinement
+      around hair and glasses. The model is chosen by licence and CPU speed,
+      and it is user-correctable with a brush in Studio.
+
+Synthetic depth of field (the **Lens** controls):
+- [ ] Parameters:
+  - **focus depth**, set by clicking the subject to focus;
+  - **aperture**: maximum blur radius as a fraction of the image diagonal;
+  - **bokeh highlight gain**: how strongly the brightest lights bloom into
+    discs;
+  - **bokeh shape**: disc or slight cat's-eye toward the corners;
+  - **transition softness**.
+- [ ] Renderer: layered depth compositing, not a single variable blur.
+  1. Slice the scene into K depth layers.
+  2. Blur each layer with a disc kernel after **boosting linear-light
+     highlights**, so neon lights become bright discs rather than grey
+     smudges.
+  3. Composite back to front with occlusion-aware alpha, so the background
+     never bleeds onto the subject.
+  4. Keep the subject matte sharp.
+  Work in linear light; add matched grain after the blur so blurred regions
+  don't look plasticky.
+- [ ] Differentiable approximation (a soft layer assignment) so the head can
+      *predict* default lens parameters. Adaptive example: wide street scenes
+      get more blur, tight portraits less.
+
+Light shaping (the **Light** controls):
+- [ ] Parameters: **subject exposure, subject warmth, background exposure,
+      background coolness, feather**, and an optional **directional
+      gradient** (angle and strength) to suggest key-light direction.
+- [ ] These are mask-weighted offsets to the existing curves and matrix, so
+      they only re-weight existing pixels. True 3D relighting stays a
+      non-goal.
+
+Evaluation:
+- [ ] **Halo audit**: manual review of 50 images for edge artefacts around
+      hair, glasses, hands and transparent objects. Pass if ≥ 80 % show no
+      visible halo at 100 % zoom.
+- [ ] **Bokeh realism check**: compare blur-disc statistics of rendered
+      night lights with real shallow-depth-of-field night photos in the
+      openly licensed set.
+- [ ] **Preference test**: Neon Street Portrait grade with Lens + Light vs.
+      the grade alone, ≥ 60 % preferred.
+- [ ] **Performance**: depth, matte and blur on a 12 MP photo in < 3 s on a
+      laptop CPU (depth runs on a proxy; the blur is tiled).
+
+Export consequences:
+- Lens and Light are spatial, so a `.cube` file can no longer carry the full
+  edit. Exporters write the graded image plus the `.cube` (colour only), and
+  optionally the depth map and matte as 16-bit PNGs for use in other tools.
+- The `EditParams` schema gains optional `lens` and `light` blocks (schema
+  v1.1).
+
+Studio (§9) additions:
+- **Lens panel**: click-to-focus on the canvas, aperture and bokeh sliders,
+  and a *depth overlay* toggle that tints near and far regions.
+- **Light panel**: subject and background sliders, a gradient direction dial,
+  and a *mask overlay* with refine and erase brushes.
+- **Compare modes** gain a "grade only / grade + lens + light" toggle.
+
+**Gate.** Halo audit and preference test pass. Otherwise Lens ships as
+"experimental", with the controls off by default.
+
+#### A1.4 Other changes made by A1
+
+- **§7 roadmap:** Pilot A and Phase 18 rows added; sequencing updated.
+- **§10 data:** stand-in style-set row added.
+- **§14 non-goals:** clarifies that parametric light shaping and synthetic
+  depth of field are in scope, and adds the style-data policy.
+- **§15 open questions:** Q3 answered.
+- **§13 risks**, added here:
+
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| Openly licensed stand-in set doesn't capture the look (licence filter shrinks the pool; Flickr-era images are graded differently) | Medium | High | Profile scoring plus hand review; widen queries; the user may add images they own; later, ask the photographer for consented examples |
+| Depth or matte errors cause halos around hair and glasses | High | Medium | Guided upsampling; matting refinement; user brush; the halo audit gate |
+| Synthetic bokeh looks fake (no highlight bloom, wrong occlusion) | Medium | Medium | Linear-light highlight boost; layered occlusion-aware compositing; grain matching |
+| Style is perceived as a copy of a living artist | Low | High | A1.1 naming and data rules; no artist images in training; attribution only as inspiration |

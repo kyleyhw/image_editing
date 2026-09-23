@@ -26,7 +26,8 @@ build/
 !.env.example
 
 # Large model / dataset artifacts
-data/
+data/*
+!data/manifests/
 *.pth
 *.pt
 *.onnx
