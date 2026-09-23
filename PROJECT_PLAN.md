@@ -1498,12 +1498,12 @@ in effect until then.
 | # | decision | answer | effect |
 |---|---|---|---|
 | 1 | edited photos | 2, 3, 5, 7, 8, 9 are edited; 1, 4, 6, 10 are unedited; more unedited photos to follow | manifest updated. The re-sent photo was an exact duplicate of photo 1. Originals of the edited ones would give owner-look pairs |
-| 2 | Clean Cool day look | pending: comparison sheet sent (v1 / v2 at 100 % and 70 %) | — |
+| 2 | Clean Cool day look | **D: v2 at 70 %** | pack rebuilt from v2 with `default_strength: 0.7` (packs can now set a default strength). v3, which adds the learned sky mask to v2, is being trained for comparison |
 | 3 | first built-in style | **Clean Cool** | unchanged |
-| 4 | learned sky segmenter | explained; pending | — |
+| 4 | learned sky segmenter | **yes** | `photostyle/sky.py`: UperNet-ConvNeXt-tiny (MIT; trained on ADE20K, which is research-use, so it is on the commercial checklist). Used by the atmosphere tools; audit in `tests/reports/sky_audit.md` |
 | 5 | FiveK pack | personal project for now; **flag if it ever goes commercial** | pack stays local; see the commercial checklist below |
 | 6 | PPR10K | undecided | not used (portraits are later anyway) |
-| 7 | release | **open source** | needs a licence file (owner to pick; MIT or Apache-2.0 recommended). Research-licence data and weights stay out of the repo |
+| 7 | release | **open source, MIT** | `LICENSE` added and `pyproject.toml` updated. Research-licence data and weights stay out of the repo |
 | 8 | front end | **most customisable + best UX** | recommendation: move Studio to Svelte (component UI), keep the FastAPI server and the WebGL renderer module. Planned as the next UI phase |
 | 9 | stock-photo API key | undecided | Openverse only |
 | 10 | preference tests | owner only, later | — |
@@ -1515,5 +1515,7 @@ in effect until then.
 - PPR10K is research-only (if ever used).
 - Openverse seed images: CC BY / BY-SA need attribution (the manifests
   carry it). BY-SA may impose share-alike on derived datasets.
+- The sky segmenter's weights are MIT, but it was trained on ADE20K
+  (research-use images). Check before commercial use.
 - Depth Anything V2 **Small** is Apache-2.0 and fine. Base, Large and
   Giant are non-commercial and excluded.
