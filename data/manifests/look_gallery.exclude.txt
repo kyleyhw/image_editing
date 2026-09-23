@@ -1,0 +1,16 @@
+# Openverse ids rejected on manual review of the look gallery
+296522dd-5e92-4f7f-89e4-2531a437f82f  # 1a: watermark
+a94e054d-de68-4993-9231-022c6fa34c8e  # 1b: satellite image
+0f7ce7ed-e9f7-45fc-a213-3742d0d587ad  # 2d: caption text
+7044d908-965f-45cd-a582-ba1979f735bc  # 3a: market close-up, not a scene
+707a601b-068a-445c-abd3-c8b4f20beef2  # 4b: illustration
+c3120d33-2a83-49fd-8e1b-beefe9fbe1c1  # 4c: drawing
+987c7566-8502-4f9e-9e38-5e620dbb8d74  # 6b: 3D render
+0160cdd9-84c4-4c52-99db-b6c4186b1589  # 7c: sculpture of a person
+b92ff12f-be18-4183-a1ec-4a2ce9ad3d28  # 7d: model / diorama
+92aa5887-2515-4a15-83bf-5a564e036774  # 8b: brand signage
+6d45f9f1-2ec9-4738-944c-59be8fde4205  # 9a: same photo as 2a
+bef33e3c-899d-40f3-8f35-1749c8540817  # 9d: unclear subject
+9cb4d57c-2998-4901-8c1d-a88834a1bd94  # 4d (round 2): watercolour texture
+0c2a77de-c291-489e-ba06-e50795577369  # 6b (round 2): game render
+58d65339-13b1-4e7f-915e-6e75da9c1da1  # 9d (round 2): architectural model render
