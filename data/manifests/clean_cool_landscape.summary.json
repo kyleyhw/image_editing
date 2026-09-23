@@ -1,0 +1,23 @@
+{
+  "profile": "clean_cool_landscape",
+  "kept": 31,
+  "night": 14,
+  "day": 17,
+  "licenses": {
+    "by": 20,
+    "by-sa": 9,
+    "cc0": 1,
+    "pdm": 1
+  },
+  "candidates": 805,
+  "download_failed": 32,
+  "too_small": 5,
+  "duplicate": 9,
+  "monochrome": 117,
+  "no_person": 0,
+  "has_person": 63,
+  "crowd": 0,
+  "gated": 546,
+  "low_score": 2,
+  "creator_capped": 0
+}

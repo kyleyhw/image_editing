@@ -2,6 +2,10 @@
 
 *Built 2026-09-23 for Pilot A (PROJECT_PLAN §17, amendment A1).*
 
+> **Status: deferred** (amendment A2, landscapes first). The owner also judged
+> that this set does not look like the reference style; see gaps 1 and 3 below.
+> Kept for the portrait track.
+
 ## What it is
 
 142 openly licensed photographs of street portraits: 71 at **night** and 71 by

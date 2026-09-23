@@ -1,0 +1,15 @@
+# Hand-review exclusions for the clean_cool_landscape style set.
+# Format: <openverse_id>  # reason. Reviewed 2026-09-23 from contact sheets.
+2df60e52-ae1b-426e-8cc4-5fd4900192ac  # night 0001: light-art installation behind fence
+b7294d3d-f5d1-4d80-97d6-94adf7081159  # night 0014: diptych
+1f2fc1dc-e098-47f2-9f40-7489c5189684  # day 0005: silhouetted satellite dish, not a landscape
+c847c1a6-5a63-46a6-afc1-945a37ac7a1d  # day 0006: still life of bottles
+330e76a0-c8c6-48c6-8430-d592d2d6c696  # day 0011: close-up of roots
+3cca9a22-b225-4d12-819e-82d5762960c2  # day 0018: CG / heavily processed
+e6801608-c1e4-4aa4-93ba-6e172259a67f  # day 0019: motion-blurred car
+6cfc79a9-ab8d-46c1-8c70-5680c8b56e16  # day 0021: infrared-look, off-palette
+05cf07a3-1b70-4144-aa70-305be6d7f0c6  # day 0025: crowd
+08c25d18-9f41-40a9-9d5e-3a1fab3c0dc3  # day 0029: painterly over-processing
+dd327078-0d96-4a86-baa2-3a0922aaab89  # day 0030: satellite imagery
+09f411d7-ecd5-4353-821e-4881deead633  # day 0032: satellite imagery
+a9c16ce7-9250-4491-b335-58ed178ee0d2  # day 0033: tourist snapshot

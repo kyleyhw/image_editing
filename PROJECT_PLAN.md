@@ -1180,10 +1180,15 @@ photographer is credited only as inspiration in research notes.
   - **hard gates** on the split tone (shadow b\* ≤ −2; highlight b\* within
     ±5–6; black point) in addition to the soft score;
   - a cap of 10 images per creator.
-- [ ] Hand-review the collected set on contact sheets. Reject the
+- [x] Hand-review the collected set on contact sheets. Reject the
       Flickr-era finish too: HDR halos, heavy vignettes, over-sharpening,
-      tilted horizons, watermarks. Target ≥ 100 kept, split night/day and
-      urban/nature.
+      tilted horizons, watermarks. **Seed done:** 31 kept (14 night / 17
+      day), and the grade statistics now match the profile (shadow b\* −7.5
+      / −5.1, highlight b\* ≈ 0). See
+      [`data/manifests/clean_cool_landscape.md`](data/manifests/clean_cool_landscape.md).
+- [ ] Grow the set to ≥ 100: re-query Openverse on a fresh daily quota,
+      try Wikimedia Commons *Quality images* from another network, and
+      add the owner's own photos.
 - [ ] **Paired landscape benchmark from FiveK.** The Hugging Face mirror
       carries per-image labels (`location`, `time`, `light`, `subject`) and
       a `license` field (Adobe / AdobeMIT). Select
