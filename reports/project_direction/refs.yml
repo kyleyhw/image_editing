@@ -1,0 +1,90 @@
+zeng:
+  type: article
+  title: Learning Image-adaptive 3D Lookup Tables for High Performance Photo Enhancement in Real-time
+  author: ["Zeng, Hui", "Cai, Jianrui", "Li, Lida", "Cao, Zisheng", "Zhang, Lei"]
+  date: 2020
+  parent:
+    type: periodical
+    title: IEEE Transactions on Pattern Analysis and Machine Intelligence
+  url: https://arxiv.org/abs/2009.14468
+adaint:
+  type: article
+  title: "AdaInt: Learning Adaptive Intervals for 3D Lookup Tables on Real-time Image Enhancement"
+  author: ["Yang, Canqian", "Jin, Meiguang", "Jia, Xu", "Xu, Yi", "Chen, Ying"]
+  date: 2022
+  parent:
+    type: proceedings
+    title: IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)
+  url: https://arxiv.org/abs/2204.13983
+seplut:
+  type: article
+  title: "SepLUT: Separable Image-adaptive Lookup Tables for Real-time Image Enhancement"
+  author: ["Yang, Canqian", "Jin, Meiguang", "Xu, Yi", "Zhang, Rui", "Chen, Ying", "Liu, Huaida"]
+  date: 2022
+  parent:
+    type: proceedings
+    title: European Conference on Computer Vision (ECCV)
+  url: https://arxiv.org/abs/2207.08351
+sa3dlut:
+  type: article
+  title: Real-time Image Enhancer via Learnable Spatial-aware 3D Lookup Tables
+  author: ["Wang, Tao", "Li, Yong", "Peng, Jingyang", "Ma, Yipeng", "Wang, Xian", "Song, Fenglong", "Yan, Youliang"]
+  date: 2021
+  parent:
+    type: proceedings
+    title: IEEE/CVF International Conference on Computer Vision (ICCV)
+  url: https://openaccess.thecvf.com/content/ICCV2021/papers/Wang_Real-Time_Image_Enhancer_via_Learnable_Spatial-Aware_3D_Lookup_Tables_ICCV_2021_paper.pdf
+csrnet:
+  type: article
+  title: Conditional Sequential Modulation for Efficient Global Image Retouching
+  author: ["He, Jingwen", "Liu, Yihao", "Qiao, Yu", "Dong, Chao"]
+  date: 2020
+  parent:
+    type: proceedings
+    title: European Conference on Computer Vision (ECCV)
+  url: https://arxiv.org/abs/2009.10390
+hdrnet:
+  type: article
+  title: Deep Bilateral Learning for Real-Time Image Enhancement
+  author: ["Gharbi, Michaël", "Chen, Jiawen", "Barron, Jonathan T.", "Hasinoff, Samuel W.", "Durand, Frédo"]
+  date: 2017
+  parent:
+    type: periodical
+    title: ACM Transactions on Graphics (SIGGRAPH)
+  url: https://arxiv.org/abs/1707.02880
+star:
+  type: article
+  title: "StarEnhancer: Learning Real-Time and Style-Aware Image Enhancement"
+  author: ["Song, Yuda", "Qian, Hui", "Du, Xin"]
+  date: 2021
+  parent:
+    type: proceedings
+    title: IEEE/CVF International Conference on Computer Vision (ICCV)
+  url: https://openaccess.thecvf.com/content/ICCV2021/papers/Song_StarEnhancer_Learning_Real-Time_and_Style-Aware_Image_Enhancement_ICCV_2021_paper.pdf
+pienet:
+  type: article
+  title: "PieNet: Personalized Image Enhancement Network"
+  author: ["Kim, Han-Ul", "Koh, Young Jun", "Kim, Chang-Su"]
+  date: 2020
+  parent:
+    type: proceedings
+    title: European Conference on Computer Vision (ECCV)
+  url: https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123750375.pdf
+exposure:
+  type: article
+  title: "Exposure: A White-Box Photo Post-Processing Framework"
+  author: ["Hu, Yuanming", "He, Hao", "Xu, Chenxi", "Wang, Baoyuan", "Lin, Stephen"]
+  date: 2018
+  parent:
+    type: periodical
+    title: ACM Transactions on Graphics
+  url: https://arxiv.org/abs/1709.09602
+ip2p:
+  type: article
+  title: "InstructPix2Pix: Learning to Follow Image Editing Instructions"
+  author: ["Brooks, Tim", "Holynski, Aleksander", "Efros, Alexei A."]
+  date: 2023
+  parent:
+    type: proceedings
+    title: IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)
+  url: https://arxiv.org/abs/2211.09800

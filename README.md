@@ -15,11 +15,12 @@ groundwork under an earlier, broader goal: a CDF + ResNet-18 feature
 extractor, a 21-parameter differentiable renderer (tone curve, 3 × 3 colour
 matrix, grain, vignette), a composite L1 / VGG / CDF loss, three
 fixed-function style models (Fujifilm Classic Chrome, Cyberpunk,
-Tilt-Shift), a Streamlit UI, and a first FiveK expert-C model. Phases 7–12
+Tilt-Shift), a Streamlit UI, and a first FiveK expert-C model. Phases 7–17
 pursue the purpose above: an evaluation harness, a SepLUT-style renderer,
-style conditioning, unpaired training, and `.cube` export. The reasoning
+style conditioning, unpaired training, `.cube` export, and a web-based
+Studio with a create-your-own-style wizard. The reasoning
 is summarised in
-[`reports/project_direction.md`](reports/project_direction.md).
+[`reports/project_direction/project_direction.pdf`](reports/project_direction/project_direction.pdf).
 
 ## Examples of every trained mode
 
@@ -140,8 +141,8 @@ is shipped as a documented negative result.
 | [`docs/architecture.md`](docs/architecture.md) | Mathematics of the feature extractor, every primitive, and the composite loss. Identity-at-init proof. |
 | [`docs/training_and_inference.md`](docs/training_and_inference.md) | Operational guide: data generation, training each architecture, CLI inference, Streamlit UI. |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phase-1 design rationale and historical context that motivated the architecture choices. |
-| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | Purpose, success criteria, Phases 1 – 6 status, and the Phase 7 – 12 roadmap. |
-| [`reports/project_direction.md`](reports/project_direction.md) | One-page rationale for the revised purpose and recommended architecture. |
+| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | Purpose, users, success metrics, target architecture, Phase 7 – 17 roadmap, UI/UX spec, data and evaluation plans, risks. |
+| [`reports/project_direction/project_direction.pdf`](reports/project_direction/project_direction.pdf) | One-page research report (PDF, Typst source alongside) on the revised purpose and recommended architecture. |
 | [`reports/Content adaptive photo edit models.md`](reports/Content%20adaptive%20photo%20edit%20models.md) | Full literature comparison: Zeng et al. 3D LUTs and 17 alternatives. |
 | [`tests/reports/phase3_to_phase6_report.md`](tests/reports/phase3_to_phase6_report.md) | End-to-end verification, including MCP-driven UI test. |
 
@@ -191,7 +192,7 @@ HSV-faithful colour identities used by the Fujifilm renderer are in
 
 ```
 .
-├── PROJECT_PLAN.md            # Purpose, status, and Phase 7 – 12 roadmap
+├── PROJECT_PLAN.md            # Purpose, architecture, roadmap, UI/UX spec
 ├── README.md                  # (this file)
 ├── pyproject.toml             # uv-managed deps (Python ≥ 3.10)
 ├── uv.lock                    # pinned resolution
@@ -238,7 +239,7 @@ HSV-faithful colour identities used by the Fujifilm renderer are in
 │   └── roadmap.md             # original Phase-1 design rationale
 │
 ├── reports/
-│   ├── project_direction.md   # one-page purpose + architecture rationale
+│   ├── project_direction/     # one-page research report (.typ, .pdf, refs)
 │   └── Content adaptive photo edit models.md  # full literature review
 │
 ├── research_notes/            # source notes behind the literature review
