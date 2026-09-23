@@ -97,3 +97,28 @@ v2 is a partial fix. Two things would fix it properly:
 2. a hue-preservation term, not just a chroma floor.
 
 **Default kept at v1** until the owner picks; both checkpoints exist.
+
+## Owner's choice and v3 (learned sky mask)
+
+**The owner chose v2 at 70 % strength (option D).** It is the `clean_cool`
+pack now (`default_strength: 0.7`).
+
+**v3** is v2 plus the learned sky segmenter (`photostyle/sky.py`,
+`--learned-sky`). The segmenter decides which pixels count as sky for the
+colour floor.
+
+| v3 | night / man-made | night / nature | day / man-made | day / nature |
+|---|---|---|---|---|
+| head: profile distance | 0.47 | 0.65 | 0.65 | 0.83 |
+| head: chroma kept (sky + saturated) | 61 % | 60 % | 65 % | 63 % |
+| head: **sky** chroma kept (learned mask) | 59 % | 57 % | 63 % | 75 % |
+| gate vs hand-made | pass | pass | pass | pass |
+
+![Pilot A v3 grid](assets/pilotA_v3_grid.jpg)
+
+**Owner photos, at 70 % (private sheet):**
+- **Pale sky (the Fuji photo):** v3 keeps more sky colour (50 % vs. 38 % for
+  v2); the sky stays slightly bluer.
+- **Other photos:** similar, or slightly less sky colour.
+- **Overall:** the difference is small. The owner decides; the default stays
+  D.
