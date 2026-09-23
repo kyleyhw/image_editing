@@ -57,3 +57,29 @@ def test_metrics_perfect_match():
     img = np.random.default_rng(0).random((8, 8, 3))
     m = all_metrics(img, img)
     assert m["l1"] == 0 and m["delta_e"] < 1e-6 and m["psnr"] > 100
+
+
+def test_cube_round_trip(tmp_path):
+    from photostyle.export import apply_lut, bake_lut, read_cube, write_cube
+
+    torch.manual_seed(0)
+    r = GlobalRenderer("per_channel")
+    theta = 0.15 * torch.randn(1, r.num_params)
+    theta[0, -1] = 0.0  # vignette is spatial and not part of the LUT
+    img = torch.rand(1, 3, 32, 48)
+    lut = bake_lut(r, theta, size=65)
+    write_cube(lut, tmp_path / "t.cube")
+    lut2 = read_cube(tmp_path / "t.cube")
+    ref = r(img, theta)
+    out = apply_lut(img, lut2)
+    mse = float(((out - ref) ** 2).mean())
+    assert 10 * np.log10(1 / mse) > 45  # plan target: .cube fidelity > 45 dB
+
+
+def test_identity_lut_is_identity():
+    from photostyle.export import apply_lut, bake_lut
+
+    r = GlobalRenderer("per_channel")
+    img = torch.rand(1, 3, 8, 8)
+    out = apply_lut(img, bake_lut(r, torch.zeros(r.num_params), size=17))
+    assert torch.allclose(out, img, atol=1e-5)
