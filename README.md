@@ -1,13 +1,25 @@
-# Image Editing: CDF + CNN Stylization
+# Image Editing: Content-Adaptive, Editable Photo Styles
 
-A general-purpose image-stylization engine that combines global CDF
-analysis with a CNN-driven differentiable renderer. The same network
-architecture trains on any style; only the data generator changes.
+**Purpose.** Learn the photo edit that takes *this particular image* to a
+target look. A style is a target appearance, not a fixed filter: a dark
+street and a bright beach need different edits to reach the same look. The
+look is learned either from a photographer's before/after pairs (e.g.
+MIT-Adobe FiveK experts) or from a set of example photos already in the
+style (e.g. cyberpunk, film). One model is conditioned on the chosen style.
+It outputs **editable parameters** (curves, colour matrix, a small LUT,
+grain, vignette) that bake to a `.cube` file, never generated pixels. It is
+designed to train on a CPU from tens to hundreds of examples per style.
 
-Phases 1–6 of [`PROJECT_PLAN.md`](PROJECT_PLAN.md) are implemented:
-generic style-agnostic primitives, a composite L1 / VGG / CDF loss,
-three trained models (Fujifilm Classic Chrome, Cyberpunk, Tilt-Shift),
-a multi-style Streamlit UI, and a MIT-Adobe FiveK data loader.
+**Status.** Phases 1–6 of [`PROJECT_PLAN.md`](PROJECT_PLAN.md) built the
+groundwork under an earlier, broader goal: a CDF + ResNet-18 feature
+extractor, a 21-parameter differentiable renderer (tone curve, 3 × 3 colour
+matrix, grain, vignette), a composite L1 / VGG / CDF loss, three
+fixed-function style models (Fujifilm Classic Chrome, Cyberpunk,
+Tilt-Shift), a Streamlit UI, and a first FiveK expert-C model. Phases 7–12
+pursue the purpose above: an evaluation harness, a SepLUT-style renderer,
+style conditioning, unpaired training, and `.cube` export. The reasoning
+is summarised in
+[`reports/project_direction.md`](reports/project_direction.md).
 
 ## Examples of every trained mode
 
@@ -93,7 +105,7 @@ A follow-up run trained the same architecture on a 500-pair MIT-5K
 subset (downloaded with the same script). The expectation was that
 more data would close the magenta-cast failure case on the alpine
 landscape. The result was the opposite — held-out mean L1 to expert
-rose from 0.0825 to 0.1030, and only 1 / 5 test pairs moved toward
+rose from 0.0741 to 0.1030, and only 1 / 5 test pairs moved toward
 the expert (vs. 4 / 5 at 80 pairs).
 
 The mechanism is a known failure mode of fixed-capacity content-
@@ -113,6 +125,14 @@ unfinished extension). The 80-pair checkpoint remains the better
 deliverable for the current architecture, and the 500-pair experiment
 is shipped as a documented negative result.
 
+> **Revised reading (2026-09).** The "architectural ceiling" explanation
+> is not yet supported. The run had uncontrolled factors: a fully fine-tuned
+> ResNet with BatchNorm at batch size 4, no ImageNet normalisation, 8 vs. 12
+> epochs, one seed, and 5 test images. The literature also finds
+> that global, image-adaptive edits capture most of FiveK's expert
+> retouching. Phase 7 of [`PROJECT_PLAN.md`](PROJECT_PLAN.md) re-tests this
+> with a proper learning curve.
+
 ## Documentation index
 
 | Document | Contents |
@@ -120,7 +140,9 @@ is shipped as a documented negative result.
 | [`docs/architecture.md`](docs/architecture.md) | Mathematics of the feature extractor, every primitive, and the composite loss. Identity-at-init proof. |
 | [`docs/training_and_inference.md`](docs/training_and_inference.md) | Operational guide: data generation, training each architecture, CLI inference, Streamlit UI. |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phase-1 design rationale and historical context that motivated the architecture choices. |
-| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | Status ledger for Phases 1 – 6. |
+| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | Purpose, success criteria, Phases 1 – 6 status, and the Phase 7 – 12 roadmap. |
+| [`reports/project_direction.md`](reports/project_direction.md) | One-page rationale for the revised purpose and recommended architecture. |
+| [`reports/Content adaptive photo edit models.md`](reports/Content%20adaptive%20photo%20edit%20models.md) | Full literature comparison: Zeng et al. 3D LUTs and 17 alternatives. |
 | [`tests/reports/phase3_to_phase6_report.md`](tests/reports/phase3_to_phase6_report.md) | End-to-end verification, including MCP-driven UI test. |
 
 ## Mathematical overview
@@ -169,7 +191,7 @@ HSV-faithful colour identities used by the Fujifilm renderer are in
 
 ```
 .
-├── PROJECT_PLAN.md            # Status ledger for Phases 1 – 6
+├── PROJECT_PLAN.md            # Purpose, status, and Phase 7 – 12 roadmap
 ├── README.md                  # (this file)
 ├── pyproject.toml             # uv-managed deps (Python ≥ 3.10)
 ├── uv.lock                    # pinned resolution
@@ -214,6 +236,12 @@ HSV-faithful colour identities used by the Fujifilm renderer are in
 │   ├── architecture.md        # math + primitives + identity proof
 │   ├── training_and_inference.md # operational guide
 │   └── roadmap.md             # original Phase-1 design rationale
+│
+├── reports/
+│   ├── project_direction.md   # one-page purpose + architecture rationale
+│   └── Content adaptive photo edit models.md  # full literature review
+│
+├── research_notes/            # source notes behind the literature review
 │
 ├── tests/
 │   └── reports/

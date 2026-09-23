@@ -96,7 +96,7 @@ NN's CNN encoder now has a real prediction job: looking at the input
 image content and predicting the renderer parameters that mimic Expert
 C's response to that content.
 
-The 10% mean improvement on held-out data is modest in absolute terms
+The ≈ 19% mean improvement on held-out data is modest in absolute terms
 but is qualitatively different from anything the synthetic experiments
 can demonstrate. It is the first evidence in this codebase that the
 architecture earns its complexity.
@@ -107,13 +107,13 @@ architecture earns its complexity.
    single failure case suggests the training distribution did not
    include enough cool / alpine scenes; a larger subset would likely
    close this gap.
-2. **Small held-out set** (5 pairs). The 10% mean improvement is a
+2. **Small held-out set** (5 pairs). The ≈ 19% mean improvement is a
    point estimate with wide confidence intervals; a 100-pair held-out
    evaluation would be more authoritative.
 3. **Composite loss is still slightly off-axis for human-edit data.**
    Expert C's edits are not just colour / tone — they include local
    contrast and dodge-and-burn that the renderer's *global* primitives
-   cannot reproduce. The 92% remaining distance to the expert is a hard
+   cannot reproduce. The ≈ 81% remaining distance to the expert is a hard
    lower bound for this architecture; closing it would require either
    per-pixel parameter maps (Phase 5's "parameter maps" extension) or a
    different renderer family.
