@@ -85,6 +85,9 @@ def main() -> None:
         with meta_path.open(newline="") as f:
             meta = {r["file"]: r for r in csv.DictReader(f)}
     want_loc, want_sub = set(args.locations.split(",")), set(args.subjects.split(","))
+    # shard -> row count, for shards fully processed in an earlier run
+    done_path = out / "shards_done.json"
+    done: dict[str, int] = json.loads(done_path.read_text()) if done_path.exists() else {}
 
     files = sorted(f for f in HfApi().list_repo_files(REPO, repo_type="dataset")
                    if f.startswith(f"{args.expert}/") and f.endswith(".parquet"))
@@ -95,6 +98,9 @@ def main() -> None:
             shards = shards[: args.max_shards]
         row0 = 0
         for si, shard in enumerate(shards):
+            if shard in done:
+                row0 += done[shard]
+                continue
             local = Path(hf_hub_download(REPO, shard, repo_type="dataset", cache_dir=args.cache))
             pf = pq.ParquetFile(local)
             names = label_names(pf)
@@ -122,8 +128,14 @@ def main() -> None:
                 if (odir / fname).exists() and (edir / fname).exists():
                     meta[fname] = {"file": fname, "split": split, "row": row0 + i, **lab}
             row0 += n
-            local.unlink(missing_ok=True)  # free disk: shards are ~2 GB each
+            # Free disk: shards are ~2 GB each. hf_hub_download returns a snapshot
+            # symlink, so delete the blob it points to as well as the link.
+            blob = local.resolve()
+            local.unlink(missing_ok=True)
+            blob.unlink(missing_ok=True)
             write_meta(meta_path, meta)
+            done[shard] = n
+            done_path.write_text(json.dumps(done, indent=1))
             print(f"{split} shard {si + 1}/{len(shards)}: rows {n}, kept {len(keep)}, "
                   f"total kept {len(meta)} [{time.time() - t0:.0f}s]", flush=True)
     write_meta(meta_path, meta)
