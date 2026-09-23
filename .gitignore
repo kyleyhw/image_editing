@@ -39,3 +39,6 @@ images/styled/
 
 # Playwright MCP working directory (snapshots, console logs)
 .playwright-mcp/
+
+# Built style packs (FiveK-derived, research licence): rebuild with tools/build_stylepacks.py
+stylepacks/
