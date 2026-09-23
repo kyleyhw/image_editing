@@ -72,15 +72,31 @@ class EditParams:
         y = r.curves(r.unpack(self.vector())["curve"])[0]
         return {c: y[i].clamp(0, 1).tolist() for i, c in enumerate("rgb")}
 
+    @torch.no_grad()
     def derived(self) -> dict[str, float]:
-        """Approximate slider readings derived from the colour matrix and bias."""
-        q = self.make_renderer().unpack(self.vector())
-        M = torch.eye(3) + q["dM"].view(3, 3)
-        gains = M.sum(1) + q["bias"][0]
-        grey = (M.sum(0) / 3).mean()
-        sat = float(torch.diagonal(M).mean() - (M.sum() - torch.diagonal(M).sum()) / 6) / float(grey)
-        return {"warmth": float(gains[0] - gains[2]), "tint": float(gains[1] - (gains[0] + gains[2]) / 2),
-                "saturation": sat, "vignette": float(q["vignette"][0, 0])}
+        """Slider-like readings measured through the *whole* renderer (curves + matrix).
+
+        warmth: mean R - B on a neutral grey ramp (positive = warmer);
+        tint: mean G - (R + B) / 2 on the ramp (positive = greener);
+        saturation: chroma ratio (out / in) on a set of saturated test colours;
+        vignette: the vignette parameter.
+        """
+        r = self.make_renderer()
+        th = self.vector()
+        q = r.unpack(th)
+        th0 = th.clone()
+        r.unpack(th0)["vignette"].zero_()
+        grey = torch.linspace(0.15, 0.85, 8).view(1, 1, 1, 8).expand(1, 3, 1, 8).contiguous()
+        g = r(grey, th0)[0, :, 0]
+        cols = torch.tensor([[0.8, 0.3, 0.3], [0.3, 0.7, 0.3], [0.3, 0.4, 0.8], [0.8, 0.7, 0.3],
+                             [0.3, 0.7, 0.7], [0.7, 0.3, 0.7]]).T.reshape(1, 3, 1, 6)
+        c = r(cols, th0)[0, :, 0]
+
+        def chroma(x):
+            return (x.max(0).values - x.min(0).values).mean()
+
+        return {"warmth": float((g[0] - g[2]).mean()), "tint": float((g[1] - (g[0] + g[2]) / 2).mean()),
+                "saturation": float(chroma(c) / chroma(cols[0, :, 0])), "vignette": float(q["vignette"][0, 0])}
 
     # serialisation / export -------------------------------------------------
     def to_json(self, path: str | Path | None = None) -> str:

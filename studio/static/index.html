@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>photostyle Studio</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <strong>photostyle Studio</strong>
+  <span id="photoName" class="muted"></span>
+  <span class="spacer"></span>
+  <label class="btn" title="Upload photos">Upload<input id="upload" type="file" accept="image/*,.dng,.cr2,.cr3,.nef,.arw" multiple hidden></label>
+  <button id="btnWizard" class="btn">+ Create style</button>
+  <button id="btnBatch" class="btn">Batch</button>
+  <select id="exportFmt" aria-label="Export format">
+    <option value="jpg">Export JPEG</option><option value="cube">Export .cube</option>
+    <option value="xmp">Export XMP (curves)</option><option value="json">Export JSON</option>
+  </select>
+  <button id="btnExport" class="btn primary" title="Export (E)">Export</button>
+</header>
+
+<main>
+  <aside id="library" aria-label="Library"></aside>
+
+  <section id="stage">
+    <div id="canvasWrap">
+      <canvas id="view" aria-label="Photo preview"></canvas>
+      <div id="divider" role="slider" aria-label="Before/after divider" tabindex="0"></div>
+      <div id="empty">Upload photos to start. Everything stays on this computer.</div>
+    </div>
+    <div id="compareBar">
+      <span class="muted">Compare:</span>
+      <button data-mode="split" class="seg on">Split</button>
+      <button data-mode="after" class="seg">After</button>
+      <button data-mode="before" class="seg">Before</button>
+      <span class="muted small">Hold <kbd>\</kbd> for the original · <kbd>[</kbd>/<kbd>]</kbd> strength · <kbd>R</kbd> reset · <kbd>Ctrl+Z</kbd> undo</span>
+    </div>
+    <div id="styleStrip" aria-label="Styles"></div>
+  </section>
+
+  <aside id="panel" aria-label="Adjustments">
+    <section>
+      <h3>Style</h3>
+      <select id="styleSel" aria-label="Style"></select>
+      <label class="row">Strength <input id="strength" type="range" min="0" max="150" value="100"><output id="strengthOut">100%</output></label>
+      <div id="ood" class="warn" hidden></div>
+      <p id="explain" class="muted"></p>
+    </section>
+    <section>
+      <h3>Curves <span class="dot" data-group="curve" title="hollow = model, filled = your edit"></span></h3>
+      <div class="tabs"><button data-ch="0" class="tab on">R</button><button data-ch="1" class="tab">G</button><button data-ch="2" class="tab">B</button></div>
+      <canvas id="curves" width="240" height="240" aria-label="Curve editor: drag the knots"></canvas>
+    </section>
+    <section>
+      <h3>Colour <span class="dot" data-group="color"></span></h3>
+      <label class="row">Warmth <input id="warmth" type="range" min="-100" max="100" value="0"></label>
+      <label class="row">Tint <input id="tint" type="range" min="-100" max="100" value="0"></label>
+      <label class="row">Saturation <input id="sat" type="range" min="-100" max="100" value="0"></label>
+    </section>
+    <section>
+      <h3>Vignette <span class="dot" data-group="vignette"></span></h3>
+      <label class="row">Amount <input id="vig" type="range" min="0" max="60" value="0"></label>
+    </section>
+    <section>
+      <h3>Histogram</h3>
+      <canvas id="hist" width="240" height="90" aria-label="Before (grey) and after (colour) histograms"></canvas>
+    </section>
+    <section class="actions">
+      <button id="btnReset" class="btn">Reset to model</button>
+      <button id="btnRemember" class="btn" title="Use this edit to personalise the style">Remember this edit</button>
+      <button id="btnPersonalise" class="btn">Personalise style</button>
+    </section>
+  </aside>
+</main>
+
+<dialog id="wizard">
+  <form method="dialog" id="wizForm">
+    <h2>Create a style</h2>
+    <label>Name <input id="wizName" required pattern="[A-Za-z0-9_-]{1,64}" placeholder="my_look"></label>
+    <fieldset>
+      <legend>What do you have?</legend>
+      <label><input type="radio" name="mode" value="paired" checked> My before/after edits (best)</label>
+      <label><input type="radio" name="mode" value="unpaired"> Photos in a style I like</label>
+    </fieldset>
+    <div id="wizPaired">
+      <label>Before (originals) <input id="wizBefore" type="file" multiple accept="image/*"></label>
+      <label>After (your edits, same file names) <input id="wizAfter" type="file" multiple accept="image/*"></label>
+    </div>
+    <div id="wizUnpaired" hidden>
+      <label>Example photos in the look <input id="wizExamples" type="file" multiple accept="image/*"></label>
+      <label>Some of your unedited photos (optional) <input id="wizInputs" type="file" multiple accept="image/*"></label>
+      <p class="muted small">Use photos you own or that are openly licensed.</p>
+    </div>
+    <div id="wizCheck" class="muted small"></div>
+    <progress id="wizProg" value="0" max="1" hidden></progress>
+    <div class="row end"><button value="cancel" class="btn">Close</button><button id="wizStart" class="btn primary" type="button">Train</button></div>
+  </form>
+</dialog>
+
+<dialog id="batch">
+  <form method="dialog">
+    <h2>Batch</h2>
+    <p class="muted">Apply the current style to every photo in the library.</p>
+    <label class="row">Series consistency <input id="consistency" type="range" min="0" max="100" value="0"><output id="consOut">0%</output></label>
+    <p class="muted small">0% = every photo edited on its own; 100% = one shared edit for the whole set.</p>
+    <div id="batchGrid"></div>
+    <div class="row end"><button value="cancel" class="btn">Close</button><button id="batchRun" class="btn" type="button">Preview</button><button id="batchExport" class="btn primary" type="button">Export all JPEGs</button></div>
+  </form>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
