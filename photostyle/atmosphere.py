@@ -109,7 +109,12 @@ def apply_scene(img: torch.Tensor, p: SceneParams, near: torch.Tensor | None = N
         if p.haze > 0:
             x = x * (1 - p.haze * t) + A * p.haze * t
         else:
-            k = (-p.haze * t).clamp(max=0.85)
+            # Remove only the haze that is there: the dark channel over A estimates
+            # the haze fraction (He et al. 2009), so haze-free dark terrain is kept
+            # and the darkest channel cannot be pushed below zero.
+            dark = box_filter(x.min(1, keepdim=True).values, 3)
+            present = (dark / A.mean().clamp_min(1e-3)).clamp(0, 1)
+            k = (-p.haze * t * present).clamp(max=0.85)
             x = (x - A * k) / (1 - k)
     if abs(p.clarity_near) > 1e-6 or abs(p.clarity_far) > 1e-6:
         r_ = max(2, min(x.shape[2], x.shape[3]) // 100)
