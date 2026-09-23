@@ -226,7 +226,9 @@ def learn_unpaired(examples: list[torch.Tensor], inputs: list[torch.Tensor], fx:
             th = predict(torch.stack([b["feat"] for b in bb]))
             outs = [r(b["src_t"][None], t[None]) for b, t in zip(bb, th)]
             if use_swd:
-                loss = loss + 0.5 * sliced_wasserstein(torch.cat([lab_pixels(o, 1024) for o in outs]), ex_pix)
+                # Per image: pooled over the batch, SWD is satisfied by a mix of very
+                # dark and very bright outputs whose union matches the examples.
+                loss = loss + 0.5 * sum(sliced_wasserstein(lab_pixels(o, 1024), ex_pix) for o in outs) / len(outs)
             if use_fidelity:
                 loss = loss + sum(fidelity_loss(o, b["src_t"][None]) for o, b in zip(outs, bb)) / len(bb)
             loss = loss + 1e-3 * th.pow(2).mean()
