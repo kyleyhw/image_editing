@@ -60,7 +60,9 @@ def test_psnr(theta_fn, r, items) -> float:
     return float(np.mean(vals))
 
 
-def train_joint(data, r, n, steps=3000, seed=0):
+def train_joint(data, r, n, steps=3000, seed=0, styles=None):
+    """Joint StyleHead + StyleEncoder over ``styles`` (default: the Phase 10 known experts)."""
+    KNOWN = styles or globals()["KNOWN"]  # noqa: N806
     torch.manual_seed(seed)
     random.seed(seed)
     head = StyleHead(FEATURE_DIM, r.num_params, n_styles=len(KNOWN))

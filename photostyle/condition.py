@@ -70,3 +70,63 @@ class StyleEncoder(nn.Module):
         """(n, D) examples of one style -> (code_dim,) code."""
         z = self.net((feats - self.mu) / self.sigma).mean(0)
         return self.scale * F.normalize(z, dim=0) * (z.shape[0] ** 0.5) / 4
+
+
+BASE_PATH = "checkpoints/base_stylehead.pt"
+
+
+class CodedHead(nn.Module):
+    """A StyleHead with one fixed style code: behaves like ``Head`` (features -> parameters).
+
+    This is how a style made on the shared base is stored in a style pack: the
+    base weights plus the style's code (fitted on pairs, or from the encoder).
+    """
+
+    def __init__(self, head: StyleHead, code: torch.Tensor):
+        super().__init__()
+        self.head = head
+        self.register_buffer("code", code.detach().clone())
+
+    def forward(self, f: torch.Tensor) -> torch.Tensor:
+        return self.head(f, self.code.expand(f.shape[0], -1))
+
+
+def load_base(path: str = BASE_PATH):
+    """-> (StyleHead, StyleEncoder, info) or None if no base has been built."""
+    import os
+
+    if not os.path.exists(path):
+        return None
+    ck = torch.load(path, map_location="cpu", weights_only=False)
+    head = StyleHead(ck["in_dim"], ck["out_dim"], n_styles=ck["n_styles"])
+    head.load_state_dict(ck["head"])
+    enc = StyleEncoder(ck["in_dim"])
+    enc.load_state_dict(ck["encoder"])
+    head.eval()
+    enc.eval()
+    return head, enc, ck["info"]
+
+
+def fit_code(head: StyleHead, renderer, items: list[dict], steps: int = 400, seed: int = 0) -> torch.Tensor:
+    """Condition-only fine-tuning (Phase 10 protocol (b)): fit a new code on pairs, base frozen.
+
+    items: dicts with "feat", "src_t", "tgt_t"."""
+    import random
+
+    torch.manual_seed(seed)
+    rng = random.Random(seed)
+    for prm in head.parameters():
+        prm.requires_grad_(False)
+    code = nn.Parameter(head.embed.weight.mean(0).clone())
+    opt = torch.optim.Adam([code], lr=1e-2)
+    for _ in range(steps):
+        b = rng.sample(items, min(8, len(items)))
+        th = head(torch.stack([it["feat"] for it in b]), code.expand(len(b), -1))
+        loss = sum((renderer(it["src_t"][None], t[None])[0] - it["tgt_t"]).abs().mean()
+                   for it, t in zip(b, th)) / len(b)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    for prm in head.parameters():
+        prm.requires_grad_(True)
+    return code.detach()

@@ -102,6 +102,31 @@ def cmd_serve(args, eng) -> None:
     run(host=args.host, port=args.port)
 
 
+def cmd_style(args) -> None:
+    import json
+
+    from photostyle import newstyle as ns
+
+    if args.step == "new":
+        p = ns.new(args.name, args.describe, args.query, args.mono)
+        print(f"style project {p.name!r}: queries {p.queries}")
+        print(f"next: photostyle style search {p.name}")
+    elif args.step == "search":
+        ns.search(args.name, args.pages)
+    elif args.step == "pick":
+        ns.pick(args.name, args.numbers, args.n_refs)
+    elif args.step == "exclude":
+        ns.exclude(args.name, args.numbers)
+    elif args.step == "train":
+        ns.train(args.name, args.recipe, tuple(Path(d) for d in args.pairs) if args.pairs else None, args.steps)
+    elif args.step == "preview":
+        ns.preview(args.name, [Path(f) for f in args.photos] or None)
+    elif args.step == "pack":
+        ns.pack(args.name, args.strength, Path(args.root))
+    elif args.step == "status":
+        print(json.dumps(ns.status(args.name), indent=1))
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="photostyle")
     ap.add_argument("--root", default="stylepacks", help="style pack folder")
@@ -128,10 +153,43 @@ def main(argv: list[str] | None = None) -> None:
     e.add_argument("--size", type=int, default=33)
     e.add_argument("-o", "--out", required=True)
     e.add_argument("photos", nargs="+")
+    st = sub.add_parser("style", help="create a new style: idea -> references -> training -> pack")
+    ss = st.add_subparsers(dest="step", required=True)
+    x = ss.add_parser("new", help="start a style project")
+    x.add_argument("name")
+    x.add_argument("--describe", required=True, help='the idea in words, e.g. "neon cyberpunk night city"')
+    x.add_argument("--query", action="append", help="search query (repeatable); default: from --describe")
+    x.add_argument("--mono", action="store_true", help="a black-and-white look")
+    x = ss.add_parser("search", help="find openly licensed candidate photos")
+    x.add_argument("name")
+    x.add_argument("--pages", type=int, default=3)
+    x = ss.add_parser("pick", help="the candidates whose look you like; more like them are added")
+    x.add_argument("name")
+    x.add_argument("numbers", nargs="+", type=int)
+    x.add_argument("--n-refs", type=int, default=40)
+    x = ss.add_parser("exclude", help="drop references")
+    x.add_argument("name")
+    x.add_argument("numbers", nargs="+", type=int)
+    x = ss.add_parser("train")
+    x.add_argument("name")
+    x.add_argument("--recipe", choices=["gentle", "strong"], default="gentle",
+                   help="gentle: close to natural looks; strong: looks far from natural (e.g. cyberpunk)")
+    x.add_argument("--pairs", nargs=2, metavar=("BEFORE_DIR", "AFTER_DIR"), help="train on your before/after pairs")
+    x.add_argument("--steps", type=int, default=1200)
+    x = ss.add_parser("preview")
+    x.add_argument("name")
+    x.add_argument("photos", nargs="*")
+    x = ss.add_parser("pack")
+    x.add_argument("name")
+    x.add_argument("--strength", type=float, default=1.0, help="the style's default strength")
+    x = ss.add_parser("status")
+    x.add_argument("name")
     sv = sub.add_parser("serve")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
     args = ap.parse_args(argv)
+    if args.cmd == "style":
+        return cmd_style(args)
 
     from photostyle.engine import Engine
 
