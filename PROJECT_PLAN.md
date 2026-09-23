@@ -1587,3 +1587,34 @@ data.
 - **Search results include digital art.** "Cyberpunk" returns many
   renders. The person filter can't see that, so the review step matters.
   A photo-vs-render classifier is in the backlog.
+
+#### A5.6 Decisions for the owner (revision round)
+
+1. **Placeholders.**
+   - Keep `natural` as the instant/base version? It is neutral, but
+     personal-use only.
+   - Or train an open-data version (`gentle` gave a pink cast)?
+   - Is `cyberpunk` at 80 % the right strength?
+2. **Default style order in Studio:** natural, cyberpunk, then Clean Cool?
+   Or retire Clean Cool from the default packs?
+3. **Your own look:** send the originals of edited photos 2, 3, 5, 7, 8 and
+   9 (Apple Photos → *Export Unmodified Original*) and more unedited
+   photos. With 20+ pairs, the `paired` recipe fits your look on the shared
+   base.
+4. **Search limit:** Openverse allows 200 requests/day, and one new style
+   uses about 15–30. Get a free Openverse API key (higher limit) or an
+   Unsplash/Pexels key?
+5. **Photo-vs-render filter:** add an automatic filter to drop digital art
+   from search results (needs a licence check for the model)? Or keep
+   manual review?
+6. **Repo tidy-up:** move the Phase 1–6 root scripts (`train.py`,
+   `inference.py`, `generate_dataset.py`, `image_editor_ui.py`, `models/`,
+   `data_generation/`) into `legacy/`?
+7. **Release:**
+   - Tag v0.2.0 and make a GitHub release?
+   - Make the repository public (if it is not)?
+   - Remove the v1 page (`/legacy`)?
+8. **Studio UX:** anything to change in layout, theme or controls now that
+   panels are customisable?
+9. **PPR10K** (portrait data, research licence): still open, for the
+   later portrait phase.
