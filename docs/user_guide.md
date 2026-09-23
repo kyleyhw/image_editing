@@ -12,8 +12,9 @@ uv sync                # CPU-only PyTorch on Linux/Windows
 uv run photostyle styles list
 ```
 
-The built-in style packs live in `stylepacks/`. Build or refresh them from
-the trained checkpoints:
+The built-in style packs live in `stylepacks/`. They are not in git: both
+are derived from MIT-Adobe FiveK, which is licensed for research. Build or
+refresh them from the data and checkpoints:
 
 ```
 uv run python tools/build_stylepacks.py
@@ -38,7 +39,7 @@ uv run photostyle serve        # http://127.0.0.1:8765
 | **Export** | JPEG (full resolution, EXIF kept, sRGB), `.cube` (curves + colour, for Resolve, Premiere, Photoshop, OBS…), XMP (Lightroom / ACR preset carrying the per-channel curves only), JSON (the full edit, re-loadable). |
 | **Remember this edit** | Stores your corrected version as a training example for that style. |
 | **Personalise style** | Fine-tunes a copy of the style (`<style>_personal`) on your remembered edits. The original style is never changed. |
-| **+ Create style** | *Before/after pairs* (best; same file names in both sets; 20+ pairs recommended), or *photos in a look* (20+ examples, plus a few of your unedited photos). Training runs in the background on the CPU. |
+| **+ Create style** | *Before/after pairs* (best; same file names in both sets; 20+ pairs recommended), or *photos in a look* (20+ examples, plus a few of your unedited photos). Training runs in the background on the CPU. Pairs give clearly better styles; learning from example photos alone gives a gentle, preset-like version of the look (see `tests/reports/phase11_unpaired.md`). |
 | **Batch** | Apply the current style to the whole library. The *series consistency* slider pulls every photo's edit toward the set's average: 0 % edits each photo on its own; 100 % applies one shared edit. |
 
 Keyboard shortcuts: `\` original · `Y` cycle compare mode · `[` `]`

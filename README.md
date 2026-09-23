@@ -10,17 +10,36 @@ It outputs **editable parameters** (curves, colour matrix, a small LUT,
 grain, vignette) that bake to a `.cube` file, never generated pixels. It is
 designed to train on a CPU from tens to hundreds of examples per style.
 
-**Status.** Phases 1–6 of [`PROJECT_PLAN.md`](PROJECT_PLAN.md) built the
-groundwork under an earlier, broader goal: a CDF + ResNet-18 feature
-extractor, a 21-parameter differentiable renderer (tone curve, 3 × 3 colour
-matrix, grain, vignette), a composite L1 / VGG / CDF loss, three
-fixed-function style models (Fujifilm Classic Chrome, Cyberpunk,
-Tilt-Shift), a Streamlit UI, and a first FiveK expert-C model. Phases 7–17
-pursue the purpose above: an evaluation harness, a SepLUT-style renderer,
-style conditioning, unpaired training, `.cube` export, and a web-based
-Studio with a create-your-own-style wizard. The reasoning
-is summarised in
+**Status.** The plan in [`PROJECT_PLAN.md`](PROJECT_PLAN.md) has been run
+end to end on a 4-core CPU. Every phase gate outcome, course correction and
+open decision is in **amendment A4**. Highlights, on FiveK landscapes:
+
+- **Content-adaptive beats one-size-fits-all.** The learned head improves
+  with data (20.6 → 22.2 dB from 10 to 1,882 pairs) while a static preset
+  stays flat at about 21.1 dB. Shrinkage calibration keeps small-data
+  styles from overshooting.
+- **One model, many styles.** A style-conditioned head beats per-style
+  models (+0.7 dB). A new style fitted from **20 before/after pairs**
+  beats a model trained on 132.
+- **Simple, editable renderer.** Per-channel curves + colour matrix match
+  3D LUTs and a per-pixel MLP within 0.4 dB. Regional edits (sky,
+  graduated filter) add little for these edits, so they stay manual tools.
+- **Styles from example photos only** work modestly (pseudo-pairs); pairs
+  are better.
+- **Clean Cool** (the first look, landscapes) passes its pilot gate. Day
+  scenes can come out over-muted, which is an open decision for the owner.
+- **Depth-aware haze / dehaze / clarity**: Depth Anything V2 Small, about
+  1 s per photo.
+- **Studio:** a local web app with WebGL preview (matches the Python
+  renderer to 1/255), curves, style strip, batch, create-a-style,
+  personalisation, and `.cube` / XMP / JPEG export. See the
+  [user guide](docs/user_guide.md).
+
+Phase reports are in [`tests/reports/`](tests/reports/). The research
+direction is summarised in
 [`reports/project_direction/project_direction.pdf`](reports/project_direction/project_direction.pdf).
+Phases 1–6 (the earlier, broader groundwork: fixed-function styles and a
+Streamlit UI) are kept below and in `legacy/`.
 
 ## Examples of every trained mode
 
