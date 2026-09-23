@@ -154,39 +154,46 @@ def distort_recover_pairs(examples: list[torch.Tensor], renderer: GlobalRenderer
 
 def learn_unpaired(examples: list[torch.Tensor], inputs: list[torch.Tensor], fx: FeatureExtractor,
                    profile: LookProfile | None = None, regime_fn: Callable | None = None, steps: int = 1200,
-                   seed: int = 0, progress: Callable | None = None):
+                   seed: int = 0, progress: Callable | None = None, use_pseudo: bool = True,
+                   use_swd: bool = True, use_fidelity: bool = True):
     """Learn a look from example photos (no pairs).
 
     examples: in-style photos; inputs: typical *unedited* photos to be edited
     (the model's input domain). If ``profile`` is given, a look profile loss
-    (per regime from ``regime_fn``) is added. Returns (head, renderer, feats, info).
+    (per regime from ``regime_fn``) is added. ``use_pseudo`` / ``use_swd`` /
+    ``use_fidelity`` switch the loss terms (Phase 11 ablation). Returns
+    (head, renderer, feats, info).
     """
     random.seed(seed)
     torch.manual_seed(seed)
     r = GlobalRenderer("per_channel")
     ex = [shrink(e, TRAIN_EDGE) for e in examples]
-    pseudo = distort_recover_pairs(ex, r, fx, k=16, seed=seed)
+    pseudo = distort_recover_pairs(ex, r, fx, k=16, seed=seed) if use_pseudo else []
     ins = [{"feat": fx(x), "src_t": shrink(x, TRAIN_EDGE)} for x in inputs]
     for it in ins:
         it["regime"] = regime_fn(it["src_t"]) if regime_fn else "day"
     ex_pix = torch.cat([lab_pixels(e[None], 4096) for e in ex])
     head = Head(FEATURE_DIM, r.num_params)
-    feats = torch.stack([it["feat"] for it in ins + pseudo])
+    feats = torch.stack([it["feat"] for it in ins + pseudo] or [fx(e) for e in ex])
     head.set_norm(feats)
     opt = torch.optim.AdamW(head.parameters(), lr=3e-3, weight_decay=1e-2)
     for step in range(1, steps + 1):
         head.train()
-        pb = random.sample(pseudo, min(8, len(pseudo)))
-        pt = head(torch.stack([p["feat"] for p in pb]))
-        rec = sum((r(p["src_t"][None], th[None])[0] - p["tgt_t"]).abs().mean() for p, th in zip(pb, pt)) / len(pb)
-        loss = 2.0 * rec + 1e-3 * pt.pow(2).mean()
+        loss = torch.zeros(())
+        if pseudo:
+            pb = random.sample(pseudo, min(8, len(pseudo)))
+            pt = head(torch.stack([p["feat"] for p in pb]))
+            rec = sum((r(p["src_t"][None], th[None])[0] - p["tgt_t"]).abs().mean() for p, th in zip(pb, pt)) / len(pb)
+            loss = loss + 2.0 * rec + 1e-3 * pt.pow(2).mean()
         if ins:
             bb = random.sample(ins, min(8, len(ins)))
             th = head(torch.stack([b["feat"] for b in bb]))
             outs = [r(b["src_t"][None], t[None]) for b, t in zip(bb, th)]
-            swd = sliced_wasserstein(torch.cat([lab_pixels(o, 1024) for o in outs]), ex_pix)
-            fid = sum(fidelity_loss(o, b["src_t"][None]) for o, b in zip(outs, bb)) / len(bb)
-            loss = loss + 0.5 * swd + fid + 1e-3 * th.pow(2).mean()
+            if use_swd:
+                loss = loss + 0.5 * sliced_wasserstein(torch.cat([lab_pixels(o, 1024) for o in outs]), ex_pix)
+            if use_fidelity:
+                loss = loss + sum(fidelity_loss(o, b["src_t"][None]) for o, b in zip(outs, bb)) / len(bb)
+            loss = loss + 1e-3 * th.pow(2).mean()
             if profile is not None:
                 loss = loss + sum(profile_loss(o, [b["regime"]], profile, ref=b["src_t"][None])
                                   for o, b in zip(outs, bb)) / len(bb)
