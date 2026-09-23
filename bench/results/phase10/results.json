@@ -24,10 +24,27 @@
   "5": {
    "encoder": 20.965976240729333,
    "embedding": 20.306121804173227
+  },
+  "20": {
+   "encoder": 20.92024065928406,
+   "embedding": 21.676410358590616,
+   "separate": 20.870880617975917
+  },
+  "50": {
+   "encoder": 20.858553788288535,
+   "embedding": 21.752356103310802,
+   "separate": 20.82297710112758
   }
  },
  "joint_train": {
   "steps": 1450,
   "val": 0.2761131525039673
+ },
+ "gate": {
+  "joint_ge_separate": true,
+  "joint_mean": 21.436026817410458,
+  "separate_mean": 20.763275359702348,
+  "fewshot20_within_1db": true,
+  "fewshot20_best": 21.676410358590616
  }
 }
