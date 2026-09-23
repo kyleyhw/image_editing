@@ -40,8 +40,10 @@ def _luma(x: torch.Tensor) -> torch.Tensor:
 
 
 def box_filter(x: torch.Tensor, r: int) -> torch.Tensor:
+    """Mean over a (2r+1)^2 window, edges replicated. Separable: O(r) per pixel, not O(r^2)."""
     k = 2 * r + 1
-    return F.avg_pool2d(F.pad(x, (r, r, r, r), mode="replicate"), k, stride=1)
+    x = F.avg_pool2d(F.pad(x, (r, r, 0, 0), mode="replicate"), (1, k), stride=1)
+    return F.avg_pool2d(F.pad(x, (0, 0, r, r), mode="replicate"), (k, 1), stride=1)
 
 
 def guided_filter(guide: torch.Tensor, src: torch.Tensor, r: int = 8, eps: float = 1e-3) -> torch.Tensor:
@@ -56,8 +58,18 @@ def guided_filter(guide: torch.Tensor, src: torch.Tensor, r: int = 8, eps: float
 
 @torch.no_grad()
 def sky_probability(img: torch.Tensor) -> torch.Tensor:
-    """Heuristic sky probability (B, 1, H, W) in [0, 1]. Not differentiable (not needed)."""
+    """Heuristic sky probability (B, 1, H, W) in [0, 1]. Not differentiable (not needed).
+
+    Large images are analysed on a 1024 px proxy; the mask is upsampled and its
+    edges re-snapped to the full-resolution image with a small guided filter.
+    """
     B, _, H, W = img.shape
+    if max(H, W) > 1024:
+        s = 1024 / max(H, W)
+        small = F.interpolate(img, size=(round(H * s), round(W * s)), mode="bilinear", antialias=True,
+                              align_corners=False)
+        p = F.interpolate(sky_probability(small), size=(H, W), mode="bilinear", align_corners=False)
+        return guided_filter(_luma(img), p, r=max(2, round(1 / s) * 2), eps=1e-3).clamp(0, 1)
     r, g, b = img[:, 0:1], img[:, 1:2], img[:, 2:3]
     y = _luma(img)
     blue = torch.sigmoid((b - torch.maximum(r, g) + 0.02) / 0.03) * torch.sigmoid((y - 0.25) / 0.05)
