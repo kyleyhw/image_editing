@@ -29,13 +29,24 @@ class Head(nn.Module):
         )
         nn.init.zeros_(self.net[-1].weight)
         nn.init.zeros_(self.net[-1].bias)
+        # Shrinkage toward the mean training prediction (alpha = 1: off). Set by
+        # photostyle.train.calibrate_shrinkage; stabilises small-data heads.
+        self.register_buffer("theta_mean", torch.zeros(out_dim))
+        self.register_buffer("alpha", torch.ones(()))
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        # Checkpoints saved before shrinkage existed load with shrinkage off.
+        state_dict.setdefault(prefix + "theta_mean", torch.zeros_like(self.theta_mean))
+        state_dict.setdefault(prefix + "alpha", torch.ones_like(self.alpha))
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
 
     def set_norm(self, feats: torch.Tensor) -> None:
         self.mu.copy_(feats.mean(0))
         self.sigma.copy_(feats.std(0).clamp_min(1e-4))
 
     def forward(self, f: torch.Tensor) -> torch.Tensor:
-        return self.net((f - self.mu) / self.sigma)
+        raw = self.net((f - self.mu) / self.sigma)
+        return self.theta_mean + self.alpha * (raw - self.theta_mean)
 
 
 class Preset(nn.Module):

@@ -104,6 +104,32 @@ def fit(model, renderer, train_items, val_items, loss_fn: Callable = paired_loss
     return {"val_loss": best, "steps": step}
 
 
+@torch.no_grad()
+def calibrate_shrinkage(head, renderer, train_items, val_items, loss_fn: Callable = paired_loss,
+                        grid=(0.0, 0.25, 0.5, 0.75, 1.0)) -> float:
+    """Pick alpha in ``grid`` minimising validation loss for
+    theta = mean_train_theta + alpha * (theta - mean_train_theta), and store it in the head.
+
+    alpha = 0 is the static preset (the head's mean edit); alpha = 1 is the raw
+    adaptive head. Small training sets sometimes produce a head that overshoots
+    on unfamiliar photos; shrinkage keeps the adaptive part only as far as the
+    validation set supports it.
+    """
+    head.eval()
+    head.alpha.fill_(1.0)
+    head.theta_mean.zero_()
+    raw_mean = head(torch.stack([it["feat"] for it in train_items])).mean(0)
+    head.theta_mean.copy_(raw_mean)
+    best_a, best_v = 1.0, float("inf")
+    for a in grid:
+        head.alpha.fill_(a)
+        v = float(loss_fn(head, renderer, val_items))
+        if v < best_v - 1e-6:
+            best_a, best_v = a, v
+    head.alpha.fill_(best_a)
+    return best_a
+
+
 def learn_paired(pairs: list[tuple[torch.Tensor, torch.Tensor]], fx: FeatureExtractor, kind: str = "per_channel",
                  val_frac: float = 0.15, seed: int = 0, progress: Callable | None = None):
     """Learn a style from (before, after) float tensors. Returns (head, renderer, feats, info)."""
@@ -126,6 +152,7 @@ def learn_paired(pairs: list[tuple[torch.Tensor, torch.Tensor]], fx: FeatureExtr
     feats = torch.stack([it["feat"] for it in items])
     head.set_norm(feats)
     info = fit(head, r, tr, val, progress=progress)
+    info["shrinkage_alpha"] = calibrate_shrinkage(head, r, tr, val)
     return head, r, feats, {**info, "n_pairs": len(items), "n_dropped": len(pairs) - len(items)}
 
 
