@@ -206,3 +206,25 @@ def test_newstyle_pick_exclude_offline(tmp_path, monkeypatch):
     assert len(q.refs) == 4 and q.excluded and all(i < 6 for i in q.refs)
     assert (tmp_path / "manifests" / "look.csv").read_text().count("\n") == 5
     assert ns.status("look")["references"] == 4
+
+
+def test_coded_pack_round_trip(tmp_path):
+    """A style stored as a code on the shared base loads and predicts like any pack."""
+    from PIL import Image
+
+    from photostyle.condition import CodedHead, StyleHead
+    from photostyle.engine import Engine, save_stylepack
+    from photostyle.features import FEATURE_DIM
+
+    r = GlobalRenderer("per_channel")
+    sh = StyleHead(FEATURE_DIM, r.num_params, n_styles=5)
+    torch.nn.init.normal_(sh.code_bias.weight, std=0.05)      # make the code matter
+    head = CodedHead(sh, torch.randn(sh.embed.weight.shape[1]))
+    feats = torch.randn(6, FEATURE_DIM)
+    save_stylepack(tmp_path / "p" / "c", "c", head, r, feats, {"head_type": "coded", "base_n_styles": 5})
+    eng = Engine(roots=[tmp_path / "p"])
+    img = Image.fromarray((np.random.default_rng(2).random((32, 48, 3)) * 255).astype("uint8"))
+    p = eng.predict(img, "c")
+    with torch.no_grad():
+        want = head(eng.fx(eng._proxy(img))[None])[0]
+    assert np.allclose(p.theta, want.tolist(), atol=1e-5)
