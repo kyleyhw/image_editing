@@ -23,6 +23,7 @@ import torch
 from PIL import Image, ImageDraw
 
 from bench.learning_curve import Pairs, seed_all, shrink, to_tensor, train
+from photostyle.export import bake_lut, write_cube
 from photostyle.features import FEATURE_DIM, FeatureExtractor
 from photostyle.head import Head
 from photostyle.render import GlobalRenderer
@@ -76,6 +77,7 @@ def main() -> None:
         a = Image.fromarray((src.permute(1, 2, 0).numpy() * 255).round().astype("uint8"))
         b = Image.fromarray((out.permute(1, 2, 0).numpy() * 255).round().astype("uint8"))
         b.save(args.out / f"{p.stem}_edit.jpg", quality=92)
+        write_cube(bake_lut(r, theta[0]), args.out / f"{p.stem}.cube", title=f"{p.stem} ({args.renderer})")
         tiles.append((p.stem, a, b))
 
     tw = 420
