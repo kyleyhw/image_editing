@@ -4,9 +4,9 @@ Shared by the benchmarks (bench/) and the user-facing engine/CLI/Studio.
 
 Paired   L1 between rendered input and target, AdamW, early stopping on a
          held-out split (the Phase 7 protocol).
-Unpaired distort-and-recover pseudo-pairs built from the examples, plus a
-         sliced-Wasserstein colour-distribution loss to the examples, plus an
-         optional look profile and fidelity terms (the Pilot A recipe).
+Unpaired distort-and-recover pseudo-pairs built from the examples (the
+         Phase 11 default); optionally a sliced-Wasserstein colour-distribution
+         loss, fidelity terms and a look profile (the Pilot A recipe).
 """
 
 from __future__ import annotations
@@ -182,13 +182,16 @@ def distort_recover_pairs(examples: list[torch.Tensor], renderer: GlobalRenderer
 def learn_unpaired(examples: list[torch.Tensor], inputs: list[torch.Tensor], fx: FeatureExtractor,
                    profile: LookProfile | None = None, regime_fn: Callable | None = None, steps: int = 1200,
                    seed: int = 0, progress: Callable | None = None, use_pseudo: bool = True,
-                   use_swd: bool = True, use_fidelity: bool = True, vignette: bool = False):
+                   use_swd: bool = False, use_fidelity: bool = False, vignette: bool = False):
     """Learn a look from example photos (no pairs).
 
     examples: in-style photos; inputs: typical *unedited* photos to be edited
     (the model's input domain). If ``profile`` is given, a look profile loss
     (per regime from ``regime_fn``) is added. ``use_pseudo`` / ``use_swd`` /
-    ``use_fidelity`` switch the loss terms (Phase 11 ablation). The vignette is
+    ``use_fidelity`` switch the loss terms. Defaults follow the Phase 11 gate
+    (tests/reports/phase11_unpaired.md): pseudo-pairs only. Without a look
+    profile to anchor it, sliced-Wasserstein matching pushes every photo toward
+    the examples' pooled colour distribution and is unstable. The vignette is
     off unless ``vignette``: distribution losses otherwise game it by darkening
     the frame (seen in Pilot A). Its head output then stays exactly zero. Returns
     (head, renderer, feats, info).
