@@ -117,13 +117,20 @@ def main() -> None:
             for col, d in (("original", odir), ("augmented", edir)):
                 if not todo:
                     break
-                column = pf.read(columns=[col]).column(col)
-                for i, (fname, _) in todo.items():
-                    try:
-                        save_jpeg(column[i]["bytes"].as_py(), d / fname, args.max_edge, args.quality)
-                    except Exception as exc:  # corrupt row: skip it
-                        print(f"  skip {shard}[{i}] {col}: {type(exc).__name__}: {exc}", flush=True)
-                del column
+                # Stream in small batches: a whole image column is ~2 GB in memory.
+                start = 0
+                for batch in pf.iter_batches(batch_size=4, columns=[col]):
+                    column = batch.column(0)
+                    for j in range(len(column)):
+                        i = start + j
+                        if i not in todo:
+                            continue
+                        try:
+                            save_jpeg(column[j]["bytes"].as_py(), d / todo[i][0], args.max_edge, args.quality)
+                        except Exception as exc:  # corrupt row: skip it
+                            print(f"  skip {shard}[{i}] {col}: {type(exc).__name__}: {exc}", flush=True)
+                    start += len(column)
+                    del column, batch
             for i, (fname, lab) in keep.items():
                 if (odir / fname).exists() and (edir / fname).exists():
                     meta[fname] = {"file": fname, "split": split, "row": row0 + i, **lab}
