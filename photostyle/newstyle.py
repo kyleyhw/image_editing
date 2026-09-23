@@ -264,22 +264,43 @@ def _tensor(path: str | Path, edge: int = 512) -> torch.Tensor:
     return shrink(torch.from_numpy(arr).permute(2, 0, 1), edge)
 
 
-def input_pool(pages: int = 2) -> list[Path]:
-    """Generic openly licensed scenes (colour, no dominant person); collected once and reused."""
+def input_pool(exclude: str | None = None, pages: int = 2, min_size: int = 100) -> list[Path]:
+    """Typical photos to be edited: the input domain for "strong" training.
+
+    Reuses photos already downloaded by other style projects (all openly licensed; mostly
+    ordinary scenes) plus the owner's unedited photos (local only), and tops up from
+    Openverse's generic-scene queries only if fewer than ``min_size`` are available."""
+    files: list[Path] = []
+    for proj in sorted(ROOT.glob("*/project.json")):
+        if proj.parent.name in (exclude, INPUT_POOL):
+            continue
+        for c in json.loads(proj.read_text()).get("candidates", []):
+            if Path(c["file"]).exists():
+                files.append(Path(c["file"]))
+    man = Path("data/owner/manifest.csv")
+    if man.exists():
+        with man.open() as f:
+            files += [Path("data/owner/srgb") / f"{r['id']}.jpg" for r in csv.DictReader(f) if r.get("edited") == "no"]
     d = ROOT / INPUT_POOL
     listing = d / "pool.json"
     if listing.exists():
-        return [Path(f) for f in json.loads(listing.read_text())]
-    cands = _collect(INPUT_QUERIES, pages, False, d / "images")
-    files = [c["file"] for c in cands]
-    d.mkdir(parents=True, exist_ok=True)
-    listing.write_text(json.dumps(files))
-    with (MANIFESTS / "style_input_pool.csv").open("w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["openverse_id", "license", "creator", "source", "landing_url", "attribution"])
-        for c in cands:
-            w.writerow([c["id"], c["license"], c["creator"], c["source"], c["landing_url"], c["attribution"]])
-    return [Path(f) for f in files]
+        files += [Path(f) for f in json.loads(listing.read_text())]
+    elif len(files) < min_size:
+        cands = _collect(INPUT_QUERIES, pages, False, d / "images")
+        if cands:                                   # never cache an empty pool (e.g. API limit reached)
+            d.mkdir(parents=True, exist_ok=True)
+            listing.write_text(json.dumps([c["file"] for c in cands]))
+            with (MANIFESTS / "style_input_pool.csv").open("w", newline="") as f:
+                w = csv.writer(f)
+                w.writerow(["openverse_id", "license", "creator", "source", "landing_url", "attribution"])
+                for c in cands:
+                    w.writerow([c["id"], c["license"], c["creator"], c["source"], c["landing_url"], c["attribution"]])
+            files += [Path(c["file"]) for c in cands]
+    files = list(dict.fromkeys(files))
+    if not files:
+        raise SystemExit("no input photos available for the 'strong' recipe (Openverse limit reached?); "
+                         "use --recipe gentle, or try again tomorrow")
+    return files
 
 
 def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = None, steps: int = 1200,
@@ -339,7 +360,7 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
         ex = [_tensor(p.candidates[i]["file"]) for i in p.refs]
         ins = []
         if recipe == "strong":
-            pool = input_pool()
+            pool = input_pool(exclude=name)
             ins = [_tensor(f) for f in random.Random(seed).sample(pool, min(300, len(pool)))]
         kw = dict(use_pseudo=True, use_swd=recipe == "strong", use_fidelity=recipe == "strong")
         head, r, feats, info = learn_unpaired(ex, ins, fx, steps=steps, seed=seed, progress=progress, **kw)
@@ -391,7 +412,8 @@ def preview(name: str, photos: list[Path] | None = None, strengths: tuple[float,
                 photos = [Path("data/owner/srgb") / f"{row['id']}.jpg" for row in csv.DictReader(f)
                           if row.get("edited") == "no"]
         if not photos:
-            photos = random.Random(0).sample(input_pool(), 6)
+            pool = input_pool(exclude=name)
+            photos = random.Random(0).sample(pool, min(6, len(pool)))
     rows = []
     with torch.no_grad():
         for ph in photos:
