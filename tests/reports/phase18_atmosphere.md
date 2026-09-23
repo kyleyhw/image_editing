@@ -26,7 +26,7 @@ fallback is used (vertical position + dark channel).
 | +haze lowers far contrast more than near contrast | 12/12 (far ×0.62 median, near ×0.96) |
 | dehaze raises far contrast | 12/12 |
 | near clarity / far softening: near contrast rises more than far | 12/12 (near ×1.5, far ×0.66) |
-| new clipped pixels, worst image | +haze 1.2 %, near/far clarity 1.9 %, dehaze 4.2 % (one sunset; 11 of 12 images ≤ 3 %, most ≈ 0) |
+| new clipped pixels, worst image | +haze 1.2 %, near/far clarity 1.9 %, dehaze 4.2 % (one image; 11 of 12 are ≤ 3 % and most ≈ 0) |
 | depth model vs fallback agreement (Spearman) | median 0.76; negative on 2 images (close-ups, where "lower = nearer" is wrong) |
 | runtime, 4-core CPU under load, 1 thread | depth 1.0 s at 1024 px (1.6 s for a 12 MP proxy); edit at 12 MP 6–7 s |
 
