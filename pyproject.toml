@@ -1,6 +1,6 @@
 [project]
 name = "image-editing"
-version = "0.1.0"
+version = "0.2.0"
 description = "Content-adaptive, editable photo styles: learn per-image parametric edits toward a target look from paired or unpaired examples."
 requires-python = ">=3.10"
 license = "MIT"

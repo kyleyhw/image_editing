@@ -19,3 +19,23 @@ jobs:
         run: uv run ruff check photostyle bench tools tests studio
       - name: Unit tests
         run: uv run pytest -q
+
+  studio-web:
+    # The built front end (studio/dist) is committed so Studio runs without Node.
+    # This job rebuilds it and fails if the committed build is out of date.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/web/package-lock.json
+      - name: Build
+        working-directory: studio/web
+        run: |
+          npm ci
+          npm run build
+      - name: Committed build is up to date
+        run: git diff --exit-code -- studio/dist
