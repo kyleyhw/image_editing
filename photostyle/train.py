@@ -182,13 +182,15 @@ def distort_recover_pairs(examples: list[torch.Tensor], renderer: GlobalRenderer
 def learn_unpaired(examples: list[torch.Tensor], inputs: list[torch.Tensor], fx: FeatureExtractor,
                    profile: LookProfile | None = None, regime_fn: Callable | None = None, steps: int = 1200,
                    seed: int = 0, progress: Callable | None = None, use_pseudo: bool = True,
-                   use_swd: bool = True, use_fidelity: bool = True):
+                   use_swd: bool = True, use_fidelity: bool = True, vignette: bool = False):
     """Learn a look from example photos (no pairs).
 
     examples: in-style photos; inputs: typical *unedited* photos to be edited
     (the model's input domain). If ``profile`` is given, a look profile loss
     (per regime from ``regime_fn``) is added. ``use_pseudo`` / ``use_swd`` /
-    ``use_fidelity`` switch the loss terms (Phase 11 ablation). Returns
+    ``use_fidelity`` switch the loss terms (Phase 11 ablation). The vignette is
+    off unless ``vignette``: distribution losses otherwise game it by darkening
+    the frame (seen in Pilot A). Its head output then stays exactly zero. Returns
     (head, renderer, feats, info).
     """
     random.seed(seed)
@@ -204,17 +206,24 @@ def learn_unpaired(examples: list[torch.Tensor], inputs: list[torch.Tensor], fx:
     feats = torch.stack([it["feat"] for it in ins + pseudo] or [fx(e) for e in ex])
     head.set_norm(feats)
     opt = torch.optim.AdamW(head.parameters(), lr=3e-3, weight_decay=1e-2)
+    keep = torch.ones(r.num_params)
+    if not vignette:
+        keep[-1] = 0.0          # GlobalRenderer layout ends with the vignette strength
+
+    def predict(f):
+        return head(f) * keep
+
     for step in range(1, steps + 1):
         head.train()
         loss = torch.zeros(())
         if pseudo:
             pb = random.sample(pseudo, min(8, len(pseudo)))
-            pt = head(torch.stack([p["feat"] for p in pb]))
+            pt = predict(torch.stack([p["feat"] for p in pb]))
             rec = sum((r(p["src_t"][None], th[None])[0] - p["tgt_t"]).abs().mean() for p, th in zip(pb, pt)) / len(pb)
             loss = loss + 2.0 * rec + 1e-3 * pt.pow(2).mean()
         if ins:
             bb = random.sample(ins, min(8, len(ins)))
-            th = head(torch.stack([b["feat"] for b in bb]))
+            th = predict(torch.stack([b["feat"] for b in bb]))
             outs = [r(b["src_t"][None], t[None]) for b, t in zip(bb, th)]
             if use_swd:
                 loss = loss + 0.5 * sliced_wasserstein(torch.cat([lab_pixels(o, 1024) for o in outs]), ex_pix)
