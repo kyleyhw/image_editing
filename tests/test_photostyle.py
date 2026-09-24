@@ -312,3 +312,18 @@ def test_web_export_matches_torch_head(tmp_path):
     with torch.no_grad():
         want = head(f[None])[0].numpy()
     assert np.allclose(theta, want, atol=1e-4)
+
+
+def test_cyberpunk_recipe_split_tones():
+    """The tutorial recipe: blue shadows, pink highlights, greens pulled toward cyan."""
+    from photostyle.recipes import _selfcheck, cyberpunk
+
+    _selfcheck()
+    ramp = torch.linspace(0.05, 0.95, 64).view(1, 1, 64).expand(3, 8, 64).contiguous()
+    out = cyberpunk(ramp)
+    dark, light = out[:, :, 4].mean(1), out[:, :, 60].mean(1)
+    assert dark[2] > dark[0]                       # shadows lean blue
+    assert light[0] > light[1] and light[2] > light[1]   # highlights lean magenta/pink
+    green = torch.tensor([0.25, 0.6, 0.2]).view(3, 1, 1).expand(3, 4, 4)
+    g = cyberpunk(green)[:, 2, 2]
+    assert g[2] - g[0] > 0.2 - 0.25                # blue gains on red: green shifts toward cyan

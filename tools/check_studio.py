@@ -98,8 +98,8 @@ def main() -> None:
         if page.locator("text=Haze").count():
             before = page.evaluate("() => { const c = window.__studio.main.canvas; return c.toDataURL().length; }")
             page.evaluate("() => { window.__studio.S.scene.haze = -0.5; }")
-            page.evaluate("""() => { const i = [...document.querySelectorAll('label')].find(l => l.textContent.trim().startsWith('Haze'))
-                                     .querySelector('input'); i.value = -50; i.dispatchEvent(new Event('input', {bubbles: true})); }""")
+            page.evaluate("""() => { const i = document.querySelector('input[type=range][aria-label="Haze"]');
+                                     i.value = -50; i.dispatchEvent(new Event('input', {bubbles: true})); }""")
             page.wait_for_function("window.__studio.S.sceneBusy === true", timeout=10_000)
             page.wait_for_function("window.__studio.S.sceneBusy === false", timeout=180_000)
             page.wait_for_timeout(300)

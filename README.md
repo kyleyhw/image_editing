@@ -42,8 +42,9 @@ open decision is in **amendment A4**. Highlights, on FiveK landscapes:
   [user guide](docs/user_guide.md).
 - **New styles from an idea:** `photostyle style …` (or Studio → Create
   style → An idea). Describe a look, pick openly licensed photos that have
-  it, and get a trained style with attribution. Placeholder styles
-  `natural` and `cyberpunk` were made this way
+  it, and get a trained style with attribution. `fujifilm` was made this
+  way from real Fuji film scans; `cyberpunk` is trained on pairs made by a
+  recipe transcribed from grading tutorials (`--recipe teacher`)
   ([report](tests/reports/new_style_pipeline.md)).
 - **Shared style base:** one model for many styles. A new style is a small
   code: fitted on 20 before/after pairs, or read instantly from example
@@ -259,7 +260,7 @@ Not in git: `data/` (datasets, your photos, caches), `checkpoints/`,
 uv sync
 uv run photostyle serve                    # Studio at http://127.0.0.1:8765
 uv run photostyle styles list
-uv run photostyle apply --style natural photos/*.jpg -o out/ --cube
+uv run photostyle apply --style fujifilm photos/*.jpg -o out/ --cube
 uv run photostyle style new my_look --describe "soft pastel morning light"   # then: search, pick, train, pack
 ```
 

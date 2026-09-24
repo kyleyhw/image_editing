@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { S, initGL, render } from "./lib/studio.svelte.js";
+  import { S, initGL, render, pretty } from "./lib/studio.svelte.js";
 
   let canvas, wrap, divider;
   onMount(() => initGL(canvas));
@@ -32,7 +32,7 @@
     e.stopPropagation();
   }
   const showing = $derived(S.peek === "__original" || S.holdBefore || S.mode === "before" ? "Original"
-    : S.peek ? S.peek.replace(/_/g, " ") : null);
+    : S.peek ? pretty(S.peek) : null);
 </script>
 
 <svelte:window onresize={placeDivider} />
@@ -55,7 +55,7 @@
       {#each [["before", "Before"], ["split", "Split"], ["after", "After"]] as [m, label]}
         <button data-mode={m} class="seg" class:on={S.mode === m} onclick={() => (S.mode = m)}>{label}</button>
       {/each}
-      <span class="compare-hint">hold <kbd>\</kbd></span>
+      <span class="compare-hint">Hold <kbd>\</kbd> for original</span>
     </div>
   {/if}
 </div>

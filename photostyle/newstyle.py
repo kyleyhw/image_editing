@@ -350,6 +350,8 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
     strong   unpaired, pseudo-pairs + per-image SWD + fidelity (looks far from natural)
     instant  no training: the shared base's encoder reads a style code from the references
              (Phase 10; needs checkpoints/base_stylehead.pt)
+    teacher  a tutorial recipe (photostyle/recipes.py) applied to input photos gives the pairs;
+             for looks defined by how they are made (e.g. cyberpunk split toning)
     paired   ``pairs=(before_dir, after_dir)``: a code fitted on the shared base if present
              (Phase 10: 20 pairs suffice), else a separate head with shrinkage (Phase 7b)
 
@@ -398,6 +400,15 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
         r = GlobalRenderer("per_channel")
         head, feats, kind, info, mode = CodedHead(sh, code), tf, "coded", {"n_refs": len(p.refs)}, "instant/base-encoder"
         extra = {"base_n_styles": sh.embed.weight.shape[0], "base": binfo.get("licence", "")}
+    elif recipe == "teacher":
+        from photostyle.recipes import RECIPES
+
+        if name not in RECIPES:
+            raise SystemExit(f"no tutorial recipe for {name!r}; available: {sorted(RECIPES)}")
+        pool = input_pool(exclude=name, include_owner=not open_only)
+        ins = [_tensor(f) for f in random.Random(seed).sample(pool, min(300, len(pool)))]
+        head, r, feats, info = learn_paired([(x, RECIPES[name](x)) for x in ins], fx, seed=seed, progress=progress)
+        mode = "teacher/recipe"
     else:
         if not p.refs:
             raise SystemExit("no references yet: run search and pick first")
@@ -509,8 +520,11 @@ def pack(name: str, strength: float = 1.0, out_root: Path = Path("stylepacks"), 
     # Publishable = trained on openly licensed photos only (refs are always open; the "strong"
     # input pool must have excluded the owner's photos; nothing FiveK-derived).
     mode = p.train.get("mode", "")
-    card["publishable"] = (ck.get("kind") != "coded" and mode.startswith("unpaired")
+    card["publishable"] = (ck.get("kind") != "coded" and mode.startswith(("unpaired", "teacher"))
                            and (p.train.get("recipe") == "gentle" or bool(p.train.get("open_only"))))
+    if mode.startswith("teacher"):
+        card["training_data"] = ("a tutorial recipe (photostyle/recipes.py) applied to openly licensed input "
+                                 "photos; the references were used to choose and check the look")
     old = out_root / name / "style.json"
     if order is None and old.exists():                  # repacking keeps the style's place in the list
         order = json.loads(old.read_text()).get("order")

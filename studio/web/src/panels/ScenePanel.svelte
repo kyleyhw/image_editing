@@ -14,16 +14,15 @@
   ];
   function set(k, v, scale) { S.scene[k] = (v / 100) * scale; applyScene(); }
   function reset() { S.scene = ZERO_SCENE(); applyScene(); commit(); }
-  const sign = (v) => (v > 0 ? `+${v}` : String(v));
 </script>
 
 <div class="stack">
   {#each CONTROLS as [k, label, hint, scale]}
-    <Slider {label} title={hint} value={Math.round((S.scene[k] / scale) * 100)} fmt={sign} disabled={!S.id}
+    <Slider {label} title={hint} value={Math.round((S.scene[k] / scale) * 100)} disabled={!S.id}
             oninput={(v) => set(k, v, scale)} onchange={commit} />
   {/each}
   <div class="row-between">
     <span class="hint">Depth and sky are found by two small models; the first change takes ~2 s.</span>
-    <button class="btn ghost sm" onclick={reset} disabled={!Object.values(S.scene).some(Boolean)}>Reset</button>
+    <button class="link-btn" onclick={reset} disabled={!Object.values(S.scene).some(Boolean)}>Reset</button>
   </div>
 </div>

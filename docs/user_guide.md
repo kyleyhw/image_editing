@@ -67,9 +67,9 @@ A pack is publishable only if it was trained on openly licensed photos alone:
 `photostyle style train NAME --recipe strong --open-only` (keeps your own photos out of the
 input pool) or the `gentle` recipe, then `pack`. Anything on the FiveK-derived base
 (`instant`, `paired`) or FiveK data (`clean_cool`, `fivek_c_landscape`) is never exported.
-A web-only version of a local look can live in `webpacks/` (e.g. the hosted `natural` is an
-open-data retrain; the local one uses the shared base):
-`uv run photostyle --root webpacks style pack natural --strength 0.7`. The browser's
+A web-only version of a local look can live in `webpacks/`
+(`uv run photostyle --root webpacks style pack NAME`); it overrides a local pack of the same name
+in the export. The browser's
 predictions match PyTorch to 0.35/255 on average (p99 1.8/255).
 
 ## Command line
@@ -114,6 +114,7 @@ existed.
 |---|---|---|
 | `gentle` | the look is close to a natural photo (film tones, soft colour) | pseudo-pairs only; stable; subtle |
 | `strong` | the look is far from natural (neon, teal & orange) | adds colour-distribution matching on a pool of openly licensed input photos; stronger but can homogenise |
+| `teacher` | the look is defined by how people make it (e.g. cyberpunk split toning) | a tutorial recipe in `photostyle/recipes.py` grades openly licensed input photos, and the style is trained on those pairs; the references are only used to choose and check the look |
 | `instant` | you want a preview in seconds | uses the shared base's encoder (build it with `tools/build_base.py`); only covers looks near the FiveK experts' |
 | `paired` | you have before/after edits (`--pairs BEFORE AFTER`) | best; with the shared base, 20 pairs are enough |
 

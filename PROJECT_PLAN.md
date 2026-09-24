@@ -1685,3 +1685,57 @@ were replaced by one:
   night blacks.
 - The local `natural` (shared base, FiveK-derived) is unchanged and never
   published.
+
+#### A5.8 New looks, natural removed, UI revision (2026-09-24)
+
+Owner: "look on the internet and make a fujifilm style. remove natural
+style. also cyberpunk isn't right, look up cyberpunk tutorials for references
+and retrain." Then, on the UI: keep the current design and its translucent
+panels, but the background must not change while editing, it should look
+less AI-generated, and closer to the calmer "Workbench" demo.
+
+- **`fujifilm`** (order 1, 80 %). Research: Classic Negative is modelled on
+  Superia; Classic Chrome is muted with cyan-shifted blues and strong
+  shadow contrast.
+  - References: 274 openly licensed Fuji film scans from Openverse
+    (Superia, C200, Fujicolor 200, Pro 400H, Classic Chrome / Negative
+    queries), ranked against a target from that research.
+  - Target: slightly lifted, cool-green shadows; warm highlights; muted
+    saturation.
+  - Selection: the top 46, after dropping a sprocket border and a light
+    leak.
+  - Training: `strong`, `--open-only`.
+  - Result: cyan-leaning skies, olive greens, softly lifted green-black
+    shadows, muted reds.
+- **`cyberpunk`** (order 2, 90 %). Retraining on better references alone
+  still gave a flat violet cast. The tutorials (TourBox, Spoon Graphics,
+  Denny's Tips) agree on a recipe:
+  - temperature to blue and tint to magenta;
+  - red → magenta; green → cyan, desaturated; blue → cyan; purple →
+    magenta;
+  - split toning: blue shadows, pink highlights;
+  - S-curve and darkened edges.
+- **New `teacher` recipe.** The tutorial recipe above is transcribed in
+  `photostyle/recipes.py`. It grades 300 open input photos, and the head
+  is trained on those pairs (`--recipe teacher --open-only`).
+  - Result: navy shadows, pink-magenta highlights and skies, reds →
+    magenta.
+  - Limit: greens move only partly to cyan, because a global matrix cannot
+    shift one hue alone.
+  - 36 hand-checked neon references (cyan/blue + magenta, little
+    orange/green) chose and checked the look.
+  - The old version is archived in `data/styles_archive/`.
+- **`natural` removed.** The local and web packs are archived in
+  `data/styles_archive/`. Its project folder stays as input-photo data for
+  training.
+- **UI.**
+  - Kept: translucent panels, every control and piece of information.
+  - Backdrop: a blurred copy of the original photo; it changes only when
+    another photo is opened. The accent colour is fixed.
+  - Layout: photos and looks in a left sidebar; a number box beside every
+    slider; one typeface (Inter).
+  - Removed: gradients, glows, serif flourishes, letter-spaced labels,
+    grain, the tilted showcase card, entrance animations and marketing
+    copy.
+- **Open decision:** the app's name. "photostyle" was a working package
+  name chosen by Claude in Phase 7; the owner wants a better one.

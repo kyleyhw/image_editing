@@ -66,7 +66,7 @@ def main() -> None:
         cap("Upload photos → the first style is predicted for THIS photo")
         cap("The strip previews every style on your photo", 2200)
 
-        for name in ("cyberpunk", "clean_cool", "natural"):
+        for name in ("cyberpunk", "clean_cool", "fujifilm"):
             page.locator(".thumb", has_text=name).click()
             page.wait_for_timeout(1800)
             cap(f"Style: {name} (content-adaptive: the edit depends on the photo)", 1500)

@@ -1,7 +1,8 @@
 <script>
-  import { S, commit, resetToModel, remember, personalise, pretty } from "../lib/studio.svelte.js";
+  import { S, commit, resetToModel, remember, personalise, pretty, setStyle } from "../lib/studio.svelte.js";
   import { describe, effectiveFrom } from "../lib/render.js";
   import Section from "./Section.svelte";
+  import Slider from "./Slider.svelte";
   import CurvesPanel from "../panels/CurvesPanel.svelte";
   import ColourPanel from "../panels/ColourPanel.svelte";
   import VignettePanel from "../panels/VignettePanel.svelte";
@@ -10,50 +11,44 @@
   import { I } from "../lib/icons.js";
   let { open = $bindable(false) } = $props();
 
-  const pct = $derived(Math.round(S.strength * 100));
   const card = $derived(S.styles.find((s) => s.name === S.style));
   const changes = $derived(S.params ? describe(effectiveFrom(S.params, S.strength, S.d, S.knots), S.params.knots) : []);
-  const pos = $derived((pct / 150) * 100);
 </script>
 
-<aside class="inspector" class:open aria-label="Adjustments">
-  <div class="sheet-grip"><button class="icon-btn" aria-label="Close adjustments" onclick={() => (open = false)}>{@html I.close}</button></div>
-  <section class="lookcard">
-    <span class="eyebrow">Look</span>
-    <h2 class="lookcard-name">{S.style ? pretty(S.style) : "—"}</h2>
-    {#if card?.description}<p class="lookcard-desc">{card.description}</p>{/if}
+<aside class="inspector panel" class:open aria-label="Adjustments">
+  <div class="sheet-grip"><span>Adjust</span><button class="icon-btn" aria-label="Close adjustments" onclick={() => (open = false)}>{@html I.close}</button></div>
+  <div class="hist-wrap"><HistogramPanel /></div>
 
-    <label class="strength">
-      <span class="strength-top"><span class="s-label">Strength</span>
-        <output class="bignum">{pct}<small>%</small></output></span>
-      <input id="strength" type="range" min="0" max="150" value={pct} disabled={!S.params} style={`--a:0%;--b:${pos}%`}
-             oninput={(e) => (S.strength = Number(e.currentTarget.value) / 100)} onchange={commit} />
-      <span class="ticks" aria-hidden="true"><span>0</span><span style="left:66.67%">100</span><span>150</span></span>
-    </label>
-
+  <section class="grp">
+    <div class="grp-head">Look</div>
+    <select class="wide" aria-label="Look" value={S.style} onchange={(e) => setStyle(e.currentTarget.value)}>
+      {#each S.styles as s (s.name)}<option value={s.name}>{pretty(s.name)}</option>{/each}
+    </select>
+    {#if card?.description}<p class="desc">{card.description}</p>{/if}
+    <Slider id="strength" label="Strength" min={0} max={150} suffix="%" reset={Math.round((S.params?.strength ?? 1) * 100)}
+            value={Math.round(S.strength * 100)} disabled={!S.params}
+            oninput={(v) => (S.strength = v / 100)} onchange={commit} />
     {#if S.params?.ood_score > 1.5}
-      <p class="note">This photo is unlike the ones this look learned from. A lower strength or another look may suit it better.</p>
+      <p class="note">This photo is unlike the ones this look learned from; a lower strength or another look may suit it better.</p>
     {/if}
     {#if changes.length}
-      <ul class="changes" aria-label="What this edit does">
-        {#each changes as c}<li><span>{c.label}</span><b>{c.value}</b></li>{/each}
-      </ul>
+      <div class="changes" aria-label="What this edit does">
+        {#each changes as c}<span class="chip">{c.label} <b>{c.value}</b></span>{/each}
+      </div>
     {/if}
     {#if S.message}<p class="hint">{S.message}</p>{/if}
   </section>
 
-  <div class="secs">
-    <Section title="Tone"><HistogramPanel /><CurvesPanel /></Section>
-    <Section title="Colour"><ColourPanel /></Section>
-    <Section title="Light"><VignettePanel /></Section>
-    {#if S.caps.scene}<Section title="Scene" open={false}><ScenePanel /></Section>{/if}
-  </div>
+  <Section title="Curves"><CurvesPanel /></Section>
+  <Section title="Colour"><ColourPanel /></Section>
+  <Section title="Light"><VignettePanel /></Section>
+  {#if S.caps.scene}<Section title="Scene" open={false}><ScenePanel /></Section>{/if}
 
   <footer class="insp-foot">
-    <button id="btnReset" class="btn ghost" onclick={resetToModel} disabled={!S.params}>{@html I.reset}Reset</button>
+    <button id="btnReset" class="btn" onclick={resetToModel} disabled={!S.params}>Reset</button>
     {#if S.caps.remember}
-      <button id="btnRemember" class="btn ghost" title="Use this edit to personalise the look" onclick={remember} disabled={!S.params}>Remember</button>
-      <button id="btnPersonalise" class="btn ghost" onclick={personalise} disabled={!S.style}>Personalise</button>
+      <button id="btnRemember" class="btn" title="Use this edit to personalise the look" onclick={remember} disabled={!S.params}>Remember</button>
+      <button id="btnPersonalise" class="btn" onclick={personalise} disabled={!S.style}>Personalise</button>
     {/if}
   </footer>
 </aside>

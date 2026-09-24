@@ -134,7 +134,7 @@ def export_backbone(out: Path) -> None:
         print(f"backbone -> {out}")
 
 
-HERO = [("neon-night", "cyberpunk"), ("valley", "natural"), ("harbour-dusk", "cyberpunk")]
+HERO = [("valley", "fujifilm"), ("neon-night", "cyberpunk"), ("mountain-lake", "fujifilm"), ("lisbon-street", "cyberpunk")]
 
 
 def export_hero(roots: list[Path], samples: Path) -> None:
@@ -159,7 +159,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="what", required=True)
     s = sub.add_parser("styles")
     s.add_argument("--roots", type=Path, nargs="+", default=[Path("stylepacks"), Path("webpacks")],
-                   help="style pack folders; webpacks/ holds web-only packs (e.g. an open-data natural)")
+                   help="style pack folders; webpacks/ holds web-only packs")
     s.add_argument("--out", type=Path, default=Path("studio/web/pages/models/styles.json"))
     h = sub.add_parser("hero")
     h.add_argument("--roots", type=Path, nargs="+", default=[Path("stylepacks"), Path("webpacks")])

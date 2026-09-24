@@ -22,7 +22,7 @@
       x.strokeStyle = COL[c] + "40"; x.lineWidth = 1.2 * dpr; line(e.knots[c]);
     }
     if (S.knots) { x.setLineDash([3 * dpr, 3 * dpr]); x.strokeStyle = "rgba(255,255,255,.35)"; x.lineWidth = dpr; line(ghost[S.ch]); x.setLineDash([]); }
-    x.shadowColor = COL[S.ch]; x.shadowBlur = 10 * dpr; x.strokeStyle = COL[S.ch]; x.lineWidth = 2 * dpr; line(e.knots[S.ch]); x.shadowBlur = 0;
+    x.strokeStyle = COL[S.ch]; x.lineWidth = 2 * dpr; line(e.knots[S.ch]);
     e.knots[S.ch].forEach((v, i) => {
       x.beginPath(); x.arc((i / (K - 1)) * W, H - v * H, 4.5 * dpr, 0, 7);
       x.fillStyle = "#0c0c0e"; x.fill(); x.lineWidth = 1.6 * dpr; x.strokeStyle = COL[S.ch]; x.stroke();
@@ -50,8 +50,8 @@
   {#each NAMES as n, i}
     <button class="chan-b" class:on={S.ch === i} style={`--c:${COL[i]}`} onclick={() => (S.ch = i)} aria-label={n}>{n[0]}</button>
   {/each}
-  {#if S.knots}<button class="btn ghost sm push" onclick={() => { S.knots = null; commit(); }}>Model curve</button>{/if}
+  {#if S.knots}<button class="link-btn push" onclick={() => { S.knots = null; commit(); }}>Model curve</button>{/if}
 </div>
 <canvas id="curves" bind:this={cv} aria-label="Curve editor: drag the points"
         onpointerdown={down} onpointermove={move} onpointerup={up}></canvas>
-<p class="hint">Drag a point. Curves stay monotone, so tones never invert.</p>
+<p class="hint">Drag a point. Curves stay monotone, so tones never invert. Dashed: the model's curve.</p>

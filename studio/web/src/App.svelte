@@ -2,10 +2,10 @@
   import { onMount } from "svelte";
   import Stage from "./Stage.svelte";
   import TopBar from "./ui/TopBar.svelte";
-  import StyleRail from "./ui/StyleRail.svelte";
+  import Sidebar from "./ui/Sidebar.svelte";
+  import Backdrop from "./ui/Backdrop.svelte";
   import Inspector from "./ui/Inspector.svelte";
   import Welcome from "./ui/Welcome.svelte";
-  import Ambient from "./ui/Ambient.svelte";
   import CreateStyle from "./dialogs/CreateStyle.svelte";
   import Batch from "./dialogs/Batch.svelte";
   import { S, boot, upload, selectPhoto, setStyle, undo, redo, resetToModel, exportCurrent, commit } from "./lib/studio.svelte.js";
@@ -49,10 +49,10 @@
 
 <input id="upload" type="file" accept={S.accept} multiple hidden onchange={(e) => { upload(e.currentTarget.files); e.currentTarget.value = ""; }} />
 
-<Ambient />
+<Backdrop />
 <div class="app" class:empty={!S.id} class:sheet-open={sheetOpen}>
   <TopBar bind:exportFmt={prefs.exportFmt} onCreate={() => (dialogs.create = true)} onBatch={() => (dialogs.batch = true)} />
-  {#if S.id}<StyleRail onCreate={() => (dialogs.create = true)} />{/if}
+  {#if S.id}<Sidebar onCreate={() => (dialogs.create = true)} />{/if}
   <main class="center">
     <Stage />
     {#if !S.id && S.ready}<Welcome />{/if}
@@ -66,13 +66,13 @@
                style={`--a:0%;--b:${(S.strength / 1.5) * 100}%`}
                oninput={(e) => (S.strength = Number(e.currentTarget.value) / 100)} onchange={commit} />
         <output>{Math.round(S.strength * 100)}</output></label>
-      <button class="btn primary" onclick={() => (sheetOpen = true)}>{@html I.sliders}Adjust</button>
+      <button class="btn" onclick={() => (sheetOpen = true)}>{@html I.sliders}Adjust</button>
     </div>
     {#if sheetOpen}<button class="scrim" aria-label="Close adjustments" onclick={() => (sheetOpen = false)}></button>{/if}
   {/if}
 </div>
 
-{#if dragging}<div class="dropzone" aria-hidden="true"><div><em>Drop</em> to open</div></div>{/if}
+{#if dragging}<div class="dropzone" aria-hidden="true">Drop to open</div>{/if}
 {#if S.busy && !S.id}<div class="thinking fixed"><span></span>Opening…</div>{/if}
 
 {#if S.caps.create}<CreateStyle bind:open={dialogs.create} />{/if}

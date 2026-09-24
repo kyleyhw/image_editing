@@ -203,4 +203,6 @@ export function renderThumb(img, params, w, target) {
   target.width = w; target.height = h; target.getContext("2d").drawImage(view.thumbCanvas, 0, 0);
 }
 
-export const pretty = (n) => n.replace(/_/g, " ");
+const NAMES = { fivek: "FiveK", fujifilm: "Fujifilm" };
+/** Display name of a style: "clean_cool" -> "Clean Cool". */
+export const pretty = (n) => n.split("_").map((w) => NAMES[w] || w.charAt(0).toUpperCase() + w.slice(1)).join(" ");

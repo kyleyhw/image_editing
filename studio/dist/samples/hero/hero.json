@@ -1,17 +1,22 @@
 [
  {
+  "before": "valley.jpg",
+  "after": "hero/valley.fujifilm.jpg",
+  "style": "fujifilm"
+ },
+ {
   "before": "neon-night.jpg",
   "after": "hero/neon-night.cyberpunk.jpg",
   "style": "cyberpunk"
  },
  {
-  "before": "valley.jpg",
-  "after": "hero/valley.natural.jpg",
-  "style": "natural"
+  "before": "mountain-lake.jpg",
+  "after": "hero/mountain-lake.fujifilm.jpg",
+  "style": "fujifilm"
  },
  {
-  "before": "harbour-dusk.jpg",
-  "after": "hero/harbour-dusk.cyberpunk.jpg",
+  "before": "lisbon-street.jpg",
+  "after": "hero/lisbon-street.cyberpunk.jpg",
   "style": "cyberpunk"
  }
 ]
