@@ -106,7 +106,7 @@ against expert C's retouches from MIT-Adobe FiveK. 80 paired
 then the generic architecture trained for 12 epochs. The held-out
 evaluation on 5 unseen test pairs is shown below.
 
-![MIT-5K expert C held-out evaluation: per row, the original input, the expert C ground truth, and the trained model's prediction](tests/reports/assets/mit5k_eval.png)
+*Figure removed (2026-09-24): it showed MIT-Adobe FiveK images without checking their licence, and some FiveK images are licensed for research only. The numbers below are unchanged.*
 
 The headline number:
 

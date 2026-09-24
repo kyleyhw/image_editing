@@ -66,12 +66,12 @@ The single failure case (img_0003, glacier) is now only marginally away
 that produced $\Delta = -0.017$ for the same image); the stochastic
 nature of training shifts where the model lands within the same local
 minimum basin. The training set is dominated by warmer indoor /
-portrait / urban scenes (per the diverse rows in `mit5k_eval.png`),
+portrait / urban scenes (per the held-out rows, figure since removed),
 so cool alpine palettes remain underweighted.
 
 ## 5. Visual evidence
 
-![5-row 3-col grid: per held-out image, the original input, expert C ground truth, and the trained model's prediction](assets/mit5k_eval.png)
+*Figure removed (2026-09-24): it showed MIT-Adobe FiveK images without checking their licence, and some FiveK images are licensed for research only. The numbers below are unchanged.*
 
 For img_0000 (building) the model correctly recovers an over-bright sky
 and aligns the building's mid-tones with expert C's darker, contrastier
@@ -170,9 +170,7 @@ also shrunk (from -8.3 % at 80 pairs to -3.6 % at 500 pairs).
 | **mean** | 0.0917 | **0.0741** | 0.1030 |
 | **pairs moved toward expert** | — | **4 / 5** | 1 / 5 |
 
-![5-row 3-col grid for the 500-pair model: per held-out image, the
-original input, expert C ground truth, and the trained model's
-prediction](assets/mit5k_eval_500pair.png)
+*Figure removed (2026-09-24): it showed MIT-Adobe FiveK images without checking their licence, and some FiveK images are licensed for research only. The numbers below are unchanged.*
 
 ### Why did more data hurt?
 

@@ -25,7 +25,9 @@ import torchvision.transforms as transforms
 from models.checkpoint_io import build_model_from_checkpoint, load_checkpoint
 
 
-OUT = "tests/reports/assets/mit5k_eval.png"
+# Writes locally, not into the committed reports: this script does not check each FiveK image's
+# licence, and only the Adobe-MIT subset may be published (see PROJECT_PLAN A4.5).
+OUT = "mit5k_eval.png"
 CKPT = "checkpoints/model_generic_mit5k_c.pth"
 TEST_DIR = "data/fivek_c_test"
 

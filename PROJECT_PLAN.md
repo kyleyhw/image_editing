@@ -1629,7 +1629,7 @@ data.
 | 4 | no API key for now | — |
 | 5 | "how can you filter?" | measured, see below; awaiting a go |
 | 6 | clean up | Phases 1–6 moved into `legacy/` (runs from there) |
-| 7 | check if public | **the repository is public** (default branch `master`). Nothing private or research-only is committed (owner photos, packs, FiveK-derived weights). **Flag:** the pre-A1 figures `tests/reports/assets/mit5k_eval*.png` were made by a script with no FiveK licence filter, so they may show FiveK images under Adobe's non-MIT (research-only) licence |
+| 7 | check if public | **the repository is public** (default branch `master`). Nothing private or research-only is committed (owner photos, packs, FiveK-derived weights). **Flag:** the pre-A1 figures `tests/reports/assets/mit5k_eval*.png` were made by a script with no FiveK licence filter, so they may show FiveK images under Adobe's non-MIT (research-only) licence. **Removed on 2026-09-24** at the owner's request (they remain in git history) |
 | 8 | show me a demo | recorded Studio walkthrough (see chat) |
 
 **Filtering digital art from search results (#5).**
