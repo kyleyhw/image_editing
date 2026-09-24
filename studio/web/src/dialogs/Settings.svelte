@@ -1,6 +1,7 @@
 <script>
   import Modal from "./Modal.svelte";
   import { PANELS, byId } from "../panels/registry.js";
+  import { DESIGNS } from "../lib/designs.js";
   let { open = $bindable(false), prefs } = $props();
   const order = $derived([...prefs.order.filter((id) => byId[id]), ...PANELS.map((p) => p.id).filter((id) => !prefs.order.includes(id))]);
   function move(id, d) {
@@ -12,7 +13,18 @@
   function reset() { prefs.order = PANELS.map((p) => p.id); prefs.hidden = []; prefs.collapsed = []; }
 </script>
 
-<Modal bind:open title="Customise panels">
+<Modal bind:open title="Design and panels">
+  <h4 class="settings-h">Design</h4>
+  <div class="designs" role="radiogroup" aria-label="Design">
+    {#each DESIGNS as d (d.id)}
+      <button role="radio" aria-checked={prefs.design === d.id} class={`designcard dc-${d.id}`} class:on={prefs.design === d.id}
+              onclick={() => (prefs.design = d.id)}>
+        <span class="dc-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+        <strong>{d.name}</strong><small>{d.blurb}</small>
+      </button>
+    {/each}
+  </div>
+  <h4 class="settings-h">Panels</h4>
   <p class="muted small">Order and visibility of the adjustment panels. Saved in this browser.</p>
   <ul class="plist">
     {#each order as id, i (id)}
@@ -24,5 +36,5 @@
       </li>
     {/each}
   </ul>
-  {#snippet footer()}<button class="btn" onclick={reset}>Reset layout</button>{/snippet}
+  {#snippet footer()}<button class="btn" onclick={reset}>Reset panels</button>{/snippet}
 </Modal>

@@ -17,6 +17,8 @@
     if (!divider || !canvas) return;
     const r = canvas.getBoundingClientRect(), w = wrap.getBoundingClientRect();
     divider.style.left = `${r.left - w.left + S.split * r.width}px`;
+    divider.style.top = `${r.top - w.top}px`;
+    divider.style.height = `${r.height}px`;
   }
   let dragging = false;
   function move(e) {
@@ -43,10 +45,20 @@
   {#if S.sceneBusy}<div class="busy">Updating scene…</div>{/if}
 </div>
 <div id="compareBar">
-  <span class="muted">Compare:</span>
-  {#each ["split", "after", "before"] as m}
-    <button data-mode={m} class="seg" class:on={S.mode === m} onclick={() => (S.mode = m)}>{m[0].toUpperCase() + m.slice(1)}</button>
-  {/each}
-  <span class="muted small">Hold <kbd>\</kbd> for the original · <kbd>[</kbd>/<kbd>]</kbd> strength · <kbd>R</kbd> reset ·
-    <kbd>Ctrl+Z</kbd> undo · <kbd>1</kbd>–<kbd>9</kbd> styles</span>
+  <div class="segs" role="group" aria-label="Compare">
+    {#each ["split", "after", "before"] as m}
+      <button data-mode={m} class="seg" class:on={S.mode === m} onclick={() => (S.mode = m)}>{m[0].toUpperCase() + m.slice(1)}</button>
+    {/each}
+  </div>
+  {#if S.params?.explain}<span class="explain-chip" title="What this edit does">{S.params.explain}</span>{/if}
+  <span class="spacer"></span>
+  <details class="keys">
+    <summary class="btn ghost small">Shortcuts</summary>
+    <div class="keys-pop">
+      <div><kbd>\</kbd> hold for the original</div><div><kbd>Y</kbd> cycle compare</div>
+      <div><kbd>[</kbd> <kbd>]</kbd> strength ∓5 %</div><div><kbd>1</kbd>–<kbd>9</kbd> styles</div>
+      <div><kbd>R</kbd> reset to model</div><div><kbd>Ctrl/⌘ Z</kbd> undo, <kbd>⇧</kbd> redo</div>
+      <div><kbd>E</kbd> export</div><div><kbd>←</kbd> <kbd>→</kbd> previous / next photo</div>
+    </div>
+  </details>
 </div>

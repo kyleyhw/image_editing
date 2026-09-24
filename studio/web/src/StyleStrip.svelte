@@ -1,13 +1,14 @@
 <script>
   import { S, view, renderThumb, setStyle } from "./lib/studio.svelte.js";
   import { json } from "./lib/api.js";
+  let { layout = "cards" } = $props();
 
   let canvases = $state({});
   let gen = 0;
-  // Rebuild thumbnails when the photo or the style list changes; a newer run cancels an older one.
+  // Rebuild thumbnails when the photo, the style list or the layout changes; a newer run cancels an older one.
   $effect(() => {
     const id = S.id, styles = S.styles.map((s) => s.name);
-    S.imgVersion;
+    S.imgVersion; layout;
     if (!id || !view.img) return;
     const g = ++gen;
     (async () => {
@@ -15,19 +16,25 @@
         const p = await json("/api/predict", { id, style: name });
         if (g !== gen) return;
         const c = canvases[name];
-        if (c) renderThumb(view.img, p, 140, c);
+        if (c) renderThumb(view.img, p, 200, c);
       }
     })();
   });
+  const pretty = (n) => n.replace(/_/g, " ");
 </script>
 
-<div id="styleStrip" aria-label="Styles">
-  <button class="thumb" onclick={() => (S.mode = "before")}>
-    {#if S.id}<img src={`/api/photo/${S.id}?edge=240`} alt="original" />{/if}<span>original</span>
+<div id="styleStrip" class={`strip-${layout}`} aria-label="Styles">
+  <h4 class="strip-title">Styles</h4>
+  <button class="thumb" class:sel={S.mode === "before"} onclick={() => (S.mode = "before")} title="The original photo">
+    <span class="tframe">{#if S.id}<img src={`/api/photo/${S.id}?edge=240`} alt="original" />{/if}</span>
+    <span class="tname">Original</span>
+    <small class="tdesc">Your photo, unedited</small>
   </button>
   {#each S.styles as st, i (st.name)}
-    <button class="thumb" class:sel={st.name === S.style} onclick={() => setStyle(st.name)} title={st.description}>
-      <canvas bind:this={canvases[st.name]}></canvas><span>{i + 1} · {st.name}</span>
+    <button class="thumb" class:sel={st.name === S.style && S.mode !== "before"} onclick={() => setStyle(st.name)} title={st.description}>
+      <span class="tframe"><canvas bind:this={canvases[st.name]}></canvas></span>
+      <span class="tname"><kbd class="tkey">{i + 1}</kbd>{pretty(st.name)}</span>
+      <small class="tdesc">{st.description || ""}</small>
     </button>
   {/each}
 </div>
