@@ -1,14 +1,37 @@
-# Legacy code
+# Legacy: Phases 1–6
 
-Kept for history, not used by the Phase 7+ engine (`photostyle/`, `bench/`).
+The project's first incarnation, kept for history and for its checkpoints:
 
-- `exploration/`: the project's first scripts (RGB channel separation,
-  per-channel histograms and CDF plots). They produced the images under
-  `images/test_images/color_decompositions/` and `color_histograms/`.
-  Run them from this folder: `python load_and_show.py`.
+- fixed-function styles generated synthetically (Fujifilm Classic Chrome,
+  Cyberpunk, Tilt-shift);
+- a 21-parameter differentiable renderer and composite L1 / VGG / CDF loss;
+- a Streamlit lab UI;
+- a first FiveK expert-C model.
 
-The Phase 1–6 model code (`models/`, `train.py`, `inference.py`,
-`image_editor_ui.py`) is still at the repository root because existing
-checkpoints and the Streamlit lab UI depend on it. The 7-parameter
-Fujifilm-specific architecture (`--arch fujifilm`) is **legacy**: its
-trained effect ratio is ≈ 0 % (see `tests/reports/phase3_to_phase6_report.md`).
+It is not used by the current engine (`photostyle/`), Studio or `bench/`.
+The 7-parameter Fujifilm-specific architecture (`--arch fujifilm`) has a
+trained effect ratio of about 0 % (see
+`tests/reports/phase3_to_phase6_report.md`).
+
+**Run everything from this folder**, so the imports and relative paths
+resolve:
+
+```
+cd legacy
+uv run python generate_dataset.py --style cyberpunk --count 30
+uv run python train.py --arch generic --style cyberpunk --epochs 8 --image_size 192
+uv run python inference.py --image_path images/test_images/climbing_test_original.jpeg \
+    --checkpoint checkpoints/model_generic_cyberpunk.pth
+uv run streamlit run image_editor_ui.py
+uv run python tools/make_examples.py          # the comparison figure in the main README
+```
+
+| path | what |
+|---|---|
+| `models/`, `data_generation/` | Phase 1–6 networks, renderers and synthetic style generators |
+| `train.py`, `inference.py`, `generate_dataset.py`, `image_editor_ui.py` | Phase 1–6 command-line tools and Streamlit UI |
+| `tools/` | figure scripts for the Phase 1–6 reports |
+| `docs/` | Phase 1–6 architecture, training guide and original roadmap |
+| `images/test_images/` | test images and their outputs |
+| `checkpoints/` | the Phase 1/2 Fujifilm checkpoint |
+| `exploration/` | the very first scripts (channel separation, histograms, CDF plots); run with `python load_and_show.py` |

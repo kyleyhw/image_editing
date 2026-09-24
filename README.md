@@ -52,7 +52,7 @@ Streamlit UI) are kept below and in `legacy/`.
 
 ## Examples of every trained mode
 
-The figure below was produced by `python tools/make_examples.py`. Rows
+The figure below (Phases 1–6, now in `legacy/`) was produced by `legacy/tools/make_examples.py`. Rows
 are deliberately diverse sample images; columns are the original input
 and the trained-model output for each style. Sample images were chosen
 to exercise different aspects of each style:
@@ -166,10 +166,13 @@ is shipped as a documented negative result.
 
 | Document | Contents |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | Mathematics of the feature extractor, every primitive, and the composite loss. Identity-at-init proof. |
-| [`docs/training_and_inference.md`](docs/training_and_inference.md) | Operational guide: data generation, training each architecture, CLI inference, Streamlit UI. |
-| [`docs/roadmap.md`](docs/roadmap.md) | Phase-1 design rationale and historical context that motivated the architecture choices. |
-| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | Purpose, users, success metrics, target architecture, Phase 7 – 17 roadmap, UI/UX spec, data and evaluation plans, risks. |
+| [`docs/user_guide.md`](docs/user_guide.md) | How to use Studio, the command line and the new-style pipeline. |
+| [`tests/reports/`](tests/reports/) | One report per phase (learning curve, renderers, regional, conditioning, unpaired, atmosphere, sky, Clean Cool, new-style pipeline). |
+| [`CHANGELOG.md`](CHANGELOG.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) | What changed; how to work on the project. |
+| [`legacy/docs/architecture.md`](legacy/docs/architecture.md) | *(legacy)* Mathematics of the feature extractor, every primitive, and the composite loss. Identity-at-init proof. |
+| [`legacy/docs/training_and_inference.md`](legacy/docs/training_and_inference.md) | *(legacy)* Operational guide: data generation, training each architecture, CLI inference, Streamlit UI. |
+| [`legacy/docs/roadmap.md`](legacy/docs/roadmap.md) | *(legacy)* Phase-1 design rationale and historical context that motivated the architecture choices. |
+| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | Purpose, users, success metrics, target architecture, Phase 7 – 17 roadmap, UI/UX spec, data and evaluation plans, risks, and amendments A1–A5 (results and decisions). |
 | [`reports/project_direction/project_direction.pdf`](reports/project_direction/project_direction.pdf) | One-page research report (PDF, Typst source alongside) on the revised purpose and recommended architecture. |
 | [`reports/Content adaptive photo edit models.md`](reports/Content%20adaptive%20photo%20edit%20models.md) | Full literature comparison: Zeng et al. 3D LUTs and 17 alternatives. |
 | [`tests/reports/phase3_to_phase6_report.md`](tests/reports/phase3_to_phase6_report.md) | End-to-end verification, including MCP-driven UI test. |
@@ -214,94 +217,49 @@ where $\Phi_\ell$ are activations of a frozen ImageNet-pretrained VGG-16
 at four canonical taps (`relu1_2`, `relu2_2`, `relu3_3`, `relu4_3`) and
 $F$ is the differentiable CDF from above. Full derivations and the
 HSV-faithful colour identities used by the Fujifilm renderer are in
-[`docs/architecture.md`](docs/architecture.md).
+[`legacy/docs/architecture.md`](legacy/docs/architecture.md).
 
 ## Project structure
 
 ```
 .
-├── PROJECT_PLAN.md            # Purpose, architecture, roadmap, UI/UX spec
-├── README.md                  # (this file)
-├── pyproject.toml             # uv-managed deps (Python ≥ 3.10)
-├── uv.lock                    # pinned resolution
-├── .pre-commit-config.yaml    # ruff + ty + detect-secrets hooks
-├── .secrets.baseline          # detect-secrets baseline
+├── PROJECT_PLAN.md          # purpose, architecture, roadmap, UI/UX spec, amendments A1–A5
+├── README.md · CHANGELOG.md · CONTRIBUTING.md · LICENSE (MIT)
+├── pyproject.toml · uv.lock # uv-managed deps (CPU-only PyTorch on Linux/Windows)
 │
-├── checkpoints/               # *.pth files (gitignored)
-│   └── model_fujifilm_classic_chrome.pth   # legacy Phase 1/2 ship
-│
-├── data_generation/
-│   ├── core.py                # StyleGenerator abstract base
-│   ├── mit5k_loader.py        # MIT-Adobe FiveK paired loader
-│   └── styles/
-│       ├── film.py            # generic S-curve + grain + vignette
-│       ├── fujifilm.py        # FujifilmGenerator + CHROME_STRENGTHS
-│       ├── cyberpunk.py       # teal/orange S-curve grade
-│       └── tilt_shift.py      # spatially variant focus band
-│
-├── models/
-│   ├── feature_extractor.py   # DifferentiableCDF + SpatialEncoder
-│   ├── transformation_head.py # 7-D Fujifilm-specific head
-│   ├── style_net.py           # Fujifilm StyleNet
-│   ├── differentiable_renderer.py # DifferentiableFujifilm
-│   ├── generic_renderer.py    # ToneCurve / ColorMatrix / Grain / Vignette
-│   ├── generic_head.py        # 21-D generic head
-│   ├── generic_style_net.py   # GenericStyleNet
-│   ├── tilt_shift.py          # spatial blur primitive + composite + net
-│   ├── composite_loss.py      # L1 + VGG + CDF
-│   └── checkpoint_io.py       # unified load/build helper
-│
-├── generate_dataset.py        # CLI: picsum download + style application
-├── train.py                   # CLI: train any arch
-├── inference.py               # CLI: render with any checkpoint
-├── image_editor_ui.py         # Streamlit multi-style UI
-│
-├── images/
-│   ├── original/              # picsum downloads (gitignored)
-│   ├── styled/                # generated pairs (gitignored)
-│   └── test_images/           # tracked test images + inference outputs
-│
-├── docs/
-│   ├── architecture.md        # math + primitives + identity proof
-│   ├── training_and_inference.md # operational guide
-│   └── roadmap.md             # original Phase-1 design rationale
-│
-├── reports/
-│   ├── project_direction/     # one-page research report (.typ, .pdf, refs)
-│   └── Content adaptive photo edit models.md  # full literature review
-│
-├── research_notes/            # source notes behind the literature review
-│
-├── tests/
-│   └── reports/
-│       ├── phase3_to_phase6_report.md  # verification narrative
-│       └── assets/                     # screenshots + comparison figure
-│
-└── tools/
-    └── make_examples.py       # regenerate the comparison figure
+├── photostyle/              # the engine
+│   ├── features.py          # frozen ResNet-18 + per-channel CDF descriptor
+│   ├── render.py            # per-channel curves + colour matrix + vignette (differentiable)
+│   ├── head.py · condition.py   # content-adaptive head; style conditioning, shared base, coded styles
+│   ├── train.py · looks.py  # paired / unpaired learning, look profiles, losses
+│   ├── regional.py · sky.py · atmosphere.py   # regional tools, learned sky mask, depth-aware scene tools
+│   ├── engine.py · export.py · io.py          # EditParams, style packs, .cube / XMP export, RAW/ICC I/O
+│   ├── newstyle.py · openverse.py             # idea → references → style pipeline
+│   └── cli.py               # `photostyle` command
+├── studio/                  # the app: FastAPI server, Svelte source (web/), built UI (dist/), v1 page (static/)
+├── bench/                   # benchmarks and phase experiments (results in bench/results/)
+├── tools/                   # data collection, style-pack and base building, end-to-end checks
+├── tests/                   # unit tests; tests/reports/ holds every phase report
+├── docs/user_guide.md       # how to use Studio, the CLI and the new-style pipeline
+├── reports/ · research_notes/   # research report and literature review
+└── legacy/                  # Phases 1–6 (fixed-function styles, Streamlit UI); run from inside legacy/
 ```
+
+Not in git: `data/` (datasets, your photos, caches), `checkpoints/`,
+`stylepacks/` (rebuild with `tools/build_stylepacks.py`).
 
 ## Quick start
 
-```powershell
-# 1. Install
+```
 uv sync
-uv run pre-commit install
-
-# 2. Generate a dataset and train one style end-to-end
-uv run python generate_dataset.py --style cyberpunk --count 30
-uv run python train.py --arch generic --style cyberpunk --epochs 8 --image_size 192
-
-# 3. Apply it to an image
-uv run python inference.py --image_path images/test_images/climbing_test_original.jpeg --checkpoint checkpoints/model_generic_cyberpunk.pth
-
-# 4. Or launch the UI
-uv run streamlit run image_editor_ui.py
+uv run photostyle serve                    # Studio at http://127.0.0.1:8765
+uv run photostyle styles list
+uv run photostyle apply --style natural photos/*.jpg -o out/ --cube
+uv run photostyle style new my_look --describe "soft pastel morning light"   # then: search, pick, train, pack
 ```
 
-See [`docs/training_and_inference.md`](docs/training_and_inference.md)
-for all options and a multi-style reproduction recipe that matches the
-verification report.
+See the [user guide](docs/user_guide.md). The Phases 1–6 tools (synthetic
+styles, Streamlit UI) are in [`legacy/`](legacy/README.md).
 
 ## Licence
 

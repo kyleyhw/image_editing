@@ -32,10 +32,10 @@ data/*
 *.pt
 *.onnx
 
-# Auto-generated datasets (regeneratable via generate_dataset.py).
-# Tracked images live under images/test_images/.
-images/original/
-images/styled/
+# Legacy auto-generated datasets (regeneratable via legacy/generate_dataset.py).
+# Tracked images live under legacy/images/test_images/.
+legacy/images/original/
+legacy/images/styled/
 
 # Playwright MCP working directory (snapshots, console logs)
 .playwright-mcp/
