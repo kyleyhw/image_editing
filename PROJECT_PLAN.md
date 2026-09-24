@@ -1738,4 +1738,4 @@ less AI-generated, and closer to the calmer "Workbench" demo.
     grain, the tilted showcase card, entrance animations and marketing
     copy.
 - **Open decision:** the app's name. "photostyle" was a working package
-  name chosen by Claude in Phase 7; the owner wants a better one.
+  name from Phase 7; the owner wants a better one.
