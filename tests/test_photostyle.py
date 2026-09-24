@@ -233,3 +233,22 @@ def test_coded_pack_round_trip(tmp_path):
     with torch.no_grad():
         want = head(eng.fx(eng._proxy(img))[None])[0]
     assert np.allclose(p.theta, want.tolist(), atol=1e-5)
+
+
+def test_flagged_art_is_skipped_unless_picked_or_restored(tmp_path, monkeypatch):
+    from photostyle import newstyle as ns
+
+    monkeypatch.setattr(ns, "ROOT", tmp_path / "styles")
+    monkeypatch.setattr(ns, "MANIFESTS", tmp_path / "manifests")
+    p = ns.new("art", "x")
+    stats = {k: 0.0 for k in ns.STAT_KEYS}
+    p.candidates = [{"id": f"i{i}", "file": "f", "stats": {**stats, "L_p50": float(i)}, "license": "cc0",
+                     "license_version": "", "creator": f"c{i}", "title": "", "source": "", "landing_url": "",
+                     "attribution": "", "photo_score": 0.01 if i in (1, 2) else 0.9} for i in range(6)]
+    p.save()
+    monkeypatch.setattr(ns, "contact_sheets", lambda *a, **k: [])
+    q = ns.pick("art", [1], n_refs=4)                      # candidates 2 and 3 (index 1, 2) look like art
+    assert 1 not in q.refs and 2 not in q.refs
+    q = ns.restore("art", [2])                              # the owner keeps number 2 (index 1)
+    assert 1 in q.refs and 2 not in q.refs
+    assert ns.status("art")["likely_digital_art"] == [3]

@@ -323,9 +323,11 @@ def _project(name: str):
 
 
 def _project_payload(p) -> dict:
+    from photostyle.newstyle import flagged
+
     return {"name": p.name, "description": p.description, "queries": p.queries,
             "candidates": [{"n": i + 1, "title": c.get("title"), "creator": c.get("creator"),
-                            "license": c.get("license")} for i, c in enumerate(p.candidates)],
+                            "license": c.get("license"), "art": flagged(p, i)} for i, c in enumerate(p.candidates)],
             "picks": [i + 1 for i in p.picks], "refs": [i + 1 for i in p.refs],
             "excluded": [i + 1 for i in p.excluded], "train": p.train}
 
@@ -389,6 +391,13 @@ def style_exclude(body: dict):
     from photostyle import newstyle as ns
 
     return _project_payload(ns.exclude(_project(body["name"]).name, [int(n) for n in body["numbers"]]))
+
+
+@app.post("/api/style/restore")
+def style_restore(body: dict):
+    from photostyle import newstyle as ns
+
+    return _project_payload(ns.restore(_project(body["name"]).name, [int(n) for n in body["numbers"]]))
 
 
 @app.post("/api/style/train")

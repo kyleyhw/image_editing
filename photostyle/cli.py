@@ -117,6 +117,10 @@ def cmd_style(args) -> None:
         ns.pick(args.name, args.numbers, args.n_refs)
     elif args.step == "exclude":
         ns.exclude(args.name, args.numbers)
+    elif args.step == "restore":
+        ns.restore(args.name, args.numbers)
+    elif args.step == "flag":
+        ns.flag(args.name)
     elif args.step == "train":
         ns.train(args.name, args.recipe, tuple(Path(d) for d in args.pairs) if args.pairs else None, args.steps)
     elif args.step == "preview":
@@ -171,6 +175,11 @@ def main(argv: list[str] | None = None) -> None:
     x = ss.add_parser("exclude", help="drop references")
     x.add_argument("name")
     x.add_argument("numbers", nargs="+", type=int)
+    x = ss.add_parser("restore", help="keep candidates the digital-art filter greyed out")
+    x.add_argument("name")
+    x.add_argument("numbers", nargs="+", type=int)
+    x = ss.add_parser("flag", help="run the digital-art filter on an existing project's candidates")
+    x.add_argument("name")
     x = ss.add_parser("train")
     x.add_argument("name")
     x.add_argument("--recipe", choices=["gentle", "strong", "instant", "paired"], default="gentle",

@@ -69,10 +69,20 @@ photostyle style new cyberpunk --describe "neon cyberpunk night city" \
 photostyle style search cyberpunk            # openly licensed candidates -> numbered contact sheets
 photostyle style pick cyberpunk 3 8 14 21    # the ones whose look you like -> + closest matches
 photostyle style exclude cyberpunk 17        # drop references you don't want (optional)
+photostyle style restore cyberpunk 12        # keep a photo the digital-art filter greyed out (optional)
 photostyle style train cyberpunk --recipe strong
 photostyle style preview cyberpunk           # before/after on your unedited photos
 photostyle style pack cyberpunk --strength 0.8
 ```
+
+**Digital art is filtered out automatically.** Searches for stylised looks
+return many renders and illustrations. Each candidate is scored by a small
+image model (LAION CLIP, MIT licence), and likely digital art is greyed out
+(marked **ART?** on contact sheets): it is skipped unless you pick or
+restore it. In a test it caught 30 of 32 renders; about 1 in 9 real photos
+(graffiti, glossy cars) gets flagged too, which is why it only greys out.
+`photostyle style flag NAME` scores a project searched before the filter
+existed.
 
 **Choosing a recipe**
 

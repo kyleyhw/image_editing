@@ -77,3 +77,5 @@ dialog h2 { margin-top: 0; font-size: 16px; }
 .pick.off { opacity: .3; }
 dialog textarea { width: 100%; background: #262626; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 5px; font: inherit; }
 dialog { width: min(760px, 94vw); }
+.pick.art img { filter: grayscale(1) opacity(.45); }
+.artbadge { position: absolute; bottom: 2px; right: 2px; background: #b3261e; color: #fff; font: 600 10px system-ui; font-style: normal; padding: 1px 4px; border-radius: 3px; }

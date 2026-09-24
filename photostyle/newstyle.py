@@ -4,6 +4,8 @@
     photostyle style search  NAME [--pages 3]          openly licensed candidates + numbered sheets
     photostyle style pick    NAME 3 7 12 ...           your picks -> "more like these" -> reference set
     photostyle style exclude NAME 5 9 ...              drop references you do not want
+    photostyle style restore NAME 12 ...               keep candidates the digital-art filter greyed out
+    photostyle style flag    NAME                      run the digital-art filter on an older project
     photostyle style train   NAME [--recipe gentle|strong|instant|paired] [--pairs BEFORE AFTER]
     photostyle style preview NAME                      before/after on your photos and public samples
     photostyle style pack    NAME [--strength 0.8]     write the style pack (with licences/attribution)
@@ -50,6 +52,7 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 
 from photostyle import openverse as ov
+from photostyle.photo_filter import is_likely_art, photo_score
 from photostyle.stats import colour_stats
 
 ROOT = Path("data/styles")
@@ -73,6 +76,7 @@ class Project:
     picks: list[int] = field(default_factory=list)
     refs: list[int] = field(default_factory=list)
     excluded: list[int] = field(default_factory=list)
+    restored: list[int] = field(default_factory=list)   # flagged as digital art, but kept by the owner
     train: dict = field(default_factory=dict)
     created: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M"))
 
@@ -145,6 +149,7 @@ def _collect(queries: list[str], pages: int, mono: bool | None, out: Path, max_p
                 fn = out / f"{item['id']}.jpg"
                 img.save(fn, quality=92)
                 cands.append({"id": item["id"], "file": str(fn), "query": q, "stats": st,
+                              "photo_score": photo_score(img),
                               "license": item.get("license"), "license_version": item.get("license_version"),
                               "creator": item.get("creator"), "title": item.get("title"),
                               "source": item.get("source"), "landing_url": item.get("foreign_landing_url"),
@@ -187,6 +192,9 @@ def contact_sheets(p: Project, idx: list[int], stem: str, per_sheet: int = 48, c
             lab = str(i + 1)
             d.rectangle([x, y, x + 12 + 12 * len(lab), y + 26], fill="black")
             d.text((x + 5, y + 2), lab, fill="white", font=font)
+            if flagged(p, i):                     # likely digital art: greyed badge, not removed
+                d.rectangle([x + tw - 58, y, x + tw, y + 24], fill="#b3261e")
+                d.text((x + tw - 54, y + 2), "ART?", fill="white", font=font)
         path = p.dir / f"{stem}_{si // per_sheet + 1}.jpg"
         sheet.save(path, quality=85)
         paths.append(path)
@@ -210,6 +218,11 @@ def rank_like(cands: list[dict], picks: list[int]) -> list[int]:
     return [int(i) for i in np.argsort(d)]
 
 
+def flagged(p: Project, i: int) -> bool:
+    """Candidate i looks like digital art and the owner has not restored it."""
+    return is_likely_art(p.candidates[i].get("photo_score")) and i not in p.restored
+
+
 def pick(name: str, numbers: list[int], n_refs: int = 40) -> Project:
     p = Project.load(name)
     if not p.candidates:
@@ -218,7 +231,8 @@ def pick(name: str, numbers: list[int], n_refs: int = 40) -> Project:
     if not picks:
         raise SystemExit("pick at least one candidate number")
     p.picks = picks
-    ex = set(p.excluded)
+    p.restored = sorted(set(p.restored) | {i for i in picks if flagged(p, i)})   # picking one restores it
+    ex = set(p.excluded) | {i for i in range(len(p.candidates)) if flagged(p, i)}
     order = [i for i in rank_like(p.candidates, picks) if i not in ex]
     refs = list(dict.fromkeys(picks + order))[:max(n_refs, len(picks))]
     p.refs = refs
@@ -241,6 +255,26 @@ def exclude(name: str, numbers: list[int]) -> Project:
         p.save()
         return pick(name, [i + 1 for i in p.picks], n_refs=n) if p.picks else p
     p.save()
+    return p
+
+
+def restore(name: str, numbers: list[int]) -> Project:
+    """Keep candidates the digital-art filter flagged (they become eligible again)."""
+    p = Project.load(name)
+    p.restored = sorted(set(p.restored) | {i - 1 for i in numbers})
+    p.save()
+    return pick(name, [i + 1 for i in p.picks], n_refs=len(p.refs) or 40) if p.picks else p
+
+
+def flag(name: str) -> Project:
+    """Score existing candidates with the photo-vs-art filter (projects searched before it existed)."""
+    p = Project.load(name)
+    for c in p.candidates:
+        if c.get("photo_score") is None:
+            c["photo_score"] = photo_score(c["file"])
+    p.save()
+    n = sum(flagged(p, i) for i in range(len(p.candidates)))
+    print(f"{n} of {len(p.candidates)} candidates look like digital art (greyed out; `style restore` keeps any)")
     return p
 
 
@@ -482,6 +516,7 @@ def pack(name: str, strength: float = 1.0, out_root: Path = Path("stylepacks"), 
 def status(name: str) -> dict:
     p = Project.load(name)
     s = {"name": p.name, "description": p.description, "queries": p.queries, "candidates": len(p.candidates),
+         "likely_digital_art": [i + 1 for i in range(len(p.candidates)) if flagged(p, i)],
          "picks": [i + 1 for i in p.picks], "references": len(p.refs), "excluded": [i + 1 for i in p.excluded],
          "trained": p.train or None, "packed": (Path("stylepacks") / name / "style.json").exists()}
     return s

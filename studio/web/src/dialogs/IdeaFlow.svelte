@@ -53,12 +53,15 @@
   <p>{step === "searching" ? "Searching and filtering photos…" : "Training the style…"} <span class="muted">{prog.text}</span></p>
   <progress value={prog.value} max={prog.max}></progress>
 {:else if step === "pick"}
-  <p>Click the photos whose <b>look</b> you like (subject doesn't matter). {picked.size} picked.</p>
+  <p>Click the photos whose <b>look</b> you like (subject doesn't matter). {picked.size} picked.
+    <span class="muted small">Greyed = looks like digital art; skipped unless you pick it.</span></p>
   <div class="pickgrid">
     {#each project.candidates as c (c.n)}
-      <button class="pick" class:on={picked.has(c.n)} onclick={() => (picked = toggle(picked, c.n))}
-              title={`${c.title || ""} — ${c.creator || "unknown"} (${c.license})`}>
+      <button class="pick" class:on={picked.has(c.n)} class:art={c.art && !picked.has(c.n)}
+              onclick={() => (picked = toggle(picked, c.n))}
+              title={`${c.art ? "Looks like digital art (skipped unless you pick it). " : ""}${c.title || ""} — ${c.creator || "unknown"} (${c.license})`}>
         <img src={img(c.n)} alt={c.title || `candidate ${c.n}`} loading="lazy" /><span>{c.n}</span>
+        {#if c.art}<em class="artbadge">digital art?</em>{/if}
       </button>
     {/each}
   </div>
