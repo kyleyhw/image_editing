@@ -135,6 +135,9 @@ def test_engine_round_trip(tmp_path):
     save_stylepack(tmp_path / "packs" / "u", "u", head, r, feats, {"source": "test", "default_strength": 0.7})
     eng = Engine(roots=[tmp_path / "packs"])
     assert [c["name"] for c in eng.styles()] == ["t", "u"]
+    save_stylepack(tmp_path / "packs" / "v", "v", head, r, feats, {"source": "test", "order": 1})
+    eng.refresh()
+    assert [c["name"] for c in eng.styles()] == ["v", "t", "u"]     # "order" first, then name
     img = Image.fromarray((np.random.default_rng(0).random((40, 60, 3)) * 255).astype("uint8"))
     p = eng.predict(img, "t")
     assert p.strength == 1.0

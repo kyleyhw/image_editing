@@ -447,7 +447,7 @@ def preview(name: str, photos: list[Path] | None = None, strengths: tuple[float,
     return out
 
 
-def pack(name: str, strength: float = 1.0, out_root: Path = Path("stylepacks")) -> Path:
+def pack(name: str, strength: float = 1.0, out_root: Path = Path("stylepacks"), order: int | None = None) -> Path:
     from photostyle.engine import save_stylepack
 
     p = Project.load(name)
@@ -466,6 +466,11 @@ def pack(name: str, strength: float = 1.0, out_root: Path = Path("stylepacks")) 
     }
     if ck.get("kind") == "coded":
         card.update(head_type="coded", base_n_styles=ck["base_n_styles"])
+    old = out_root / name / "style.json"
+    if order is None and old.exists():                  # repacking keeps the style's place in the list
+        order = json.loads(old.read_text()).get("order")
+    if order is not None:
+        card["order"] = order
     folder = save_stylepack(out_root / name, name, head, r, feats, card)
     if p.refs:
         man = _write_manifest(p)

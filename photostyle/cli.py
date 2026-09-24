@@ -122,7 +122,7 @@ def cmd_style(args) -> None:
     elif args.step == "preview":
         ns.preview(args.name, [Path(f) for f in args.photos] or None)
     elif args.step == "pack":
-        ns.pack(args.name, args.strength, Path(args.root))
+        ns.pack(args.name, args.strength, Path(args.root), args.order)
     elif args.step == "status":
         print(json.dumps(ns.status(args.name), indent=1))
 
@@ -184,6 +184,7 @@ def main(argv: list[str] | None = None) -> None:
     x = ss.add_parser("pack")
     x.add_argument("name")
     x.add_argument("--strength", type=float, default=1.0, help="the style's default strength")
+    x.add_argument("--order", type=int, help="position in the style list (lower first; kept when repacking)")
     x = ss.add_parser("status")
     x.add_argument("name")
     sv = sub.add_parser("serve")

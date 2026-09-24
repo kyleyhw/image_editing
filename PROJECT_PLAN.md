@@ -1618,3 +1618,32 @@ data.
    panels are customisable?
 9. **PPR10K** (portrait data, research licence): still open, for the
    later portrait phase.
+
+**Owner answers (2026-09-24):**
+
+| # | answer | done |
+|---|---|---|
+| 1 | keep the placeholders as they are | — |
+| 2 | order natural → cyberpunk → Clean Cool | packs carry an `order`; Studio and the CLI list them in that order |
+| 3 | own look later | — |
+| 4 | no API key for now | — |
+| 5 | "how can you filter?" | measured, see below; awaiting a go |
+| 6 | clean up | Phases 1–6 moved into `legacy/` (runs from there) |
+| 7 | check if public | **the repository is public** (default branch `master`). Nothing private or research-only is committed (owner photos, packs, FiveK-derived weights). **Flag:** the pre-A1 figures `tests/reports/assets/mit5k_eval*.png` were made by a script with no FiveK licence filter, so they may show FiveK images under Adobe's non-MIT (research-only) licence |
+| 8 | show me a demo | recorded Studio walkthrough (see chat) |
+
+**Filtering digital art from search results (#5).**
+- **Openverse metadata cannot do it:** `category` is empty for 95 % of
+  results, and the 15 tagged "photograph" were exactly the AI renders.
+- **Zero-shot CLIP works:** LAION CLIP ViT-B/32, MIT licence. Each photo
+  is scored against "a photograph taken with a camera" vs. "digital art /
+  3D render / video game screenshot / illustration / AI-generated concept
+  art / map / collage".
+- **Result on 93 hand-labelled cyberpunk candidates** (threshold 0.05):
+  - 30/32 renders caught;
+  - 7/61 real photos wrongly flagged (graffiti, an art installation,
+    glossy tuned cars);
+  - about 0.16 s per image, plus a one-time 605 MB download.
+- **Proposal:** flag rather than delete. Likely renders are pre-dropped but
+  shown greyed-out in the pick and review steps, so one click restores
+  them.

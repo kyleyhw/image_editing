@@ -207,7 +207,9 @@ class Engine:
                         self._styles[pack.name] = pack
 
     def styles(self) -> list[dict]:
-        return [p.card for p in self._styles.values()]
+        """Style cards in display order: the card's optional "order" (lower first), then name."""
+        packs = sorted(self._styles.values(), key=lambda p: (p.card.get("order", 1000), p.name))
+        return [p.card for p in packs]
 
     def style(self, name: str) -> StylePack:
         if name not in self._styles:

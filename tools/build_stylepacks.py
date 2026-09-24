@@ -60,6 +60,7 @@ def main() -> None:
             "note": "vignette is disabled for this look",
             "version": "v2 (chroma-keep), chosen by the owner at 70 % strength (PROJECT_PLAN A4.5)",
             "default_strength": 0.7,
+            "order": 3,
         })
         print("clean_cool -> stylepacks/clean_cool")
 
@@ -83,6 +84,7 @@ def main() -> None:
             "licence": "MIT-Adobe FiveK: research use (Adobe / AdobeMIT per image); "
                        "do not redistribute this pack commercially",
             "report": "tests/reports/phase7_learning_curve.md",
+            "order": 4,
             "train": info,
         })
         print(f"fivek_c_landscape -> stylepacks/fivek_c_landscape ({info})")
