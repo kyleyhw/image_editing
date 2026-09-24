@@ -1739,3 +1739,37 @@ less AI-generated, and closer to the calmer "Workbench" demo.
     copy.
 - **Open decision:** the app's name. "photostyle" was a working package
   name from Phase 7; the owner wants a better one.
+
+#### A5.9 Looks follow tutorials (2026-09-24)
+
+Owner: "each style should learn from online tutorials that you should
+understand, not just your interpretation".
+
+- `photostyle/develop.py` implements the Lightroom tools the tutorials use,
+  with Lightroom's slider names, ranges and sign conventions: white balance,
+  contrast, tone regions, fade, colour mixer, colour grading, calibration,
+  channel curves, dehaze and vignette.
+- `photostyle/recipes.py` holds each look as a table of settings. Every row
+  records its tutorial and kind (numeric / direction / calibrated /
+  conflict). Tables and links are in `docs/looks.md`.
+- **Cyberpunk.** Four tutorials (TourBox, Spoon Graphics, Denny's Tips, Drew
+  Deltz). Only "green saturation -100" and "red primary all the way left"
+  are numeric; the rest are directions with chosen amounts. On the green
+  primary the tutorials conflict; Denny's Lightroom-specific instruction is
+  followed.
+- **Fujifilm (Superia 400 / Classic Negative family).** Four sources
+  (Legendary Presets, PresetLove, Scott Tucker, J.M. Peltier). The numeric
+  values (WB 5000-5200 K, green hue +10, yellow saturation -12) are kept.
+  Direction-only amounts were fitted to 46 Fuji film scans
+  (`tools/calibrate_recipe.py`; mismatch 0.30 -> 0.09):
+  - more contrast, whites and blacks;
+  - blues and aquas -40;
+  - lime shadow tint halved;
+  - zeroed as unsupported by the scans: softer shadows, vibrance, vivid
+    reds and greens, warm highlights.
+- **Results.** Both looks are trained with `--recipe teacher --open-only`.
+  Fujifilm is subtle, so it ships at 100 %. The earlier scan-trained Fuji
+  pack, which is more strongly cyan, is archived in
+  `data/styles_archive/fujifilm_scans_pack` for comparison.
+- **History.** Commits were rewritten to the owner's identity. Assistant
+  attribution trailers were removed, and no longer added.

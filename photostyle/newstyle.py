@@ -523,8 +523,12 @@ def pack(name: str, strength: float = 1.0, out_root: Path = Path("stylepacks"), 
     card["publishable"] = (ck.get("kind") != "coded" and mode.startswith(("unpaired", "teacher"))
                            and (p.train.get("recipe") == "gentle" or bool(p.train.get("open_only"))))
     if mode.startswith("teacher"):
-        card["training_data"] = ("a tutorial recipe (photostyle/recipes.py) applied to openly licensed input "
-                                 "photos; the references were used to choose and check the look")
+        from photostyle.recipes import RECIPE_TABLES, SOURCES
+
+        card["training_data"] = ("a recipe transcribed from grading tutorials (photostyle/recipes.py), applied to "
+                                 "openly licensed input photos; the references chose and checked the look")
+        used = sorted({s for row in RECIPE_TABLES.get(name, []) for s in row[3]})
+        card["tutorials"] = [{"title": SOURCES[k][0], "url": SOURCES[k][1]} for k in used]
     old = out_root / name / "style.json"
     if order is None and old.exists():                  # repacking keeps the style's place in the list
         order = json.loads(old.read_text()).get("order")
