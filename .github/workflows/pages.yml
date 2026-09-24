@@ -1,0 +1,62 @@
+name: Pages
+
+# Hosted Studio: the Svelte front end built with VITE_STATIC=1, which runs the model in the
+# browser. The ResNet-18 backbone is exported to ONNX here (torchvision ImageNet weights; not
+# committed); the style heads come from studio/web/pages/models/styles.json (publishable packs
+# only, made with `tools/export_web.py styles`).
+on:
+  push:
+    branches: [master, claude/sleepy-ride-ic77xy]
+    paths:
+      - "studio/web/**"
+      - "tools/export_web.py"
+      - "photostyle/features.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install (CPU-only torch)
+        run: uv sync --frozen
+      - name: Export the backbone to ONNX
+        run: uv run --with onnx==1.23.0 --with onnxruntime==1.23.2 python tools/export_web.py backbone --out studio/web/pages/models/rn18.onnx
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/web/package-lock.json
+      - name: Build
+        working-directory: studio/web
+        run: |
+          npm ci
+          npm run build:pages
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

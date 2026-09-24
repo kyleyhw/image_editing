@@ -10,6 +10,9 @@ It outputs **editable parameters** (curves, colour matrix, a small LUT,
 grain, vignette) that bake to a `.cube` file, never generated pixels. It is
 designed to train on a CPU from tens to hundreds of examples per style.
 
+**Try it:** <https://kyleyhw.github.io/image_editing/>. Studio runs the model in your
+browser, so your photos never leave your device.
+
 **Status.** The plan in [`PROJECT_PLAN.md`](PROJECT_PLAN.md) has been run
 end to end on a 4-core CPU. Every phase gate outcome, course correction and
 open decision is in **amendment A4**. Highlights, on FiveK landscapes:
@@ -30,10 +33,12 @@ open decision is in **amendment A4**. Highlights, on FiveK landscapes:
   scenes can come out over-muted, which is an open decision for the owner.
 - **Depth-aware haze / dehaze / clarity**: Depth Anything V2 Small, about
   1 s per photo.
-- **Studio v2:** a local web app (Svelte) with WebGL preview (matches the
-  Python renderer to 1/255), customisable panels, curves, a Scene panel
-  (haze, clarity, sky light), style strip, batch, create-a-style,
-  personalisation, and `.cube` / XMP / JPEG export. See the
+- **Studio:** a web app (Svelte) with a WebGL preview (matches the Python
+  renderer to 1/255). Hover a look to preview it on your photo; the room is lit
+  by the edit. Curves, colour, a Scene panel (haze, clarity, sky light), batch,
+  create-a-style, personalisation, and `.cube` / XMP / JPEG export. It is
+  **hosted on GitHub Pages** with the model running in the browser (ONNX Runtime
+  Web; matches PyTorch to 0.35/255), or run it locally with everything. See the
   [user guide](docs/user_guide.md).
 - **New styles from an idea:** `photostyle style …` (or Studio → Create
   style → An idea). Describe a look, pick openly licensed photos that have
@@ -269,6 +274,11 @@ not in this repository. MIT-Adobe FiveK and anything trained on it (the
 personal use only. The openly licensed style-seed images need the
 attribution recorded in `data/manifests/`. Depth Anything V2 Small is
 Apache-2.0. See `PROJECT_PLAN.md` A4.5 for the commercial-use checklist.
+
+The hosted Studio ships only packs trained on openly licensed photos
+(`studio/web/pages/models/styles.json`; attribution inside it), the torchvision
+ResNet-18 ImageNet weights, public-domain sample photos
+(`studio/web/public/samples/ATTRIBUTION.md`) and the Geist / Instrument Serif fonts (OFL).
 
 ## References
 

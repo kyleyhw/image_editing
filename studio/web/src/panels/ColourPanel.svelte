@@ -1,10 +1,12 @@
 <script>
   import { S, commit } from "../lib/studio.svelte.js";
+  import Slider from "../ui/Slider.svelte";
+  const sign = (v) => (v > 0 ? `+${v}` : String(v));
 </script>
 
-{#each [["warmth", "Warmth"], ["tint", "Tint"], ["sat", "Saturation"]] as [k, label]}
-  <label class="row">{label}
-    <input id={k} type="range" min="-100" max="100" value={S.d[k]} oninput={(e) => (S.d[k] = +e.currentTarget.value)} onchange={commit} />
-    <output>{S.d[k]}</output>
-  </label>
-{/each}
+<div class="stack">
+  {#each [["warmth", "Warmth", "Cooler ← → warmer"], ["tint", "Tint", "Magenta ← → green"], ["sat", "Saturation", ""]] as [k, label, hint]}
+    <Slider id={k} {label} title={hint} value={S.d[k]} fmt={sign} disabled={!S.params}
+            oninput={(v) => (S.d[k] = v)} onchange={commit} />
+  {/each}
+</div>

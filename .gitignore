@@ -46,3 +46,8 @@ stylepacks/
 # Studio front-end build tooling (the built studio/dist is committed)
 node_modules/
 !studio/dist/
+
+# GitHub Pages build (npm run build:pages; deployed by .github/workflows/pages.yml)
+site/
+# Publishable style packs for the hosted Studio only (tools/export_web.py styles --roots stylepacks webpacks)
+webpacks/

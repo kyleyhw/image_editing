@@ -122,3 +122,58 @@ export function draw(R, e, K, mode = 2, split = 0.5) {
   gl.uniform1f(u("split"), split); gl.uniform1i(u("mode"), mode);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
+
+// ------------------------------------------------------------------ CPU colour path
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+
+/** The shader's colour path on one colour (no vignette): curves -> matrix + bias -> clamp. */
+export function applyColour(e, K, rgb) {
+  const c = [0, 1, 2].map((ch) => {
+    const t = clamp01(rgb[ch]) * (K - 1), i = Math.min(Math.floor(t), K - 2), u = t - i, k = e.knots[ch];
+    return k[i] + u * (k[i + 1] - k[i]);
+  });
+  const M = [1 + e.dM[0], e.dM[1], e.dM[2], e.dM[3], 1 + e.dM[4], e.dM[5], e.dM[6], e.dM[7], 1 + e.dM[8]];
+  return [0, 1, 2].map((r) => clamp01(M[r * 3] * c[0] + M[r * 3 + 1] * c[1] + M[r * 3 + 2] * c[2] + e.bias[r]));
+}
+
+/** A 3D LUT in .cube format (red index fastest, as photostyle.export.write_cube). */
+export function bakeCube(e, K, size = 33, title = "photostyle") {
+  const out = [`TITLE "${title}"`, `LUT_3D_SIZE ${size}`, "DOMAIN_MIN 0.0 0.0 0.0", "DOMAIN_MAX 1.0 1.0 1.0"];
+  for (let b = 0; b < size; b++) for (let g = 0; g < size; g++) for (let r = 0; r < size; r++) {
+    const o = applyColour(e, K, [r / (size - 1), g / (size - 1), b / (size - 1)]);
+    out.push(o.map((v) => v.toFixed(6)).join(" "));
+  }
+  return out.join("\n") + "\n";
+}
+
+const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const chroma = (c) => Math.max(...c) - Math.min(...c);
+const TEST = [[0.8, 0.3, 0.3], [0.3, 0.7, 0.3], [0.3, 0.4, 0.8], [0.8, 0.7, 0.3], [0.3, 0.7, 0.7], [0.7, 0.3, 0.7]];
+
+/** What an edit does, measured end to end through the renderer (so it stays true while the
+ * user edits): [{label, value}] for the changes big enough to notice. */
+export function describe(e, K) {
+  const out = [], pct = (v) => `${v > 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`;
+  for (const { label, x } of [{ label: "Shadows", x: 0.12 }, { label: "Midtones", x: 0.5 }, { label: "Highlights", x: 0.88 }]) {
+    const d = lum(applyColour(e, K, [x, x, x])) - x;
+    if (Math.abs(d) > 0.015) out.push({ label, value: pct(d) });
+  }
+  let warm = 0, tint = 0;
+  for (let i = 0; i < 8; i++) {
+    const x = 0.15 + (0.7 * i) / 7, o = applyColour(e, K, [x, x, x]);
+    warm += (o[0] - o[2]) / 8; tint += (o[1] - (o[0] + o[2]) / 2) / 8;
+  }
+  if (Math.abs(warm) > 0.01) out.push({ label: warm > 0 ? "Warmer" : "Cooler", value: pct(Math.abs(warm)).slice(1) });
+  if (Math.abs(tint) > 0.01) out.push({ label: tint > 0 ? "Green tint" : "Magenta tint", value: pct(Math.abs(tint)).slice(1) });
+  const sat = TEST.reduce((s, c) => s + chroma(applyColour(e, K, c)) / chroma(c), 0) / TEST.length - 1;
+  if (Math.abs(sat) > 0.03) out.push({ label: "Saturation", value: pct(sat) + "%" });
+  if (e.vig > 0.03) out.push({ label: "Vignette", value: String(Math.round(e.vig * 100)) });
+  return out;
+}
+
+/** Blend two effective edits (style changes animate instead of jumping). */
+export function mixEffective(a, b, t) {
+  const l = (x, y) => x + (y - x) * t;
+  return { knots: a.knots.map((r, c) => r.map((v, i) => l(v, b.knots[c][i]))), dM: a.dM.map((v, i) => l(v, b.dM[i])),
+           bias: a.bias.map((v, i) => l(v, b.bias[i])), vig: l(a.vig, b.vig), g: b.g };
+}

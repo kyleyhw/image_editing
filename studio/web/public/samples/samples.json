@@ -1,0 +1,56 @@
+[
+ {
+  "file": "mountain-lake.jpg",
+  "thumb": "mountain-lake.thumb.jpg",
+  "title": "Free mountain, lake landscape image",
+  "creator": null,
+  "license": "cc0",
+  "landing_url": "https://www.rawpixel.com/image/5904011/photo-image-public-domain-tree-green",
+  "attribution": "\"Free mountain, lake landscape image\" by unknown, CC0 1.0, via rawpixel"
+ },
+ {
+  "file": "valley.jpg",
+  "thumb": "valley.thumb.jpg",
+  "title": "Sun on the landscape",
+  "creator": "AlaskaNPS",
+  "license": "pdm",
+  "landing_url": "https://www.flickr.com/photos/75182224@N04/9024877289",
+  "attribution": "\"Sun on the landscape\" by AlaskaNPS, Public Domain Mark, via flickr"
+ },
+ {
+  "file": "lisbon-street.jpg",
+  "thumb": "lisbon-street.thumb.jpg",
+  "title": "Calc\u0327ada da Glo\u0301ria Lisbon",
+  "creator": "Terry Kearney",
+  "license": "cc0",
+  "landing_url": "https://www.flickr.com/photos/24490288@N04/52558428971",
+  "attribution": "\"Calc\u0327ada da Glo\u0301ria Lisbon\" by Terry Kearney, CC0 1.0, via flickr"
+ },
+ {
+  "file": "harbour-dusk.jpg",
+  "thumb": "harbour-dusk.thumb.jpg",
+  "title": "Coastal Landscape",
+  "creator": "JJ Skys the Limit",
+  "license": "cc0",
+  "landing_url": "https://stocksnap.io/photo/coastal-landscape-FIMX5UYOIC",
+  "attribution": "\"Coastal Landscape\" by JJ Skys the Limit, CC0 1.0, via stocksnap"
+ },
+ {
+  "file": "forest-path.jpg",
+  "thumb": "forest-path.thumb.jpg",
+  "title": "Forest Trail",
+  "creator": "GlacierNPS",
+  "license": "pdm",
+  "landing_url": "https://www.flickr.com/photos/43288043@N04/48920669091",
+  "attribution": "\"Forest Trail\" by GlacierNPS, Public Domain Mark, via flickr"
+ },
+ {
+  "file": "neon-night.jpg",
+  "thumb": "neon-night.thumb.jpg",
+  "title": "Susukino",
+  "creator": "Peter Cartledge",
+  "license": "pdm",
+  "landing_url": "https://www.flickr.com/photos/61482680@N02/26738302018",
+  "attribution": "\"Susukino\" by Peter Cartledge, Public Domain Mark, via flickr"
+ }
+]

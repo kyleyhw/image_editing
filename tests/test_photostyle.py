@@ -252,3 +252,63 @@ def test_flagged_art_is_skipped_unless_picked_or_restored(tmp_path, monkeypatch)
     q = ns.restore("art", [2])                              # the owner keeps number 2 (index 1)
     assert 1 in q.refs and 2 not in q.refs
     assert ns.status("art")["likely_digital_art"] == [3]
+
+
+def test_pack_publishable_only_for_open_training(tmp_path, monkeypatch):
+    """Only packs trained on openly licensed photos alone are marked publishable (hosted Studio)."""
+    import json
+
+    from photostyle import newstyle as ns
+    from photostyle.features import FEATURE_DIM
+    from photostyle.head import Head
+
+    monkeypatch.setattr(ns, "ROOT", tmp_path / "styles")
+    monkeypatch.setattr(ns, "MANIFESTS", tmp_path / "manifests")
+    r = GlobalRenderer("per_channel")
+    cases = {("unpaired/strong", "strong", False): False, ("unpaired/strong", "strong", True): True,
+             ("unpaired/gentle", "gentle", False): True, ("paired", "paired", False): False}
+    for i, ((mode, recipe, open_only), want) in enumerate(cases.items()):
+        p = ns.new(f"s{i}", "x")
+        torch.save({"kind": "head", "state_dict": Head(FEATURE_DIM, r.num_params).state_dict(), "renderer": "per_channel",
+                    "feats": torch.randn(4, FEATURE_DIM)}, p.dir / "head.pt")
+        p.train = {"mode": mode, "recipe": recipe, "open_only": open_only}
+        p.save()
+        ns.pack(f"s{i}", out_root=tmp_path / "packs")
+        assert json.loads((tmp_path / "packs" / f"s{i}" / "style.json").read_text())["publishable"] is want
+
+
+def test_web_export_matches_torch_head(tmp_path):
+    """tools/export_web.py: only publishable packs are exported, and the head maths the browser
+    runs (numpy mirror of studio/web/src/lib/browser.js) reproduces the PyTorch head."""
+    import base64
+    import json
+    import math
+
+    from photostyle.engine import save_stylepack
+    from photostyle.features import FEATURE_DIM
+    from photostyle.head import Head
+    from tools.export_web import export_styles
+
+    r = GlobalRenderer("per_channel")
+    torch.manual_seed(0)
+    head = Head(FEATURE_DIM, r.num_params).eval()
+    for prm in head.parameters():
+        torch.nn.init.normal_(prm, std=0.05)
+    feats = torch.randn(8, FEATURE_DIM)
+    head.set_norm(feats)
+    save_stylepack(tmp_path / "p" / "open", "open", head, r, feats, {"publishable": True})
+    save_stylepack(tmp_path / "p" / "closed", "closed", head, r, feats, {})
+    export_styles([tmp_path / "p"], tmp_path / "styles.json")
+    data = json.loads((tmp_path / "styles.json").read_text())
+    assert [s["card"]["name"] for s in data["styles"]] == ["open"]
+    H = {k: (np.frombuffer(base64.b64decode(v), "<f4") if isinstance(v, str) else v) for k, v in data["styles"][0]["head"].items()}
+    f = torch.randn(FEATURE_DIM)
+    z = (f.numpy() - H["mu"]) / H["sigma"]
+    h = H["w1"].reshape(H["hidden"], -1) @ z + H["b1"]
+    h = (h - h.mean()) / np.sqrt(h.var() + 1e-5) * H["ln_w"] + H["ln_b"]
+    h = 0.5 * h * (1 + np.vectorize(math.erf)(h / math.sqrt(2)))
+    out = H["w2"].reshape(H["out"], -1) @ h + H["b2"]
+    theta = H["theta_mean"] + H["alpha"] * (out - H["theta_mean"])
+    with torch.no_grad():
+        want = head(f[None])[0].numpy()
+    assert np.allclose(theta, want, atol=1e-4)

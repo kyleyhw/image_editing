@@ -1,13 +1,13 @@
 <script>
   import { onMount } from "svelte";
-  import { S, view, initGL, render } from "./lib/studio.svelte.js";
+  import { S, initGL, render } from "./lib/studio.svelte.js";
 
   let canvas, wrap, divider;
   onMount(() => initGL(canvas));
 
   // Re-render on any change that affects the picture.
   $effect(() => {
-    S.params; S.strength; S.mode; S.split; S.holdBefore;
+    S.params; S.strength; S.mode; S.split; S.holdBefore; S.peek;
     JSON.stringify(S.d); JSON.stringify(S.knots);
     render();
     placeDivider();
@@ -31,34 +31,31 @@
     if (e.key === "ArrowRight") S.split = Math.min(1, S.split + 0.05);
     e.stopPropagation();
   }
+  const showing = $derived(S.peek === "__original" || S.holdBefore || S.mode === "before" ? "Original"
+    : S.peek ? S.peek.replace(/_/g, " ") : null);
 </script>
 
 <svelte:window onresize={placeDivider} />
 
-<div id="canvasWrap" bind:this={wrap}>
-  <canvas id="view" bind:this={canvas} aria-label="Photo preview"></canvas>
-  <div id="divider" bind:this={divider} role="slider" aria-label="Before/after divider" aria-valuenow={Math.round(S.split * 100)}
-       tabindex="0" hidden={S.mode !== "split" || S.holdBefore || !S.params}
-       onpointerdown={(e) => { dragging = true; e.currentTarget.setPointerCapture(e.pointerId); }}
-       onpointermove={move} onpointerup={() => (dragging = false)} onkeydown={key}></div>
-  {#if !S.photos.length}<div id="empty">Upload photos to start. Everything stays on this computer.</div>{/if}
-  {#if S.sceneBusy}<div class="busy">Updating scene…</div>{/if}
-</div>
-<div id="compareBar">
-  <div class="segs" role="group" aria-label="Compare">
-    {#each ["split", "after", "before"] as m}
-      <button data-mode={m} class="seg" class:on={S.mode === m} onclick={() => (S.mode = m)}>{m[0].toUpperCase() + m.slice(1)}</button>
-    {/each}
-  </div>
-  {#if S.params?.explain}<span class="explain-chip" title="What this edit does">{S.params.explain}</span>{/if}
-  <span class="spacer"></span>
-  <details class="keys">
-    <summary class="btn ghost small">Shortcuts</summary>
-    <div class="keys-pop">
-      <div><kbd>\</kbd> hold for the original</div><div><kbd>Y</kbd> cycle compare</div>
-      <div><kbd>[</kbd> <kbd>]</kbd> strength ∓5 %</div><div><kbd>1</kbd>–<kbd>9</kbd> styles</div>
-      <div><kbd>R</kbd> reset to model</div><div><kbd>Ctrl/⌘ Z</kbd> undo, <kbd>⇧</kbd> redo</div>
-      <div><kbd>E</kbd> export</div><div><kbd>←</kbd> <kbd>→</kbd> previous / next photo</div>
+<div class="stage" class:has-photo={!!S.id}>
+  <div id="canvasWrap" bind:this={wrap}>
+    <canvas id="view" bind:this={canvas} aria-label="Photo preview" class:ready={!!S.params}></canvas>
+    <div id="divider" bind:this={divider} role="slider" aria-label="Before/after divider" aria-valuenow={Math.round(S.split * 100)}
+         tabindex="0" hidden={S.mode !== "split" || S.holdBefore || !S.params || !!S.peek}
+         onpointerdown={(e) => { dragging = true; e.currentTarget.setPointerCapture(e.pointerId); }}
+         onpointermove={move} onpointerup={() => (dragging = false)} onkeydown={key}>
+      <span class="tag tag-l">Before</span><span class="tag tag-r">After</span>
     </div>
-  </details>
+    {#if showing}<div class="peek-tag">{showing}</div>{/if}
+    {#if S.id && !S.params}<div class="thinking"><span></span>Reading the photo…</div>{/if}
+    {#if S.sceneBusy}<div class="thinking small"><span></span>Updating scene…</div>{/if}
+  </div>
+  {#if S.id}
+    <div class="compare" role="group" aria-label="Compare">
+      {#each [["before", "Before"], ["split", "Split"], ["after", "After"]] as [m, label]}
+        <button data-mode={m} class="seg" class:on={S.mode === m} onclick={() => (S.mode = m)}>{label}</button>
+      {/each}
+      <span class="compare-hint">hold <kbd>\</kbd></span>
+    </div>
+  {/if}
 </div>

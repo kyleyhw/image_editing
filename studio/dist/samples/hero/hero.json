@@ -1,0 +1,17 @@
+[
+ {
+  "before": "neon-night.jpg",
+  "after": "hero/neon-night.cyberpunk.jpg",
+  "style": "cyberpunk"
+ },
+ {
+  "before": "valley.jpg",
+  "after": "hero/valley.natural.jpg",
+  "style": "natural"
+ },
+ {
+  "before": "harbour-dusk.jpg",
+  "after": "hero/harbour-dusk.cyberpunk.jpg",
+  "style": "cyberpunk"
+ }
+]

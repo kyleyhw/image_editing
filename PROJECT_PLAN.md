@@ -1647,3 +1647,41 @@ data.
 - **Proposal:** flag rather than delete. Likely renders are pre-dropped but
   shown greyed-out in the pick and review steps, so one click restores
   them.
+
+#### A5.7 Studio redesign and hosting (2026-09-24)
+
+Owner: "none of these UIs are adequate … change the font to a more modern
+font, be ambitious"; "host it on GitHub Pages". The four switchable designs
+were replaced by one:
+
+- **Type:** Geist (UI), Geist Mono (numbers), Instrument Serif (display);
+  all OFL and bundled, so it also works offline.
+- **A room lit by the photo:** a blurred copy of the edit fills the
+  background, and the accent colour is taken from the edit's most vivid
+  pixels.
+- **Looks** are listed with previews on your photo; hovering one previews it
+  full size, and style changes tween. The look card shows strength and chips
+  saying what the edit does. These are measured through the renderer and
+  replace the server's "explain" text, whose midtone figure misread
+  base-coded curves (e.g. "−75 %" for a mild edit).
+- **Phones:** the looks become a row and the adjustments a bottom sheet.
+
+**Hosting.** `.github/workflows/pages.yml` builds the same front end with
+`VITE_STATIC=1`.
+
+- The model runs in the browser: ResNet-18 through ONNX Runtime Web, with
+  fp16-stored weights and fp32 maths (22 MB), and the head in JS.
+- Predictions match PyTorch to 0.35/255 on average (p99 1.8/255).
+- Photos are never uploaded.
+- It has no scene tools, batch or training.
+
+**Publishable packs only.**
+- Packs are marked publishable when trained on openly licensed photos
+  alone: `style train --open-only` or the `gentle` recipe.
+- `cyberpunk` was retrained with `--open-only`, which dropped the owner's 4
+  unedited photos from its input pool; it looks the same.
+- The hosted `natural` is an open-data retrain in `webpacks/`, at 70 %. It
+  is weaker than the local one: a slight cool cast on neutrals and lifted
+  night blacks.
+- The local `natural` (shared base, FiveK-derived) is unchanged and never
+  published.

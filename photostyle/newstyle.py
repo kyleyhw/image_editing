@@ -302,12 +302,14 @@ def _tensor(path: str | Path, edge: int = 512) -> torch.Tensor:
     return shrink(torch.from_numpy(arr).permute(2, 0, 1), edge)
 
 
-def input_pool(exclude: str | None = None, pages: int = 2, min_size: int = 100) -> list[Path]:
+def input_pool(exclude: str | None = None, pages: int = 2, min_size: int = 100,
+               include_owner: bool = True) -> list[Path]:
     """Typical photos to be edited: the input domain for "strong" training.
 
     Reuses photos already downloaded by other style projects (all openly licensed; mostly
     ordinary scenes) plus the owner's unedited photos (local only), and tops up from
-    Openverse's generic-scene queries only if fewer than ``min_size`` are available."""
+    Openverse's generic-scene queries only if fewer than ``min_size`` are available.
+    ``include_owner=False`` keeps the owner's photos out (for packs that will be published)."""
     files: list[Path] = []
     for proj in sorted(ROOT.glob("*/project.json")):
         if proj.parent.name in (exclude, INPUT_POOL):
@@ -316,7 +318,7 @@ def input_pool(exclude: str | None = None, pages: int = 2, min_size: int = 100) 
             if Path(c["file"]).exists():
                 files.append(Path(c["file"]))
     man = Path("data/owner/manifest.csv")
-    if man.exists():
+    if include_owner and man.exists():
         with man.open() as f:
             files += [Path("data/owner/srgb") / f"{r['id']}.jpg" for r in csv.DictReader(f) if r.get("edited") == "no"]
     d = ROOT / INPUT_POOL
@@ -342,7 +344,7 @@ def input_pool(exclude: str | None = None, pages: int = 2, min_size: int = 100) 
 
 
 def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = None, steps: int = 1200,
-          seed: int = 0, progress=None) -> Project:
+          seed: int = 0, progress=None, open_only: bool = False) -> Project:
     """Recipes:
     gentle   unpaired, pseudo-pairs only (Phase 11 default; looks near natural)
     strong   unpaired, pseudo-pairs + per-image SWD + fidelity (looks far from natural)
@@ -350,6 +352,10 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
              (Phase 10; needs checkpoints/base_stylehead.pt)
     paired   ``pairs=(before_dir, after_dir)``: a code fitted on the shared base if present
              (Phase 10: 20 pairs suffice), else a separate head with shrinkage (Phase 7b)
+
+    ``open_only``: train only on openly licensed photos (no owner photos in the "strong" input
+    pool), so the pack can be published (e.g. on the hosted Studio). Paired/instant styles on the
+    FiveK-derived base are never publishable.
     """
     from photostyle.condition import CodedHead, fit_code, load_base
     from photostyle.features import FeatureExtractor
@@ -398,7 +404,7 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
         ex = [_tensor(p.candidates[i]["file"]) for i in p.refs]
         ins = []
         if recipe == "strong":
-            pool = input_pool(exclude=name)
+            pool = input_pool(exclude=name, include_owner=not open_only)
             ins = [_tensor(f) for f in random.Random(seed).sample(pool, min(300, len(pool)))]
         kw = dict(use_pseudo=True, use_swd=recipe == "strong", use_fidelity=recipe == "strong")
         head, r, feats, info = learn_unpaired(ex, ins, fx, steps=steps, seed=seed, progress=progress, **kw)
@@ -406,7 +412,7 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
     ck = p.dir / "head.pt"
     torch.save({"kind": kind, "state_dict": head.state_dict(), "renderer": r.kind, "feats": feats, **extra}, ck)
     p.train = {"mode": mode, "recipe": recipe, "n_refs": len(p.refs), "steps": steps, "seed": seed,
-               "seconds": round(time.time() - t0), **{k: v for k, v in info.items() if isinstance(v, int | float)}}
+               "seconds": round(time.time() - t0), "open_only": open_only, **{k: v for k, v in info.items() if isinstance(v, int | float)}}
     p.save()
     print(f"trained {mode} in {p.train['seconds']} s -> {ck}")
     print(f"next: photostyle style preview {name}")
@@ -500,6 +506,11 @@ def pack(name: str, strength: float = 1.0, out_root: Path = Path("stylepacks"), 
     }
     if ck.get("kind") == "coded":
         card.update(head_type="coded", base_n_styles=ck["base_n_styles"])
+    # Publishable = trained on openly licensed photos only (refs are always open; the "strong"
+    # input pool must have excluded the owner's photos; nothing FiveK-derived).
+    mode = p.train.get("mode", "")
+    card["publishable"] = (ck.get("kind") != "coded" and mode.startswith("unpaired")
+                           and (p.train.get("recipe") == "gentle" or bool(p.train.get("open_only"))))
     old = out_root / name / "style.json"
     if order is None and old.exists():                  # repacking keeps the style's place in the list
         order = json.loads(old.read_text()).get("order")

@@ -22,31 +22,55 @@ uv run python tools/build_stylepacks.py
 
 ## Studio (the app)
 
-```
-uv run photostyle serve        # http://127.0.0.1:8765
-```
+Two ways to run it, one interface:
+
+- **In your browser:** <https://kyleyhw.github.io/image_editing/>. The model runs on
+  your device (ResNet-18 through ONNX Runtime Web, the style head in JavaScript; a
+  22 MB download, cached by the browser). Photos are never uploaded. It has the
+  publishable looks only (trained on openly licensed photos; see *Hosting* below), and no
+  scene tools, batch or style training.
+- **Locally, with everything:** `uv run photostyle serve` (http://127.0.0.1:8765).
+  All your style packs, the Scene panel, batch, create-a-style and personalisation.
 
 | Area | What it does |
 |---|---|
-| **Library** (left) | Upload photos (JPEG, PNG, TIFF, HEIC with `pillow-heif`, camera RAW). Colour profiles such as iPhone Display P3 are converted to sRGB on import. |
-| **Canvas** | Split view with a draggable divider, or *After* / *Before*. Hold `\` to see the original. |
-| **Style strip** (bottom) | Every style previewed on *your* photo. Click one, or press `1`–`9`. |
-| **Panels** (right) | Click a panel title to collapse it; **⚙** reorders or hides panels (remembered in this browser). |
-| **Style panel** | Strength from 0–150 % (0 % is exactly the original). The *Explain* line says in words what the edit does. A yellow warning appears when a photo is unlike anything the style learned from. |
-| **Curves** | R / G / B tabs; drag a knot. Curves stay monotone, so tones never invert. The dashed line shows the model's curve once you have changed it. |
-| **Colour** | Warmth, tint and saturation on top of the model's colour balance. |
-| **Scene** | Haze (+ add / − remove), near and far clarity, and sky exposure / warmth / saturation. Uses a depth model and a learned sky mask, computed once per photo (about 2 s). Applied to the photo before the style, and carried into exports. |
-| **Markers** | A hollow circle means the value came from the model; a filled square means you changed it. |
-| **Histogram** | Grey is before; coloured lines are after. |
-| **Export** | JPEG (full resolution, EXIF kept, sRGB), `.cube` (curves + colour, for Resolve, Premiere, Photoshop, OBS…), XMP (Lightroom / ACR preset carrying the per-channel curves only), JSON (the full edit, re-loadable). |
-| **Remember this edit** | Stores your corrected version as a training example for that style. |
-| **Personalise style** | Fine-tunes a copy of the style (`<style>_personal`) on your remembered edits. The original style is never changed. |
-| **+ Create style** | Three routes. **An idea:** describe the look; Studio searches openly licensed photos, you click the ones whose look you like, it adds more like them, you drop any you don't want, then it trains (see *Creating a new style* below). **Before/after pairs** (best; same file names in both sets; 20+ pairs recommended). **Photos in a look** you already have (20+). Training runs in the background on the CPU. Pairs give clearly better styles than example photos alone (`tests/reports/phase11_unpaired.md`). |
-| **Batch** | Apply the current style to the whole library. The *series consistency* slider pulls every photo's edit toward the set's average: 0 % edits each photo on its own; 100 % applies one shared edit. |
+| **Welcome** | Open a photo, drop one anywhere, or start from a public-domain sample. |
+| **Looks** (left) | Every look previewed on *your* photo. **Hover** a look to see it full size without committing; click it (or press `1`–`9`) to choose it. `0` / *Original* shows the unedited photo. On a phone the looks are a row under the photo. |
+| **Photos** (top) | Your open photos; **+** adds more (JPEG, PNG, TIFF, HEIC with `pillow-heif` and camera RAW when running locally). `←` `→` step through them. |
+| **Canvas** | Before / Split / After. Drag the divider; hold `\` to see the original. Changing look animates from the old edit to the new one. The room around the photo is lit by it, and the accent colour follows the edit. |
+| **Look card** (right) | Strength 0–150 % (0 % is exactly the original). The chips below say what the edit does (shadows, midtones, highlights, warmth, tint, saturation, vignette), measured through the renderer, so they stay true as you edit. A note appears when a photo is unlike what the look learned from. |
+| **Tone** | Histogram of the edited photo, and R / G / B curves: drag a point. Curves stay monotone, so tones never invert. The dashed line is the model's curve once you have changed it; *Model curve* puts it back. |
+| **Colour**, **Light** | Warmth, tint, saturation and vignette on top of the model's edit. Double-click a slider to reset it. |
+| **Scene** (local) | Haze (+ add / − remove), near and far clarity, and sky exposure / warmth / saturation. Uses a depth model and a learned sky mask, computed once per photo (about 2 s). Applied to the photo before the look, and carried into exports. |
+| **Export** | JPEG at full resolution; `.cube` (curves + colour, for Resolve, Premiere, Photoshop, OBS…); JSON (the full edit). Locally also XMP (Lightroom / ACR preset carrying the per-channel curves only); in the browser also PNG. |
+| **Remember / Personalise** (local) | *Remember* stores your corrected version as a training example for that look; *Personalise* fine-tunes a copy (`<style>_personal`) on those. The original look is never changed. |
+| **New style** (local) | Three routes. **An idea:** describe the look; Studio searches openly licensed photos, you click the ones whose look you like, it adds more like them, you drop any you don't want, then it trains (see *Creating a new style* below). **Before/after pairs** (best; same file names in both sets; 20+ pairs recommended). **Photos in a look** you already have (20+). Training runs in the background on the CPU. |
+| **Batch** (local) | Apply the current look to the whole library. *Series consistency* pulls every photo's edit toward the set's average: 0 % edits each photo on its own; 100 % applies one shared edit. |
 
 Keyboard shortcuts: `\` original · `Y` cycle compare mode · `[` `]`
 strength ±5 % · `R` reset to model · `Ctrl/Cmd+Z` undo (`+Shift` redo) · `E`
-export · `←` `→` previous/next photo · `1`–`9` styles.
+export · `←` `→` previous/next photo · `1`–`9` looks · `0` original.
+
+### Hosting (GitHub Pages)
+
+`.github/workflows/pages.yml` builds and deploys the browser version on every push that
+touches the front end. It exports the ResNet-18 backbone to ONNX (fp16-stored weights,
+fp32 maths; 0.1 % feature error), builds with `npm run build:pages` and publishes `site/`.
+The looks it ships are in `studio/web/pages/models/styles.json`, written by
+
+```
+uv run python tools/export_web.py styles     # packs whose style.json says "publishable": true
+uv run python tools/export_web.py hero       # welcome-screen before/after images
+```
+
+A pack is publishable only if it was trained on openly licensed photos alone:
+`photostyle style train NAME --recipe strong --open-only` (keeps your own photos out of the
+input pool) or the `gentle` recipe, then `pack`. Anything on the FiveK-derived base
+(`instant`, `paired`) or FiveK data (`clean_cool`, `fivek_c_landscape`) is never exported.
+A web-only version of a local look can live in `webpacks/` (e.g. the hosted `natural` is an
+open-data retrain; the local one uses the shared base):
+`uv run photostyle --root webpacks style pack natural --strength 0.7`. The browser's
+predictions match PyTorch to 0.35/255 on average (p99 1.8/255).
 
 ## Command line
 

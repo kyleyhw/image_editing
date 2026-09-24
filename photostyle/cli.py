@@ -122,7 +122,8 @@ def cmd_style(args) -> None:
     elif args.step == "flag":
         ns.flag(args.name)
     elif args.step == "train":
-        ns.train(args.name, args.recipe, tuple(Path(d) for d in args.pairs) if args.pairs else None, args.steps)
+        ns.train(args.name, args.recipe, tuple(Path(d) for d in args.pairs) if args.pairs else None, args.steps,
+                 open_only=args.open_only)
     elif args.step == "preview":
         ns.preview(args.name, [Path(f) for f in args.photos] or None)
     elif args.step == "pack":
@@ -187,6 +188,8 @@ def main(argv: list[str] | None = None) -> None:
                         "instant: no training, via the shared base's encoder; paired: with --pairs")
     x.add_argument("--pairs", nargs=2, metavar=("BEFORE_DIR", "AFTER_DIR"), help="train on your before/after pairs")
     x.add_argument("--steps", type=int, default=1200)
+    x.add_argument("--open-only", action="store_true",
+                   help="openly licensed photos only (leave your own photos out), so the pack can be published")
     x = ss.add_parser("preview")
     x.add_argument("name")
     x.add_argument("photos", nargs="*")
