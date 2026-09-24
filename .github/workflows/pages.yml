@@ -6,7 +6,7 @@ name: Pages
 # only, made with `tools/export_web.py styles`).
 on:
   push:
-    branches: [master, claude/sleepy-ride-ic77xy]
+    branches: [master]   # the github-pages environment only accepts deploys from master
     paths:
       - "studio/web/**"
       - "tools/export_web.py"
