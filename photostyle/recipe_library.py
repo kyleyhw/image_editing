@@ -87,7 +87,7 @@ LOOKS = {
     # ------------------------------------------------------------------ day landscapes
     "moody_forest": dict(
         title="Moody Forest", category="Day landscape",
-        subject="overcast forests and fields with lots of green", queries=["misty forest", "foggy forest overcast"],
+        subject="misty, overcast forests with tall trees and lots of green", queries=["misty forest", "foggy forest overcast"],
         grade="A", rows=[
             ("exposure", "stops", -0.5, ["RNG"], "numeric", "exposure down about -0.5"),
             ("contrast", "amount", 42.5, ["RNG"], "mid", "contrast +35 to +50"),

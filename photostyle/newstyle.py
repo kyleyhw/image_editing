@@ -414,7 +414,7 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
         # hue_weight: keep colourful pixels' hue (the global renderer otherwise trades hue for brightness
         # on strong highlight/shadow moves, e.g. orange skies turning green; tools/check_library.py)
         head, r, feats, info = learn_paired([(x, RECIPES[name](x)) for x in ins], fx, seed=seed, progress=progress,
-                                            hue_weight=1.0)
+                                            hue_weight=0.3)
         info = {**info, "n_own": min(150, len(own))}
         mode = "teacher/recipe"
     else:
