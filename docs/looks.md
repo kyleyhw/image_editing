@@ -10,7 +10,11 @@ and the amount is chosen. **calibrated**: a factor on a direction-only amount, f
 (`tools/calibrate_recipe.py`, stored in `photostyle/calibration/`), keeping the tutorial's sign;
 x0 means the target does not use that step. **conflict**: the tutorials disagree (the note says which was followed).
 
-## fujifilm
+## fujifilm (recipe kept as a candidate)
+
+The live `fujifilm` look is trained directly on 46 openly licensed Fuji film scans (owner's choice). This
+recipe produced a more muted result and is kept for reference.
+
 
 Calibration target: statistics of 46 openly licensed Fuji film scans (Superia, C200, Pro 400H), measured on 60 open input photos
 

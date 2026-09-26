@@ -43,11 +43,11 @@ open decision is in **amendment A4**. Highlights, on FiveK landscapes:
 - **New styles from an idea:** `photostyle style …` (or Studio → Create
   style → An idea). Describe a look, pick openly licensed photos that have
   it, and get a trained style with attribution.
-- **Looks from tutorials:** `fujifilm` and `cyberpunk` are recipes transcribed
-  from public grading tutorials as Lightroom-style slider settings, each value
-  with its source ([docs/looks.md](docs/looks.md)). The model is trained on
-  photos graded by the recipe (`--recipe teacher`); the Fuji amounts the
-  tutorials leave open are calibrated to real Fuji film scans.
+- **Looks:** `cyberpunk` is a recipe transcribed from public grading
+  tutorials as Lightroom-style slider settings, each value with its source
+  ([docs/looks.md](docs/looks.md)), and the model is trained on photos graded
+  by it (`--recipe teacher`). `fujifilm` is trained directly on 46 openly
+  licensed Fuji film scans; its tutorial recipe is kept as a candidate.
 - **Shared style base:** one model for many styles. A new style is a small
   code: fitted on 20 before/after pairs, or read instantly from example
   photos.

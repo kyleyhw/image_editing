@@ -1773,3 +1773,17 @@ understand, not just your interpretation".
   `data/styles_archive/fujifilm_scans_pack` for comparison.
 - **History.** Commits were rewritten to the owner's identity. Assistant
   attribution trailers were removed, and no longer added.
+
+#### A5.10 Fujifilm option D (2026-09-26)
+
+The owner found the tutorial Fujifilm bland.
+- **Demo photos.** A FiveK-trained edited-vs-unedited classifier (85 %
+  cross-validated) rates 4 of 6 demo photos as unedited. Forest path is
+  0.93, harbour 0.53. About 26 % of the input pool looks edited. Openverse
+  strips the metadata that would confirm it.
+- **The picked look.** The old natural pack's edit of "Sun on the landscape"
+  cannot be reproduced by the Fuji tutorial steps (fit 3.9/255 vs 3.0 for
+  identity).
+- **Choice.** Of four options, the owner picked **D: the pack trained
+  directly on the Fuji scans**, now live at 80 %. The tutorial recipe and
+  the Classic Chrome recipe stay as candidates.
