@@ -1,0 +1,21 @@
+{
+ "before": "examples/golden_backlit/before.jpg",
+ "after": "examples/golden_backlit/after.jpg",
+ "photo": {
+  "title": ".",
+  "creator": "Kh\u00e1nh Hmoong",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/7997148@N05/15812645103",
+  "attribution": "\".\" by Kh\u00e1nh Hmoong, CC BY 2.0, via flickr",
+  "p_edited": 0.0
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: backlit portraits at sunset",
+ "tutorials": [
+  {
+   "title": "James Young, How To Edit Backlit Portraits: Full Breakdown",
+   "url": "https://jamesyoungphotography.com/lightroom/backlit-portrait"
+  }
+ ],
+ "title": "Golden Backlit"
+}

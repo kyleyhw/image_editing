@@ -1,0 +1,21 @@
+{
+ "before": "examples/matte_urban/before.jpg",
+ "after": "examples/matte_urban/after.jpg",
+ "photo": {
+  "title": "Riga",
+  "creator": "kevin dooley",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/12836528@N00/9271183509",
+  "attribution": "\"Riga\" by kevin dooley, CC BY 2.0, via flickr",
+  "p_edited": 0.01
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: streets, walls and urban textures",
+ "tutorials": [
+  {
+   "title": "The Editing Studio, Vintage Film Lightroom Preset: Complete Guide",
+   "url": "https://theeditingstudio.co/blog/vintage-clean-film-lightroom-preset-guide"
+  }
+ ],
+ "title": "Matte Urban"
+}

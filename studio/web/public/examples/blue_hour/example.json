@@ -1,0 +1,29 @@
+{
+ "before": "examples/blue_hour/before.jpg",
+ "after": "examples/blue_hour/after.jpg",
+ "photo": {
+  "title": "Dusk in October",
+  "creator": "halfrain",
+  "license": "by-sa",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/54217251@N05/8066531587",
+  "attribution": "\"Dusk in October\" by halfrain, CC BY-SA 2.0, via flickr",
+  "p_edited": 0.43
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: twilight seascapes and landscapes after sunset",
+ "tutorials": [
+  {
+   "title": "Presetpedia, Twilight Haze preset (night Lightroom presets)",
+   "url": "https://presetpedia.com/night-lightroom-presets/"
+  },
+  {
+   "title": "Life Pixel, 6 Lightroom Tips for Editing Your Blue Hour Shots",
+   "url": "https://www.lifepixel.com/photo-tutorials/6-lightroom-tips-for-editing-your-blue-hour-shots"
+  },
+  {
+   "title": "Fstoppers (Alex Cooke), Make Your Blue Hour Photos Stand Out",
+   "url": "https://fstoppers.com/lightroom/make-your-blue-hour-photos-stand-out-701417"
+  }
+ ],
+ "title": "Blue Hour"
+}

@@ -1,0 +1,21 @@
+{
+ "before": "examples/moody_portrait/before.jpg",
+ "after": "examples/moody_portrait/after.jpg",
+ "photo": {
+  "title": "Back Cover",
+  "creator": "SodanieChea",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/41942551@N02/7211052548",
+  "attribution": "\"Back Cover\" by SodanieChea, CC BY 2.0, via flickr",
+  "p_edited": 0.19
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: low-key and indoor portraits",
+ "tutorials": [
+  {
+   "title": "James Young, How to Edit Dark Witchy Portraits",
+   "url": "https://jamesyoungphotography.com/lightroom/cinematic-tutorial"
+  }
+ ],
+ "title": "Moody Portrait"
+}

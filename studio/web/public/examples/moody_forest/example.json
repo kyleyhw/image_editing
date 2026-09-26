@@ -1,0 +1,25 @@
+{
+ "before": "examples/moody_forest/before.jpg",
+ "after": "examples/moody_forest/after.jpg",
+ "photo": {
+  "title": "Where did the hills go?",
+  "creator": "kewl",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/58411470@N00/54245258635",
+  "attribution": "\"Where did the hills go?\" by kewl, CC BY 2.0, via flickr",
+  "p_edited": 0.1
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: overcast forests and fields with lots of green",
+ "tutorials": [
+  {
+   "title": "Run N Gun Photography, Dark & Moody Lightroom Mobile Tutorial",
+   "url": "https://therunngun.com/dark-moody-lightroom-mobile-tutorial/"
+  },
+  {
+   "title": "lightroomtutorials.com, How to Create a Moody Jungle Green Look",
+   "url": "https://www.lightroomtutorials.com/jungle-green/"
+  }
+ ],
+ "title": "Moody Forest"
+}

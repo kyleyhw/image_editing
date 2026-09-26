@@ -1,0 +1,25 @@
+{
+ "before": "examples/milky_way/before.jpg",
+ "after": "examples/milky_way/after.jpg",
+ "photo": {
+  "title": "Milky Way Wheelie",
+  "creator": "Zach Dischner",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/35557234@N07/14964347624",
+  "attribution": "\"Milky Way Wheelie\" by Zach Dischner, CC BY 2.0, via flickr",
+  "p_edited": 0.24
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: night skies and the Milky Way over a landscape",
+ "tutorials": [
+  {
+   "title": "Dylan Giannakopoulos (Australian Photography), How to edit the Milky Way in Lightroom",
+   "url": "https://www.australianphotography.com/photo-tips/how-to-edit-the-milky-way-in-lightroom"
+  },
+  {
+   "title": "Mikko Lagerstedt, 4 Easy Steps to Edit Astrophotography in Lightroom",
+   "url": "https://mikkolagerstedt.com/blog/how-to-edit-astrophotography-in-lightroom/"
+  }
+ ],
+ "title": "Milky Way"
+}

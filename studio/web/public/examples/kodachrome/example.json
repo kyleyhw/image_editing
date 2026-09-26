@@ -1,0 +1,25 @@
+{
+ "before": "examples/kodachrome/before.jpg",
+ "after": "examples/kodachrome/after.jpg",
+ "photo": {
+  "title": "Hijabs for Sale",
+  "creator": "kyle simourd",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/89241789@N00/2064898873",
+  "attribution": "\"Hijabs for Sale\" by kyle simourd, CC BY 2.0, via flickr",
+  "p_edited": 0.01
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: colourful street and travel scenes in daylight",
+ "tutorials": [
+  {
+   "title": "The Editing Studio, Kodachrome Film Lightroom Preset: Complete Guide",
+   "url": "https://theeditingstudio.co/blog/kodachrome-film-lightroom-preset-guide"
+  },
+  {
+   "title": "The Editing Studio, How to Get the Kodachrome Look in Lightroom",
+   "url": "https://theeditingstudio.co/blog/how-to-get-the-kodachrome-look-in-lightroom"
+  }
+ ],
+ "title": "Kodachrome Street"
+}

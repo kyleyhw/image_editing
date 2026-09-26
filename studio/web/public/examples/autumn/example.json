@@ -1,0 +1,21 @@
+{
+ "before": "examples/autumn/before.jpg",
+ "after": "examples/autumn/after.jpg",
+ "photo": {
+  "title": "Fall color along the McKenzie River Trail, Oregon",
+  "creator": "Bonnie Moreland (free images)",
+  "license": "pdm",
+  "license_version": "1.0",
+  "url": "https://www.flickr.com/photos/66741228@N05/44318174145",
+  "attribution": "\"Fall color along the McKenzie River Trail, Oregon\" by Bonnie Moreland (free images), Public Domain Mark, via flickr",
+  "p_edited": 0.09
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: autumn foliage and cosy autumn scenes",
+ "tutorials": [
+  {
+   "title": "Diego Sanchez (WeGraphics), Enhance Autumn Colors in Lightroom with Ease",
+   "url": "https://we.graphics/blog/enhance-autumn-colors-in-lightroom-with-ease/"
+  }
+ ],
+ "title": "Autumn"
+}

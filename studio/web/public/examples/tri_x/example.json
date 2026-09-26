@@ -1,0 +1,21 @@
+{
+ "before": "examples/tri_x/before.jpg",
+ "after": "examples/tri_x/after.jpg",
+ "photo": {
+  "title": "Los Habaneros #11",
+  "creator": "Thomas Leuthard",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/41346951@N05/11304709586",
+  "attribution": "\"Los Habaneros #11\" by Thomas Leuthard, CC BY 2.0, via flickr",
+  "p_edited": 0.8
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: street and documentary portraits in black and white",
+ "tutorials": [
+  {
+   "title": "Presetpedia, Vintage Emulation B&W (Tri-X 400 / HP5) preset",
+   "url": "https://presetpedia.com/black-and-white-lightroom-presets/"
+  }
+ ],
+ "title": "Tri-X B&W"
+}

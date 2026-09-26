@@ -1,0 +1,29 @@
+{
+ "before": "examples/teal_orange/before.jpg",
+ "after": "examples/teal_orange/after.jpg",
+ "photo": {
+  "title": "Toronto: Queen Street West Old City Hall",
+  "creator": "The City of Toronto",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/34608255@N08/9841300276",
+  "attribution": "\"Toronto: Queen Street West Old City Hall\" by The City of Toronto, CC BY 2.0, via flickr",
+  "p_edited": 0.13
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: city streets and architecture in daylight",
+ "tutorials": [
+  {
+   "title": "lightroomtutorials.com, How to Create a Teal and Orange Look in Lightroom",
+   "url": "https://www.lightroomtutorials.com/teal-orange/"
+  },
+  {
+   "title": "Denny's Tips, Orange and Teal Color Grading",
+   "url": "https://www.dennystips.com/orange-teal/"
+  },
+  {
+   "title": "Presetpedia, Moody Japan preset",
+   "url": "https://presetpedia.com/japan-lightroom-presets/"
+  }
+ ],
+ "title": "Teal & Orange"
+}

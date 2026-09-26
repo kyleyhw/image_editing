@@ -1,0 +1,25 @@
+{
+ "before": "examples/tokyo_night/before.jpg",
+ "after": "examples/tokyo_night/after.jpg",
+ "photo": {
+  "title": "Free urban alley night image",
+  "creator": null,
+  "license": "cc0",
+  "license_version": "1.0",
+  "url": "https://www.rawpixel.com/image/5903327/photo-image-lights-public-domain-shadow",
+  "attribution": "\"Free urban alley night image\" by unknown, CC0 1.0, via rawpixel",
+  "p_edited": 0.25
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: neon-lit night streets (Masashi Wakui style)",
+ "tutorials": [
+  {
+   "title": "Tim Daniels (DIYPhotography), How to create the Wakui cinematic look in Lightroom and Photoshop",
+   "url": "https://www.diyphotography.net/how-to-create-the-wakui-cinematic-look-in-lightroom-and-photoshop/"
+  },
+  {
+   "title": "lightroomtutorials.com, How to Achieve the Masashi Wakui Look",
+   "url": "https://www.lightroomtutorials.com/how-to-achieve-the-masashi-wakui-look/"
+  }
+ ],
+ "title": "Tokyo Night"
+}
