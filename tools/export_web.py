@@ -13,11 +13,8 @@ plain JavaScript. Two parts:
             and fp32 compute (22 MB, 0.1 % feature error vs PyTorch). Built in CI, not
             committed.
 
-  hero      welcome-screen before/after images (public-domain samples x publishable packs).
-
 Usage:
     uv run python tools/export_web.py styles
-    uv run python tools/export_web.py hero
     uv run --with onnx --with onnxruntime python tools/export_web.py backbone --out site/models/rn18.onnx
 """
 
@@ -136,26 +133,6 @@ def export_backbone(out: Path) -> None:
         print(f"backbone -> {out}")
 
 
-HERO = [("valley", "fujifilm"), ("neon-night", "cyberpunk"), ("mountain-lake", "fujifilm"), ("lisbon-street", "cyberpunk")]
-
-
-def export_hero(roots: list[Path], samples: Path) -> None:
-    """Before/after pairs for the welcome screen: public-domain samples graded by publishable packs."""
-    from photostyle.engine import Engine
-
-    eng = Engine(roots=roots)                 # a later root overrides a style of the same name
-    out, items = samples / "hero", []
-    out.mkdir(parents=True, exist_ok=True)
-    for sample, style in HERO:
-        if not eng.style(style).card.get("publishable"):
-            raise SystemExit(f"{style} is not publishable")
-        src = samples / f"{sample}.jpg"
-        eng.render(src, eng.predict(src, style)).save(out / f"{sample}.{style}.jpg", quality=88)
-        items.append({"before": f"{sample}.jpg", "after": f"hero/{sample}.{style}.jpg", "style": style})
-        print(f"hero {sample} x {style}")
-    (out / "hero.json").write_text(json.dumps(items, indent=1))
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="what", required=True)
@@ -163,16 +140,11 @@ def main() -> None:
     s.add_argument("--roots", type=Path, nargs="+", default=[Path("stylepacks"), Path("webpacks")],
                    help="style pack folders; webpacks/ holds web-only packs")
     s.add_argument("--out", type=Path, default=Path("studio/web/pages/models/styles.json"))
-    h = sub.add_parser("hero")
-    h.add_argument("--roots", type=Path, nargs="+", default=[Path("stylepacks"), Path("webpacks")])
-    h.add_argument("--samples", type=Path, default=Path("studio/web/public/samples"))
     b = sub.add_parser("backbone")
     b.add_argument("--out", type=Path, default=Path("site/models/rn18.onnx"))
     args = ap.parse_args()
     if args.what == "styles":
         export_styles(args.roots, args.out)
-    elif args.what == "hero":
-        export_hero(args.roots, args.samples)
     else:
         export_backbone(args.out)
 

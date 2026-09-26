@@ -72,3 +72,28 @@ def subject_scores(images: list, text: str) -> list[float] | None:
         inp = proc(text=[text], images=img.convert("RGB"), padding=True, return_tensors="pt")
         out.append(float(model(**inp).logits_per_image[0, 0]))
     return out
+
+
+@torch.no_grad()
+def embed_images(paths: list, batch: int = 32):
+    """L2-normalised CLIP image embeddings (N, D), or None if the model is unavailable."""
+    model, proc = _load()
+    if model is None:
+        return None
+    out = []
+    for i in range(0, len(paths), batch):
+        ims = [Image.open(p).convert("RGB") for p in paths[i:i + batch]]
+        px = proc(images=ims, return_tensors="pt")["pixel_values"]
+        e = model.visual_projection(model.vision_model(pixel_values=px).pooler_output)
+        out.append(e / e.norm(dim=-1, keepdim=True))
+    return torch.cat(out)
+
+
+@torch.no_grad()
+def embed_texts(texts: list[str]):
+    model, proc = _load()
+    if model is None:
+        return None
+    tok = proc(text=texts, padding=True, return_tensors="pt")
+    e = model.text_projection(model.text_model(input_ids=tok["input_ids"], attention_mask=tok["attention_mask"]).pooler_output)
+    return e / e.norm(dim=-1, keepdim=True)

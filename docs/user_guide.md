@@ -1,4 +1,4 @@
-# User guide
+# User guide (Irodori)
 
 photostyle learns the edit that takes *each* photo toward a look, and hands
 it back as settings you can still change: per-channel curves, a colour
@@ -35,7 +35,7 @@ Two ways to run it, one interface:
 | Area | What it does |
 |---|---|
 | **Welcome** | Open a photo, drop one anywhere, or start from a public-domain sample. |
-| **Looks** (left) | Every look previewed on *your* photo. **Hover** a look to see it full size without committing; click it (or press `1`–`9`) to choose it. `0` / *Original* shows the unedited photo. On a phone the looks are a row under the photo. |
+| **Looks** (left) | Grouped by the kind of photo they suit (landscapes, cities, portraits, food, seasons). The chevron next to a look opens its example: an openly licensed photo of the subject its tutorial was written for, before/after the look, with links to the tutorials the recipe comes from (the authors' own before/after is on their pages). The same panel is under *Example & sources* in the Adjust panel. Every look is previewed on *your* photo. **Hover** a look to see it full size without committing; click it (or press `1`–`9`) to choose it. `0` / *Original* shows the unedited photo. On a phone the looks are a row under the photo. |
 | **Photos** (top) | Your open photos; **+** adds more (JPEG, PNG, TIFF, HEIC with `pillow-heif` and camera RAW when running locally). `←` `→` step through them. |
 | **Canvas** | Before / Split / After. Drag the divider; hold `\` to see the original. Changing look animates from the old edit to the new one. The room around the photo is lit by it, and the accent colour follows the edit. |
 | **Look card** (right) | Strength 0–150 % (0 % is exactly the original). The chips below say what the edit does (shadows, midtones, highlights, warmth, tint, saturation, vignette), measured through the renderer, so they stay true as you edit. A note appears when a photo is unlike what the look learned from. |
@@ -60,7 +60,7 @@ The looks it ships are in `studio/web/pages/models/styles.json`, written by
 
 ```
 uv run python tools/export_web.py styles     # packs whose style.json says "publishable": true
-uv run python tools/export_web.py hero       # welcome-screen before/after images
+uv run python tools/build_library.py         # the twenty tutorial looks, with their examples
 ```
 
 A pack is publishable only if it was trained on openly licensed photos alone:

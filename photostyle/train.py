@@ -71,6 +71,29 @@ def paired_loss(model, renderer, items: list[dict]) -> torch.Tensor:
     return loss / len(items) + 1e-4 * theta.pow(2).mean() + reg
 
 
+def hue_loss(out: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+    """1 - cosine between the chroma vectors (rgb minus grey) of output and target, weighted by the
+    target's chroma: penalises hue flips on colourful pixels (e.g. an orange sky turning green)
+    that an L1 loss accepts as a cheap compromise."""
+    co, ct = out - out.mean(0, keepdim=True), tgt - tgt.mean(0, keepdim=True)
+    w = ct.norm(dim=0)
+    cos = (co * ct).sum(0) / (co.norm(dim=0) * w + 1e-6)
+    return (w * (1 - cos)).sum() / (w.sum() + 1e-6)
+
+
+def paired_hue_loss(weight: float = 0.5) -> Callable:
+    """paired_loss plus ``weight`` x hue_loss (used for recipe-taught looks)."""
+    def loss_fn(model, renderer, items):
+        theta = model(torch.stack([it["feat"] for it in items]))
+        loss = 0.0
+        for it, th in zip(items, theta):
+            out = renderer(it["src_t"][None], th[None])[0]
+            loss = loss + (out - it["tgt_t"]).abs().mean() + weight * hue_loss(out, it["tgt_t"])
+        reg = renderer.regularizer() if hasattr(renderer, "regularizer") else 0.0
+        return loss / len(items) + 1e-4 * theta.pow(2).mean() + reg
+    return loss_fn
+
+
 def fit(model, renderer, train_items, val_items, loss_fn: Callable = paired_loss, steps=3000, batch=8,
         lr=3e-3, weight_decay=1e-2, patience=20, eval_every=25, progress: Callable | None = None) -> dict:
     """AdamW with early stopping on ``loss_fn(val_items)``. Items need 'feat' (+ fields loss_fn uses)."""
@@ -131,7 +154,7 @@ def calibrate_shrinkage(head, renderer, train_items, val_items, loss_fn: Callabl
 
 
 def learn_paired(pairs: list[tuple[torch.Tensor, torch.Tensor]], fx: FeatureExtractor, kind: str = "per_channel",
-                 val_frac: float = 0.15, seed: int = 0, progress: Callable | None = None):
+                 val_frac: float = 0.15, seed: int = 0, progress: Callable | None = None, hue_weight: float = 0.0):
     """Learn a style from (before, after) float tensors. Returns (head, renderer, feats, info)."""
     random.seed(seed)
     torch.manual_seed(seed)
@@ -151,9 +174,10 @@ def learn_paired(pairs: list[tuple[torch.Tensor, torch.Tensor]], fx: FeatureExtr
     head = Head(FEATURE_DIM, r.num_params)
     feats = torch.stack([it["feat"] for it in items])
     head.set_norm(feats)
-    info = fit(head, r, tr, val, progress=progress)
-    info["shrinkage_alpha"] = calibrate_shrinkage(head, r, tr, val)
-    return head, r, feats, {**info, "n_pairs": len(items), "n_dropped": len(pairs) - len(items)}
+    lf = paired_hue_loss(hue_weight) if hue_weight else paired_loss
+    info = fit(head, r, tr, val, loss_fn=lf, progress=progress)
+    info["shrinkage_alpha"] = calibrate_shrinkage(head, r, tr, val, loss_fn=lf)
+    return head, r, feats, {**info, "n_pairs": len(items), "n_dropped": len(pairs) - len(items), "hue_weight": hue_weight}
 
 
 # --------------------------------------------------------------------------- unpaired

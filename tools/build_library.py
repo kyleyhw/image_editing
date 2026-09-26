@@ -24,7 +24,6 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from photostyle import newstyle as ns  # noqa: E402
 from photostyle.edited import p_edited  # noqa: E402
-from photostyle.photo_filter import subject_scores  # noqa: E402
 from photostyle.recipe_library import LOOKS, NOT_MODELLED  # noqa: E402
 from photostyle.recipes import SOURCES  # noqa: E402
 
@@ -38,15 +37,63 @@ def tutorials(rows):
     return [{"title": SOURCES[k][0], "url": SOURCES[k][1]} for k in keys]
 
 
+def local_candidates(look: dict, out: Path, n: int = 60) -> list[dict]:
+    """Fallback when Openverse refuses (daily limit): the n openly licensed images already downloaded
+    (data/cache/openverse) that best match the look's subject and queries, by CLIP similarity."""
+    import glob
+    import shutil
+
+    import torch
+
+    from photostyle import openverse as ov
+    from photostyle.photo_filter import embed_texts, photo_score
+    from photostyle.stats import colour_stats
+
+    meta = {}
+    for f in glob.glob(str(ns.CACHE / "search" / "*.json")):
+        for it in json.loads(Path(f).read_text()):
+            meta[it["id"]] = it
+    d = torch.load("data/cache/clip_cache_embeddings.pt")
+    texts = [f"a photo of {look['subject']}"] + [f"a photo of {q}" for q in look["queries"]]
+    sim = (d["emb"] @ embed_texts(texts).T).mean(1)
+    out.mkdir(parents=True, exist_ok=True)
+    cands = []
+    for k in sim.argsort(descending=True).tolist():
+        f = Path(d["files"][k])
+        item = meta.get(f.stem)
+        img = Image.open(f).convert("RGB")
+        if item is None or min(img.size) < 320:
+            continue
+        mono = colour_stats(img)["chroma_mean"] < 3
+        if mono and look["title"] != "Tri-X B&W":
+            continue
+        dst = out / f.name
+        shutil.copy(f, dst)
+        cands.append({"id": item["id"], "file": str(dst), "query": "local cache (CLIP subject match)",
+                      "stats": colour_stats(img), "photo_score": photo_score(img),
+                      "license": item.get("license"), "license_version": item.get("license_version"),
+                      "creator": item.get("creator"), "title": item.get("title"), "source": item.get("source"),
+                      "landing_url": item.get("foreign_landing_url"), "attribution": ov.attribution(item)})
+        if len(cands) >= n:
+            break
+    return cands
+
+
 def pick_example(p: ns.Project, subject: str) -> int:
     idx = [i for i, c in enumerate(p.candidates) if not ns.flagged(p, i) and min(Image.open(c["file"]).size) >= 480]
+    from photostyle.photo_filter import embed_images, embed_texts
+
     files = [p.candidates[i]["file"] for i in idx]
-    sims = subject_scores(files, f"a photo of {subject}") or [0.0] * len(idx)
-    pe = p_edited(files)             # an example should start from an unedited-looking photo
+    E = embed_images(files)
+    T = embed_texts([f"a photo of {subject}", "a photo with a watermark, a signature, a logo or text on it",
+                     "a heavily edited, over-processed photo with a filter"])
+    sim = (E @ T.T) * 100                  # CLIP logit scale
+    pe = p_edited(files)                   # an example should start from an unedited-looking photo
 
     def key(k):
         c = p.candidates[idx[k]]
-        return sims[k] + 2.0 * (c.get("photo_score") or 0) - 6.0 * pe[k] - 0.5 * GOOD_LICENCES.get(c["license"], 3)
+        return (float(sim[k, 0]) - 0.6 * float(sim[k, 1]) - 0.4 * float(sim[k, 2])
+                + 2.0 * (c.get("photo_score") or 0) - 6.0 * pe[k] - 0.5 * GOOD_LICENCES.get(c["license"], 3))
     return idx[max(range(len(idx)), key=key)]
 
 
@@ -61,6 +108,9 @@ def build(name: str, look: dict, order: int, skip_search: bool, examples_only: b
         portrait = look["category"] == "Portrait"
         p.candidates = ns._collect(look["queries"], 2, None if name == "tri_x" else False, p.dir / "candidates",
                                    max_person=1.0 if portrait else 0.04)
+        if len(p.candidates) < 20:           # Openverse limit reached: use the local cache of open images
+            print(f"[{name}] Openverse gave {len(p.candidates)}; using the local cache", flush=True)
+            p.candidates = local_candidates(look, p.dir / "candidates")
         p.save()
     print(f"[{name}] {len(p.candidates)} candidates", flush=True)
     if not p.candidates:

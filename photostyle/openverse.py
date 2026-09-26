@@ -41,9 +41,13 @@ def search(query: str, page: int, session: requests.Session, cache: Path) -> lis
         "page": page,
         "mature": "false",
     }
-    r = session.get(API, params=params, timeout=30)
-    if r.status_code == 429:
-        raise RuntimeError("Openverse rate limit reached; rerun later (200 requests/day).")
+    for wait in (0, 20, 60, 180):            # 403/429 are throttling: back off before giving up
+        time.sleep(wait)
+        r = session.get(API, params=params, timeout=30)
+        if r.status_code not in (403, 429):
+            break
+    if r.status_code in (403, 429):
+        raise RuntimeError(f"Openverse refused the request ({r.status_code}): rate limit; rerun later (200 requests/day).")
     r.raise_for_status()
     results = r.json().get("results", [])
     key.parent.mkdir(parents=True, exist_ok=True)
