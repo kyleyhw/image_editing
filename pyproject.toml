@@ -25,6 +25,7 @@ dependencies = [
 
 [project.scripts]
 photostyle = "photostyle.cli:main"
+irodori = "photostyle.cli:main"
 
 [build-system]
 requires = ["hatchling"]

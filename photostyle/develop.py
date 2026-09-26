@@ -20,6 +20,7 @@ All tools take and return (3, H, W) sRGB tensors in [0, 1].
 
 from __future__ import annotations
 
+import numpy as np
 import torch
 
 from photostyle.hsv import hsv_to_rgb, rgb_to_hsv
@@ -129,11 +130,13 @@ def color_grading(x, shadows=(0, 0), midtones=(0, 0), highlights=(0, 0), balance
     return y.clamp(0, 1)
 
 
-def calibration(x, red_hue=0.0, green_hue=0.0, blue_hue=0.0, red_sat=0.0, green_sat=0.0, blue_sat=0.0):
+def calibration(x, red_hue=0.0, green_hue=0.0, blue_hue=0.0, red_sat=0.0, green_sat=0.0, blue_sat=0.0,
+                shadow_tint=0.0):
     """Camera-calibration primaries, applied to chroma only so neutrals stay neutral.
     Red hue - pushes red toward magenta (+ toward orange); Green hue + toward cyan (- toward yellow);
     Blue hue - toward cyan (+ toward purple). +-100 moves 35 % of a primary into its neighbour.
-    Saturation +-100 scales that primary's chroma by 0..2."""
+    Saturation +-100 scales that primary's chroma by 0..2. Shadows tint +-100 adds up to 0.08 of magenta
+    (+) or green (-) in the shadows."""
     k = 0.35
     M = torch.eye(3)
     r, g, b = red_hue / 100, green_hue / 100, blue_hue / 100
@@ -143,7 +146,10 @@ def calibration(x, red_hue=0.0, green_hue=0.0, blue_hue=0.0, red_sat=0.0, green_
     M = M * torch.tensor([1 + red_sat / 100, 1 + green_sat / 100, 1 + blue_sat / 100]).view(1, 3)
     L = _lum(x).unsqueeze(0)
     c = x - L
-    return (L + torch.einsum("ij,jhw->ihw", M, c)).clamp(0, 1)
+    y = L + torch.einsum("ij,jhw->ihw", M, c)
+    if shadow_tint:
+        y = y + (1 - L) ** 2 * shadow_tint / 100 * 0.08 * torch.tensor([0.5, -1.0, 0.5]).view(3, 1, 1)
+    return y.clamp(0, 1)
 
 
 def channel_curve(x, channel, lift=0.0, pull=0.0):
@@ -153,6 +159,84 @@ def channel_curve(x, channel, lift=0.0, pull=0.0):
     i = "rgb".index(channel)
     y[i] = lift + (1 - lift - pull) * x[i]
     return y.clamp(0, 1)
+
+
+def kelvin_to_temperature(kelvin: float, as_shot: float = 5500.0) -> float:
+    """Tutorials written for raw files give absolute white balance in kelvin. JPEG input has no as-shot
+    white balance, so it is taken as 5500 K daylight and every 30 K is one slider unit
+    (4200 K -> -43, 2850 K -> -88, 7555 K -> +68), clipped to +-100."""
+    return float(np.clip((kelvin - as_shot) / 30.0, -100, 100))
+
+
+def _pchip(xs, ys, t):
+    """Monotone cubic (Fritsch-Carlson) interpolation, like Lightroom's smooth point curve."""
+    xs, ys = np.asarray(xs, float), np.asarray(ys, float)
+    h = np.diff(xs)
+    d = np.diff(ys) / h
+    m = np.zeros_like(xs)
+    m[0], m[-1] = d[0], d[-1]
+    for i in range(1, len(xs) - 1):
+        m[i] = 0.0 if d[i - 1] * d[i] <= 0 else 3 * (h[i - 1] + h[i]) / ((2 * h[i] + h[i - 1]) / d[i - 1] + (h[i] + 2 * h[i - 1]) / d[i])
+    i = np.clip(np.searchsorted(xs, t) - 1, 0, len(xs) - 2)
+    u = (t - xs[i]) / h[i]
+    h00, h10, h01, h11 = 2 * u**3 - 3 * u**2 + 1, u**3 - 2 * u**2 + u, -2 * u**3 + 3 * u**2, u**3 - u**2
+    return h00 * ys[i] + h10 * h[i] * m[i] + h01 * ys[i + 1] + h11 * h[i] * m[i + 1]
+
+
+def _curve_lut(points):
+    pts = sorted(points)
+    if pts[0][0] > 0:
+        pts = [(0, pts[0][1])] + pts
+    if pts[-1][0] < 255:
+        pts = pts + [(255, pts[-1][1])]
+    xs, ys = zip(*pts)
+    return torch.tensor(np.clip(_pchip(xs, ys, np.arange(256)), 0, 255) / 255.0, dtype=torch.float32)
+
+
+def _apply_lut(ch, lut):
+    t = ch.clamp(0, 1) * 255
+    i0 = t.floor().long().clamp(0, 254)
+    f = t - i0
+    return lut[i0] * (1 - f) + lut[i0 + 1] * f
+
+
+def point_curve(x, rgb=None, r=None, g=None, b=None):
+    """Point curves given as (input, output) pairs on 0-255, like Lightroom's point-curve panel:
+    ``rgb`` applies to all channels first, then ``r``/``g``/``b`` per channel. Smooth monotone
+    interpolation between points."""
+    y = x.clone()
+    if rgb:
+        lut = _curve_lut(rgb)
+        y = torch.stack([_apply_lut(y[i], lut) for i in range(3)])
+    for i, pts in enumerate((r, g, b)):
+        if pts:
+            y[i] = _apply_lut(y[i], _curve_lut(pts))
+    return y.clamp(0, 1)
+
+
+def parametric_curve(x, highlights=0.0, lights=0.0, darks=0.0, shadows=0.0):
+    """Lightroom's region curve (splits at 25/50/75 %): each slider +-100 moves its quarter of the tonal
+    range by up to +-0.1 of full scale, smoothly."""
+    L = _lum(x)
+    d = (0.10 * shadows / 100 * torch.exp(-((L - 0.125) / 0.1) ** 2)
+         + 0.10 * darks / 100 * torch.exp(-((L - 0.375) / 0.12) ** 2)
+         + 0.10 * lights / 100 * torch.exp(-((L - 0.625) / 0.12) ** 2)
+         + 0.10 * highlights / 100 * torch.exp(-((L - 0.875) / 0.1) ** 2))
+    return _scale_lum(x, (L + d).clamp(0, 1)).clamp(0, 1)
+
+
+def black_white(x, mix=None):
+    """Black & white treatment with a B&W mix (band -> +-100): each band's grey is brightened or darkened by
+    up to +-40 %, weighted by how colourful the pixel is. Output is neutral grey."""
+    mix = mix or {}
+    hsv = rgb_to_hsv(x)
+    h, s = hsv[0], hsv[1].clamp(0, 1)
+    L = _lum(x)
+    k = torch.zeros_like(L)
+    for name, c in BANDS.items():
+        k += _band(h, c) * mix.get(name, 0) / 100 * 0.4
+    grey = (L * (1 + s * k)).clamp(0, 1)
+    return grey.expand(3, *grey.shape).clone()
 
 
 def dehaze(x, amount=0.0):
@@ -169,9 +253,10 @@ def vignette(x, amount=0.0):
     return (x * (1 + amount / 100 * 0.6 * r2)).clamp(0, 1)
 
 
-ORDER = ["white_balance", "exposure", "contrast", "tone_regions", "channel_curves", "fade", "hsl",
-         "saturation", "calibration", "color_grading", "dehaze", "vignette"]
+ORDER = ["white_balance", "exposure", "contrast", "tone_regions", "parametric_curve", "point_curve", "channel_curves",
+         "fade", "hsl", "saturation", "calibration", "black_white", "color_grading", "dehaze", "vignette"]
 TOOLS = {"white_balance": white_balance, "exposure": exposure, "contrast": contrast, "tone_regions": tone_regions,
+         "parametric_curve": parametric_curve, "point_curve": point_curve, "black_white": black_white,
          "fade": fade, "hsl": hsl, "saturation": saturation, "calibration": calibration,
          "color_grading": color_grading, "dehaze": dehaze, "vignette": vignette}
 

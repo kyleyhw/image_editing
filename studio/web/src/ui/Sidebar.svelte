@@ -1,8 +1,24 @@
 <script>
   import { S, view, photoURL, renderThumb, selectPhoto, setStyle, setPeek, pretty } from "../lib/studio.svelte.js";
+  import LookExample from "./LookExample.svelte";
   let { onCreate } = $props();
   const GUIDE = "https://github.com/kyleyhw/image_editing/blob/master/docs/user_guide.md#creating-a-new-style-idea--references--style";
   let canvases = $state({});
+  let openInfo = $state(null);
+  const name = (st) => st.title || pretty(st.name);
+
+  // Looks grouped by the kind of photo they suit, in the order the packs give.
+  const groups = $derived.by(() => {
+    const out = [];
+    for (const st of S.styles) {
+      const c = st.category || "More looks";
+      let g = out.find((x) => x.name === c);
+      if (!g) out.push((g = { name: c, looks: [] }));
+      g.looks.push(st);
+    }
+    return out;
+  });
+  const keyOf = (st) => S.styles.indexOf(st);
 
   // Look previews: each look rendered on this photo, as its params arrive.
   $effect(() => {
@@ -35,12 +51,26 @@
                   onpointerenter={() => setPeek("__original")} onpointerleave={() => setPeek(null)}>
         <img class="item-thumb" src={photoURL(S.id, 240)} alt="" /><span class="item-name">Original</span><kbd>0</kbd>
       </button></li>
-      {#each S.styles as st, i (st.name)}
-        <li><button class="item look" class:on={st.name === S.style && S.mode !== "before"} title={st.description}
+      {#each groups as g (g.name)}
+        <li class="group-head">{g.name}</li>
+        {#each g.looks as st (st.name)}
+          {@const i = keyOf(st)}
+          <li class="look-row">
+            <button class="item look" class:on={st.name === S.style && S.mode !== "before"} title={st.description}
                     onclick={() => setStyle(st.name)} onpointerenter={() => setPeek(st.name)} onpointerleave={() => setPeek(null)}>
-          <span class="item-thumb" class:loading={!S.byStyle[st.name]}><canvas bind:this={canvases[st.name]}></canvas></span>
-          <span class="item-name">{pretty(st.name)}</span>{#if i < 9}<kbd>{i + 1}</kbd>{/if}
-        </button></li>
+              <span class="item-thumb" class:loading={!S.byStyle[st.name]}><canvas bind:this={canvases[st.name]}></canvas></span>
+              <span class="item-name">{name(st)}</span>{#if i < 9}<kbd>{i + 1}</kbd>{/if}
+            </button>
+            {#if st.example || st.tutorials?.length}
+              <button class="info-btn" class:on={openInfo === st.name} aria-expanded={openInfo === st.name}
+                      aria-label={`Example and sources for ${name(st)}`} title="Example and sources"
+                      onclick={() => (openInfo = openInfo === st.name ? null : st.name)}>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            {/if}
+          </li>
+          {#if openInfo === st.name}<li class="look-ex-row"><LookExample look={st} /></li>{/if}
+        {/each}
       {/each}
     </ul>
     {#if S.caps.create}

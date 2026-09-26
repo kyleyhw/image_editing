@@ -301,7 +301,9 @@ def test_web_export_matches_torch_head(tmp_path):
     export_styles([tmp_path / "p"], tmp_path / "styles.json")
     data = json.loads((tmp_path / "styles.json").read_text())
     assert [s["card"]["name"] for s in data["styles"]] == ["open"]
-    H = {k: (np.frombuffer(base64.b64decode(v), "<f4") if isinstance(v, str) else v) for k, v in data["styles"][0]["head"].items()}
+    dt = "<f2" if data.get("dtype") == "float16" else "<f4"
+    H = {k: (np.frombuffer(base64.b64decode(v), dt).astype(np.float64) if isinstance(v, str) else v)
+         for k, v in data["styles"][0]["head"].items()}
     f = torch.randn(FEATURE_DIM)
     z = (f.numpy() - H["mu"]) / H["sigma"]
     h = H["w1"].reshape(H["hidden"], -1) @ z + H["b1"]
@@ -311,7 +313,7 @@ def test_web_export_matches_torch_head(tmp_path):
     theta = H["theta_mean"] + H["alpha"] * (out - H["theta_mean"])
     with torch.no_grad():
         want = head(f[None])[0].numpy()
-    assert np.allclose(theta, want, atol=1e-4)
+    assert np.allclose(theta, want, atol=2e-3)       # float16 weights
 
 
 def test_cyberpunk_recipe_split_tones():

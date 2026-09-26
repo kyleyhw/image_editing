@@ -1,4 +1,7 @@
-# Image Editing: Content-Adaptive, Editable Photo Styles
+# Irodori (彩り): Content-Adaptive, Editable Photo Styles
+
+*Irodori* is Japanese for colouring, or a colour scheme. The Python package and CLI keep the
+working name `photostyle`; `irodori` is an alias for the same CLI.
 
 **Purpose.** Learn the photo edit that takes *this particular image* to a
 target look. A style is a target appearance, not a fixed filter: a dark

@@ -13,10 +13,24 @@ ort.env.wasm.numThreads = 1;              // GitHub Pages is not cross-origin is
 
 const PREDICT_EDGE = 512, SHORT_SIDE = 224, PREVIEW_EDGE = 1600, THUMB_EDGE = 320;
 
-const f32 = (b64) => {
+const bytes = (b64) => {
   const s = atob(b64), u = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
-  return new Float32Array(u.buffer);
+  return u;
+};
+function half(h) {                              // IEEE 754 binary16 -> number
+  const e = (h >> 10) & 31, f = h & 1023, sg = h >> 15 ? -1 : 1;
+  if (e === 0) return sg * 2 ** -14 * (f / 1024);
+  if (e === 31) return f ? NaN : sg * Infinity;
+  return sg * 2 ** (e - 15) * (1 + f / 1024);
+}
+let DTYPE = "float32";
+const f32 = (b64) => {
+  const u = bytes(b64);
+  if (DTYPE !== "float16") return new Float32Array(u.buffer);
+  const h = new Uint16Array(u.buffer), out = new Float32Array(h.length);
+  for (let i = 0; i < h.length; i++) out[i] = half(h[i]);
+  return out;
 };
 
 let session = null, modelReady = null, styles = [];
@@ -119,6 +133,7 @@ export const browser = {
   accept: "image/*",
   async init(onModel) {
     const data = await (await fetch(`${BASE}models/styles.json`)).json();
+    DTYPE = data.dtype || "float32";
     styles = data.styles.map((s) => ({
       ...s,
       head: { ...s.head, ...Object.fromEntries(["mu", "sigma", "w1", "b1", "ln_w", "ln_b", "w2", "b2", "theta_mean"]

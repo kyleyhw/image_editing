@@ -405,9 +405,14 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
 
         if name not in RECIPES:
             raise SystemExit(f"no tutorial recipe for {name!r}; available: {sorted(RECIPES)}")
-        pool = input_pool(exclude=name, include_owner=not open_only)
-        ins = [_tensor(f) for f in random.Random(seed).sample(pool, min(300, len(pool)))]
+        # the look's own candidates (photos of the subject its tutorial was written for) come first,
+        # then a general sample so the style still behaves on other photos
+        own = [c["file"] for i, c in enumerate(p.candidates) if not flagged(p, i)]
+        pool = [f for f in input_pool(exclude=name, include_owner=not open_only) if str(f) not in set(own)]
+        files = own[:150] + random.Random(seed).sample(pool, min(300 - min(150, len(own)), len(pool)))
+        ins = [_tensor(f) for f in files]
         head, r, feats, info = learn_paired([(x, RECIPES[name](x)) for x in ins], fx, seed=seed, progress=progress)
+        info = {**info, "n_own": min(150, len(own))}
         mode = "teacher/recipe"
     else:
         if not p.refs:

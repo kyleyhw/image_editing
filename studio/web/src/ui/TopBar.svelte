@@ -7,7 +7,7 @@
 </script>
 
 <header class="topbar">
-  <a class="brand" href="./">photostyle</a>
+  <a class="brand" href="./">Irodori<span class="brand-jp" lang="ja">彩り</span></a>
   {#if S.id}
     <nav class="crumbs" aria-label="Location"><span class="muted">Photos</span><span class="sep">/</span><span class="crumb-file">{name}</span></nav>
   {/if}

@@ -122,6 +122,12 @@ CLASSIC_CHROME_NOT_MODELLED = ["grain 15-20 amount, 20-25 size, 40-50 roughness 
 
 RECIPE_TABLES = {"cyberpunk": CYBERPUNK, "fujifilm": FUJIFILM, "classic_chrome": CLASSIC_CHROME}
 
+# the twenty-look library (photostyle/recipe_library.py)
+from photostyle.recipe_library import LOOKS, S as _LIB_SOURCES  # noqa: E402
+
+SOURCES.update(_LIB_SOURCES)
+RECIPE_TABLES.update({name: look["rows"] for name, look in LOOKS.items()})
+
 
 CALIBRATION_DIR = Path(__file__).parent / "calibration"
 
@@ -137,7 +143,9 @@ def calibrated(name: str) -> list:
     out = []
     for tool, param, value, srcs, kind, note in RECIPE_TABLES[name]:
         f = fac.get(f"{tool}.{param}", 1.0) if kind == "direction" else 1.0
-        if isinstance(value, tuple) and tool == "color_grading":
+        if f == 1.0 or isinstance(value, list):     # lists are curve points: never scaled
+            pass
+        elif isinstance(value, tuple) and tool == "color_grading":
             value = (value[0], value[1] * f)
         elif isinstance(value, tuple):
             value = tuple(v * f for v in value)
@@ -148,11 +156,11 @@ def calibrated(name: str) -> list:
 
 
 def settings(table) -> dict:
-    """Recipe table -> develop() settings."""
+    """Recipe table -> develop() settings. "a.b" params nest ({"hsl": {"hue": {"red": ...}}})."""
     out: dict = {}
     for tool, param, value, *_ in table:
         t = out.setdefault(tool, {})
-        if tool == "hsl":
+        if "." in param:
             kind, band = param.split(".")
             t.setdefault(kind, {})[band] = value
         else:

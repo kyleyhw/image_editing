@@ -35,11 +35,13 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-CARD_KEYS = ("name", "description", "default_strength", "order", "renderer", "knots", "references", "source")
+CARD_KEYS = ("name", "description", "default_strength", "order", "renderer", "knots", "references", "source",
+             "title", "category", "subject", "grade", "tutorials", "example", "not_modelled")
 
 
 def _b64(t: torch.Tensor) -> str:
-    return base64.b64encode(t.detach().float().contiguous().numpy().astype("<f4").tobytes()).decode()
+    """float16, little-endian, base64 (half the size of float32; the head's outputs change by < 1e-3)."""
+    return base64.b64encode(t.detach().float().contiguous().numpy().astype("<f2").tobytes()).decode()
 
 
 def export_styles(roots: list[Path], out: Path) -> None:
@@ -82,7 +84,7 @@ def export_styles(roots: list[Path], out: Path) -> None:
         print(f"export {folder.name}")
     styles.sort(key=lambda s: (s["card"].get("order", 1000), s["card"]["name"]))
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"version": 1, "feature_dim": 1280, "styles": styles}))
+    out.write_text(json.dumps({"version": 2, "dtype": "float16", "feature_dim": 1280, "styles": styles}))
     print(f"{len(styles)} styles -> {out} ({out.stat().st_size / 1e6:.1f} MB)")
 
 

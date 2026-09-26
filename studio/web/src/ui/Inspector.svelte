@@ -8,6 +8,7 @@
   import VignettePanel from "../panels/VignettePanel.svelte";
   import ScenePanel from "../panels/ScenePanel.svelte";
   import HistogramPanel from "../panels/HistogramPanel.svelte";
+  import LookExample from "./LookExample.svelte";
   import { I } from "../lib/icons.js";
   let { open = $bindable(false) } = $props();
 
@@ -22,7 +23,7 @@
   <section class="grp">
     <div class="grp-head">Look</div>
     <select class="wide" aria-label="Look" value={S.style} onchange={(e) => setStyle(e.currentTarget.value)}>
-      {#each S.styles as s (s.name)}<option value={s.name}>{pretty(s.name)}</option>{/each}
+      {#each S.styles as s (s.name)}<option value={s.name}>{s.title || pretty(s.name)}</option>{/each}
     </select>
     {#if card?.description}<p class="desc">{card.description}</p>{/if}
     <Slider id="strength" label="Strength" min={0} max={150} suffix="%" reset={Math.round((S.params?.strength ?? 1) * 100)}
@@ -39,6 +40,9 @@
     {#if S.message}<p class="hint">{S.message}</p>{/if}
   </section>
 
+  {#if card?.example || card?.tutorials?.length}
+    <Section title="Example & sources" open={false}><LookExample look={card} /></Section>
+  {/if}
   <Section title="Curves"><CurvesPanel /></Section>
   <Section title="Colour"><ColourPanel /></Section>
   <Section title="Light"><VignettePanel /></Section>

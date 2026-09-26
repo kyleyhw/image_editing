@@ -57,3 +57,18 @@ def photo_score(img: Image.Image | str | Path) -> float | None:
 
 def is_likely_art(score: float | None, threshold: float = THRESHOLD) -> bool:
     return score is not None and score < threshold
+
+
+@torch.no_grad()
+def subject_scores(images: list, text: str) -> list[float] | None:
+    """CLIP similarity of each image to ``text`` (e.g. "a photo of a misty forest"); None if unavailable."""
+    model, proc = _load()
+    if model is None:
+        return None
+    out = []
+    for img in images:
+        if not isinstance(img, Image.Image):
+            img = Image.open(img)
+        inp = proc(text=[text], images=img.convert("RGB"), padding=True, return_tensors="pt")
+        out.append(float(model(**inp).logits_per_image[0, 0]))
+    return out

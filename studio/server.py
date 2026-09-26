@@ -35,7 +35,7 @@ import uuid
 from pathlib import Path
 
 import torch
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from PIL import Image
 
@@ -116,6 +116,18 @@ def legacy() -> str:
 def assets(name: str):
     f = (DIST / "assets" / name).resolve()
     if not f.is_relative_to((DIST / "assets").resolve()) or not f.exists():
+        raise HTTPException(404)
+    return FileResponse(f)
+
+
+@app.get("/samples/{path:path}")
+@app.get("/examples/{path:path}")
+def public_files(path: str, request: Request):
+    """Files copied from studio/web/public into the build (sample photos, look examples)."""
+    top = request.url.path.split("/")[1]
+    root = (DIST / top).resolve()
+    f = (root / path).resolve()
+    if not f.is_relative_to(root) or not f.is_file():
         raise HTTPException(404)
     return FileResponse(f)
 
