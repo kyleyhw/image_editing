@@ -1,0 +1,21 @@
+{
+ "before": "examples/moody_food/before.jpg",
+ "after": "examples/moody_food/after.jpg",
+ "photo": {
+  "title": "Tea mug, a lighter and a pile of books",
+  "creator": "freestocks.org",
+  "license": "cc0",
+  "license_version": "1.0",
+  "url": "https://www.flickr.com/photos/135396164@N05/41528789245",
+  "attribution": "\"Tea mug, a lighter and a pile of books\" by freestocks.org, CC0 1.0, via flickr",
+  "p_edited": 0.15
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: food, drinks and still life on dark surfaces",
+ "tutorials": [
+  {
+   "title": "Flourish Presets, How to Edit Dark and Moody Photos With Moody Presets",
+   "url": "https://flourishpresets.com/blogs/flourish-presets-lightroom-presets-luts/how-to-edit-dark-and-moody-photos-moody-presets"
+  }
+ ],
+ "title": "Moody Food"
+}

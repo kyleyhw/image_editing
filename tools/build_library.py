@@ -19,6 +19,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -79,8 +80,14 @@ def local_candidates(look: dict, out: Path, n: int = 60) -> list[dict]:
     return cands
 
 
+def colourful(file: str, min_chroma: float = 0.04) -> bool:
+    a = np.asarray(Image.open(file).convert("RGB").resize((128, 128)), dtype=np.float32) / 255
+    return float((a.max(-1) - a.min(-1)).mean()) >= min_chroma
+
+
 def pick_example(p: ns.Project, subject: str) -> int:
-    idx = [i for i, c in enumerate(p.candidates) if not ns.flagged(p, i) and min(Image.open(c["file"]).size) >= 480]
+    idx = [i for i, c in enumerate(p.candidates) if not ns.flagged(p, i) and min(Image.open(c["file"]).size) >= 480
+           and colourful(c["file"])]            # a monochrome "before" cannot show a look (even a B&W one)
     from photostyle.photo_filter import embed_images, embed_texts
 
     files = [p.candidates[i]["file"] for i in idx]
@@ -98,7 +105,6 @@ def pick_example(p: ns.Project, subject: str) -> int:
 
 
 def build(name: str, look: dict, order: int, skip_search: bool, examples_only: bool = False) -> None:
-    from photostyle.engine import Engine
 
     proj = ns.ROOT / name / "project.json"
     if not proj.exists():
@@ -127,8 +133,17 @@ def build(name: str, look: dict, order: int, skip_search: bool, examples_only: b
                 tutorials=tutorials(look["rows"]), not_modelled=NOT_MODELLED,
                 references="training photos found by subject search on Openverse (openly licensed); "
                            "attribution in ATTRIBUTION.csv")
-    # example
-    i = pick_example(p, look["subject"])
+    card_f.write_text(json.dumps(card, indent=1))
+    write_example(name, p, look["subject"], look["title"])
+
+
+def write_example(name: str, p: ns.Project, subject: str, title: str) -> None:
+    """Pick the candidate that best shows the look's ideal subject; write its before/after and credit."""
+    from photostyle.engine import Engine
+
+    card_f = Path("stylepacks") / name / "style.json"
+    card = json.loads(card_f.read_text())
+    i = pick_example(p, subject)
     c = p.candidates[i]
     out = EXAMPLES / name
     out.mkdir(parents=True, exist_ok=True)
@@ -140,14 +155,12 @@ def build(name: str, look: dict, order: int, skip_search: bool, examples_only: b
     example = {"before": f"examples/{name}/before.jpg", "after": f"examples/{name}/after.jpg",
                "photo": {"title": c.get("title"), "creator": c.get("creator"), "license": c.get("license"),
                          "license_version": c.get("license_version"), "url": c.get("landing_url"),
-                         "attribution": c.get("attribution")},
-               "why": f"chosen as the candidate that best matches the tutorial's subject: {look['subject']}"}
+                         "attribution": c.get("attribution"),
+                         "p_edited": round(float(p_edited([c["file"]])[0]), 2)},
+               "why": f"chosen as the candidate that best matches the tutorial's subject: {subject}"}
     card["example"] = example
     card_f.write_text(json.dumps(card, indent=1))
-    example["photo"]["p_edited"] = round(float(p_edited([c["file"]])[0]), 2)
-    card["example"] = example
-    card_f.write_text(json.dumps(card, indent=1))
-    (out / "example.json").write_text(json.dumps({**example, "tutorials": card["tutorials"], "title": look["title"]}, indent=1))
+    (out / "example.json").write_text(json.dumps({**example, "tutorials": card.get("tutorials"), "title": title}, indent=1))
     print(f"[{name}] packed; example: {c.get('title')!r} by {c.get('creator')} ({c.get('license')})", flush=True)
 
 
@@ -156,7 +169,12 @@ def main() -> None:
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--skip-search", action="store_true")
     ap.add_argument("--examples-only", action="store_true", help="re-pick and re-render examples of built looks")
+    ap.add_argument("--extra", nargs="*", default=[],
+                    help="also re-pick examples of tutorial looks outside the library (e.g. cyberpunk)")
     args = ap.parse_args()
+    for name in args.extra:
+        card = json.loads((Path("stylepacks") / name / "style.json").read_text())
+        write_example(name, ns.Project.load(name), card["subject"], card.get("title") or name)
     for k, (name, look) in enumerate(LOOKS.items()):
         if args.only and name not in args.only:
             continue

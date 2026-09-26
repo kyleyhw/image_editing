@@ -1,0 +1,25 @@
+{
+ "before": "examples/golden_hour/before.jpg",
+ "after": "examples/golden_hour/after.jpg",
+ "photo": {
+  "title": "Serene mountain sunrise landscape",
+  "creator": null,
+  "license": "cc0",
+  "license_version": "1.0",
+  "url": "https://www.rawpixel.com/image/6077012/_dsc0885",
+  "attribution": "\"Serene mountain sunrise landscape\" by unknown, CC0 1.0, via rawpixel",
+  "p_edited": 0.1
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: sunrise and sunset landscapes",
+ "tutorials": [
+  {
+   "title": "Lucy Song (LR Presets), How to Edit Sunrise & Sunset Photos in Lightroom",
+   "url": "https://www.lightroompresets.com/blogs/pretty-presets-blog/how-to-edit-sunrise-and-sunset-photos-in-lightroom"
+  },
+  {
+   "title": "HueBliss, Golden Hour Photography Settings",
+   "url": "https://huebliss.com/golden-hour-photography-settings/"
+  }
+ ],
+ "title": "Golden Hour"
+}

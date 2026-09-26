@@ -24,7 +24,7 @@ owner's choice). Its tutorial recipe is kept below as a candidate.
 
 ### Moody Forest (`moody_forest`)
 
-Best for: overcast forests and fields with lots of green. Grade A: the tutorials give (nearly) all the numbers.
+Best for: misty, overcast forests with tall trees and lots of green. Grade A: the tutorials give (nearly) all the numbers.
 
 | tool | setting | tutorial value | calibrated | source | kind | what the tutorial says |
 |---|---|---|---|---|---|---|

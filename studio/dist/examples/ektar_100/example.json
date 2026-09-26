@@ -1,0 +1,25 @@
+{
+ "before": "examples/ektar_100/before.jpg",
+ "after": "examples/ektar_100/after.jpg",
+ "photo": {
+  "title": "Laundry day in Venice",
+  "creator": "o palsson",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/45713725@N00/6875702573",
+  "attribution": "\"Laundry day in Venice\" by o palsson, CC BY 2.0, via flickr",
+  "p_edited": 0.05
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: colourful travel scenes and objects in daylight",
+ "tutorials": [
+  {
+   "title": "Legendary Presets, How to Get the Kodak Ektar 100 Look in Lightroom",
+   "url": "https://legendarypresets.com/kodak-ektar-100-lightroom-preset-guide/"
+  },
+  {
+   "title": "Legendary Presets, Step-by-Step Lightroom Workflow for High-Saturation Film Looks",
+   "url": "https://legendarypresets.com/step-by-step-lightroom-workflow-for-high-saturation-film-looks/"
+  }
+ ],
+ "title": "Ektar 100"
+}

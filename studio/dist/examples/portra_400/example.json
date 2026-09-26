@@ -1,0 +1,25 @@
+{
+ "before": "examples/portra_400/before.jpg",
+ "after": "examples/portra_400/after.jpg",
+ "photo": {
+  "title": "CERRO LAS GEMELAS, CORDOBA. ARGENTINA",
+  "creator": "Juan Montiel",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/105787344@N05/11120288444",
+  "attribution": "\"CERRO LAS GEMELAS, CORDOBA. ARGENTINA\" by Juan Montiel, CC BY 2.0, via flickr",
+  "p_edited": 0.13
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: daylight portraits outdoors",
+ "tutorials": [
+  {
+   "title": "Diego Sanchez (Medialoot), How to Emulate the Portra 400 Film Look in Lightroom",
+   "url": "https://medialoot.com/blog/how-to-emulate-the-portra-400-film-look-in-lightroom/"
+  },
+  {
+   "title": "Presetpedia, Kodak Portra 400 Classic Film preset",
+   "url": "https://presetpedia.com/kodak-portra-lightroom-presets/"
+  }
+ ],
+ "title": "Portra 400"
+}

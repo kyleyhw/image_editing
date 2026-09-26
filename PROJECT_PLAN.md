@@ -1787,3 +1787,29 @@ The owner found the tutorial Fujifilm bland.
 - **Choice.** Of four options, the owner picked **D: the pack trained
   directly on the Fuji scans**, now live at 80 %. The tutorial recipe and
   the Classic Chrome recipe stay as candidates.
+
+#### A5.11 Irodori and the twenty-look library (2026-09-26)
+
+- **Name.** The project is now **Irodori** (彩り, "colouring"). The Python package stays
+  `photostyle`, and `irodori` is a CLI alias.
+- **Twenty looks from tutorials.** Each look is a recipe transcribed from public tutorials
+  (`photostyle/recipe_library.py`). Every setting cites its source and records whether the
+  tutorial gave a number or only a direction. The looks cover day/night landscape, day/night
+  city, portrait, food & objects and seasons. `docs/looks.md` lists the full tables.
+- **Training.** Each recipe grades up to 150 openly licensed photos of its own subject plus a
+  general open sample (300 pairs). The head is trained on those pairs with open data only, so
+  every look is publishable. Build them all with `tools/build_library.py`.
+- **Hue-preserving loss.** Per-channel curves turned green-edged skies and food green in four
+  looks. A chroma-direction loss fixed it:
+  - At weight 1.0, the looks became much weaker than their recipes.
+  - At **0.3**, hue jumps are ≤ 0.2 % on every look.
+  - Mean difference from the recipe is 0.5–4.8/255 for 18 looks. It is 8.8 for moody_forest
+    (−50 % saturation is only partly reproduced) and 10.4 for bright_food.
+  - Checked by `tools/check_library.py`.
+- **Examples.** Each look has an expandable before/after panel with these rules:
+  - The photo is an openly licensed photo of the tutorial's ideal subject. It is picked by CLIP
+    subject match, with penalties for watermarks, already-edited photos (FiveK classifier) and
+    monochrome photos.
+  - The panel links the tutorials. The tutorial authors' own before/after photos stay on their
+    pages; they are linked, never copied.
+  - Cyberpunk has an example too (`--extra cyberpunk`).

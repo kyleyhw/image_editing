@@ -1,0 +1,21 @@
+{
+ "before": "examples/bright_airy/before.jpg",
+ "after": "examples/bright_airy/after.jpg",
+ "photo": {
+  "title": "V\u00e2n",
+  "creator": "Kh\u00e1nh Hmoong",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/7997148@N05/20816910088",
+  "attribution": "\"V\u00e2n\" by Kh\u00e1nh Hmoong, CC BY 2.0, via flickr",
+  "p_edited": 0.26
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: weddings and lifestyle portraits in soft light",
+ "tutorials": [
+  {
+   "title": "The Editing Studio, Bright and Airy Lightroom Presets: Complete Guide",
+   "url": "https://theeditingstudio.co/blog/bright-and-airy-lightroom-presets"
+  }
+ ],
+ "title": "Bright & Airy"
+}

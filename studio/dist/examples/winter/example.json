@@ -1,0 +1,29 @@
+{
+ "before": "examples/winter/before.jpg",
+ "after": "examples/winter/after.jpg",
+ "photo": {
+  "title": "Snowy Landscape 2",
+  "creator": "cclogg",
+  "license": "cc0",
+  "license_version": "1.0",
+  "url": "https://www.flickr.com/photos/46244586@N02/16000236846",
+  "attribution": "\"Snowy Landscape 2\" by cclogg, CC0 1.0, via flickr",
+  "p_edited": 0.2
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: snowy landscapes",
+ "tutorials": [
+  {
+   "title": "Mikko Lagerstedt, Cinematic Color Grading: Creating Atmosphere in Landscape Photography",
+   "url": "https://mikkolagerstedt.com/blog/cinematic-color-grading-landscape-photography/"
+  },
+  {
+   "title": "David Shaw (Digital Photography School), Tips for Processing Winter Landscapes in Lightroom",
+   "url": "https://digital-photography-school.com/tips-for-processing-winter-landscapes-in-lightroom/"
+  },
+  {
+   "title": "James Abbott (Picfair Focus), How to shoot and edit snowy winter landscapes",
+   "url": "https://focus.picfair.com/articles/how-to-shoot-and-edit-snowy-landscapes"
+  }
+ ],
+ "title": "Winter"
+}

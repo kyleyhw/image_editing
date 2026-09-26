@@ -1,0 +1,33 @@
+{
+ "before": "examples/cyberpunk/before.jpg",
+ "after": "examples/cyberpunk/after.jpg",
+ "photo": {
+  "title": "Shinjuku by night",
+  "creator": "WordRidden",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/97844767@N00/3008530019",
+  "attribution": "\"Shinjuku by night\" by WordRidden, CC BY 2.0, via flickr",
+  "p_edited": 0.03
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: neon-lit city streets at night",
+ "tutorials": [
+  {
+   "title": "Drew Deltz, Editing Like a Pro: Transforming Photos into Cyberpunk Masterpieces with Photoshop",
+   "url": "https://drewdeltz.systeme.io/blog/editing-like-a-pro-transforming-photos-into-cyberpunk-masterpieces-with-photoshop"
+  },
+  {
+   "title": "Denny's Tips, Cyberpunk Lightroom Tutorial",
+   "url": "https://www.dennystips.com/cyberpunk-lightroom-tutorial/"
+  },
+  {
+   "title": "Spoon Graphics, How to Apply Cyberpunk Style Color Grading & Neon Effects to Your Photos",
+   "url": "https://blog.spoongraphics.co.uk/tutorials/how-to-apply-cyberpunk-style-color-grading-neon-effects-to-your-photos"
+  },
+  {
+   "title": "TourBox, Creating Cyberpunk Color Grading in Photoshop: A Step-by-Step Guide",
+   "url": "https://www.tourboxtech.com/en/news/cyberpunk-colors.html"
+  }
+ ],
+ "title": "Cyberpunk"
+}

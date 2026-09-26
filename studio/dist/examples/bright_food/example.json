@@ -1,0 +1,25 @@
+{
+ "before": "examples/bright_food/before.jpg",
+ "after": "examples/bright_food/after.jpg",
+ "photo": {
+  "title": "Free breakfast table food image",
+  "creator": null,
+  "license": "cc0",
+  "license_version": "1.0",
+  "url": "https://www.rawpixel.com/image/5919290/image-public-domain-table-food",
+  "attribution": "\"Free breakfast table food image\" by unknown, CC0 1.0, via rawpixel",
+  "p_edited": 0.0
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: food on light tables, overhead and daylight",
+ "tutorials": [
+  {
+   "title": "Heather Templeton (Replica Surfaces), Light and airy food photography",
+   "url": "https://www.replicasurfaces.com/blogs/replica-surfaces-blog/how-to-take-light-and-airy-food-photos"
+  },
+  {
+   "title": "Ali Tanis (FoodShot AI), Food Color Grading: How to Make Food Photos Pop",
+   "url": "https://foodshot.ai/blog/food-color-grading"
+  }
+ ],
+ "title": "Bright Food"
+}

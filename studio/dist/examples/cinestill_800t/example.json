@@ -1,0 +1,21 @@
+{
+ "before": "examples/cinestill_800t/before.jpg",
+ "after": "examples/cinestill_800t/after.jpg",
+ "photo": {
+  "title": "businessmen",
+  "creator": "OiMax",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/72396314@N00/375563778",
+  "attribution": "\"businessmen\" by OiMax, CC BY 2.0, via flickr",
+  "p_edited": 0.27
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: city streets at night under street and shop lights",
+ "tutorials": [
+  {
+   "title": "Lou & Marks Presets, CineStill 800T Film Lightroom Presets",
+   "url": "https://loumarkspresets.com/blogs/lightroom/cinestill-800t-free-download"
+  }
+ ],
+ "title": "CineStill 800T"
+}

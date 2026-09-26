@@ -1,0 +1,21 @@
+{
+ "before": "examples/velvia/before.jpg",
+ "after": "examples/velvia/after.jpg",
+ "photo": {
+  "title": "From_Zvartes_Rock_2_13.10.13",
+  "creator": "Liga_Eglite",
+  "license": "by",
+  "license_version": "2.0",
+  "url": "https://www.flickr.com/photos/90673730@N04/10314026334",
+  "attribution": "\"From_Zvartes_Rock_2_13.10.13\" by Liga_Eglite, CC BY 2.0, via flickr",
+  "p_edited": 0.02
+ },
+ "why": "chosen as the candidate that best matches the tutorial's subject: sunny landscapes with sky, water and foliage",
+ "tutorials": [
+  {
+   "title": "Legendary Presets, Step-by-Step Lightroom Workflow for High-Saturation Film Looks",
+   "url": "https://legendarypresets.com/step-by-step-lightroom-workflow-for-high-saturation-film-looks/"
+  }
+ ],
+ "title": "Velvia Vivid"
+}
