@@ -1,0 +1,44 @@
+{
+ "name": "fujifilm",
+ "loss": 0.0877242958780072,
+ "n_refs": 46,
+ "n_inputs": 60,
+ "factors": {
+  "contrast.amount": 4.0,
+  "tone_regions.shadows": 0.0,
+  "tone_regions.whites": 4.0,
+  "tone_regions.blacks": 4.0,
+  "fade.amount": 1.0,
+  "hsl.sat.blue": 4.0,
+  "hsl.sat.aqua": 4.0,
+  "hsl.sat.red": 0.0,
+  "hsl.sat.green": 0.0,
+  "saturation.vibrance": 0.0,
+  "color_grading.shadows": 0.5,
+  "color_grading.highlights": 0.0
+ },
+ "values": {
+  "white_balance.temperature": -8.0,
+  "contrast.amount": 40.0,
+  "tone_regions.shadows": 0.0,
+  "tone_regions.whites": 40.0,
+  "tone_regions.blacks": -40.0,
+  "fade.amount": 20.0,
+  "hsl.hue.green": 10.0,
+  "hsl.sat.yellow": -12.0,
+  "hsl.sat.blue": -40.0,
+  "hsl.sat.aqua": -40.0,
+  "hsl.sat.red": 0.0,
+  "hsl.sat.green": 0.0,
+  "saturation.vibrance": 0.0,
+  "color_grading.shadows": [
+   95,
+   7.0
+  ],
+  "color_grading.highlights": [
+   35,
+   0.0
+  ]
+ },
+ "target_note": "statistics of 46 openly licensed Fuji film scans (Superia, C200, Pro 400H), measured on 60 open input photos"
+}

@@ -6,9 +6,12 @@ records where it comes from:
 - "direction": the tutorial states the direction only, and the amount is
   chosen here.
 - "conflict": the tutorials disagree; the note says which one was followed.
-- "direction, calibrated": the amount was fitted to reference photos of the
-  look (tools/calibrate_recipe.py). The sign stays the tutorial's; 0 means
-  the references do not support it.
+The tables hold the tutorials' own amounts. A look may also have a
+calibration (``photostyle/calibration/<name>.json``, written by
+tools/calibrate_recipe.py): one non-negative factor per direction-only row,
+fitted to a target (reference photos, or a look the owner picked). The
+tutorials' numbers and every sign stay as stated; a factor of 0 means the
+target does not use that step.
 
 ``photostyle style train NAME --recipe teacher`` grades openly licensed input
 photos with the recipe and trains the content-adaptive head on those pairs, so
@@ -18,6 +21,9 @@ not modelled.
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 import torch
 
@@ -39,6 +45,8 @@ SOURCES = {
     "PL": ("PresetLove, Superia 400 Film Preset", "https://presetlove.com/presets/superia-400/"),
     "ST": ("Scott Tucker, My Fujifilm Superia X-Tra 400 Film Simulation", "https://www.scotttuckerphoto.com/blog/superia400"),
     "JP": ("J.M. Peltier, Fujifilm Classic Chrome vs. Classic Neg", "https://www.jmpeltier.com/fujifilm-classic-chrome-vs-classic-neg/"),
+    "ES": ("The Editing Studio, Fujifilm Look Lightroom Preset: Complete Guide (Classic Chrome)",
+           "https://theeditingstudio.co/blog/fujifilm-look-lightroom-preset"),
 }
 
 # (tool, param) -> (value, [sources], kind, note)
@@ -76,25 +84,67 @@ CYBERPUNK = [
 CYBERPUNK_NOT_MODELLED = ["clarity - (softer glow; SG, DT): a local operation", "neon glow layers (SG, DD)"]
 
 FUJIFILM = [
-    ('white_balance', 'temperature', -8, ['LP'], 'numeric', 'white balance 5000-5200 K instead of 5500 K daylight, i.e. slightly cooler (converted to this scale)'),
-    ('contrast', 'amount', 40.0, ['PL', 'JP'], 'direction, calibrated', 'a bit more contrast than neutral (Classic Negative); amount calibrated to the Fuji scans (x4 of 10)'),
-    ('tone_regions', 'shadows', 0.0, ['PL'], 'direction, calibrated', 'softens shadows; calibrated to 0: the Fuji scans do not support it'),
-    ('tone_regions', 'whites', 40.0, ['PL'], 'direction, calibrated', 'increases whites; amount calibrated to the Fuji scans (x4 of 10)'),
-    ('tone_regions', 'blacks', -40.0, ['PL'], 'direction, calibrated', 'deepens blacks; amount calibrated to the Fuji scans (x4 of -10)'),
-    ('fade', 'amount', 20.0, ['ST'], 'direction, calibrated', "the 'full film look' version adds shadow fade; amount confirmed by the Fuji scans"),
-    ('hsl', 'hue.green', 10, ['LP'], 'numeric', 'green hue +10 toward aqua'),
-    ('hsl', 'sat.yellow', -12, ['LP'], 'numeric', 'yellow saturation -10 to -15'),
-    ('hsl', 'sat.blue', -40.0, ['JP'], 'direction, calibrated', 'cooler colours desaturated more than reds and oranges; amount calibrated to the Fuji scans (x4 of -10)'),
-    ('hsl', 'sat.aqua', -40.0, ['JP'], 'direction, calibrated', 'cooler colours desaturated more than reds and oranges; amount calibrated to the Fuji scans (x4 of -10)'),
-    ('hsl', 'sat.red', 0.0, ['ST'], 'direction, calibrated', 'vivid reds; calibrated to 0: the Fuji scans do not support it'),
-    ('hsl', 'sat.green', 0.0, ['ST'], 'direction, calibrated', 'green greens; calibrated to 0: the Fuji scans do not support it'),
-    ('saturation', 'vibrance', 0.0, ['PL'], 'direction, calibrated', 'amplifies vibrance; calibrated to 0: the Fuji scans do not support it'),
-    ('color_grading', 'shadows', (95, 7.0), ['PL', 'ST'], 'direction, calibrated', 'lime green in the shadows / slight greens in shadows; amount calibrated to the Fuji scans (x0.5 of (95, 14))'),
-    ('color_grading', 'highlights', (35, 0.0), ['PL', 'ST'], 'direction, calibrated', 'warm brown highlights / warm but not green whites; calibrated to 0: the Fuji scans do not support it'),
+    ("white_balance", "temperature", -8, ["LP"], "numeric",
+     "white balance 5000-5200 K instead of 5500 K daylight, i.e. slightly cooler (converted to this scale)"),
+    ("contrast", "amount", 10, ["PL", "JP"], "direction", "a bit more contrast than neutral (Classic Negative)"),
+    ("tone_regions", "shadows", 15, ["PL"], "direction", "softens shadows"),
+    ("tone_regions", "whites", 10, ["PL"], "direction", "increases whites"),
+    ("tone_regions", "blacks", -10, ["PL"], "direction", "deepens blacks"),
+    ("fade", "amount", 20, ["ST"], "direction", "the 'full film look' version adds shadow fade"),
+    ("hsl", "hue.green", 10, ["LP"], "numeric", "green hue +10 toward aqua"),
+    ("hsl", "sat.yellow", -12, ["LP"], "numeric", "yellow saturation -10 to -15"),
+    ("hsl", "sat.blue", -10, ["JP"], "direction", "cooler colours desaturated more than reds and oranges"),
+    ("hsl", "sat.aqua", -10, ["JP"], "direction", "cooler colours desaturated more than reds and oranges"),
+    ("hsl", "sat.red", 5, ["ST"], "direction", "vivid reds"),
+    ("hsl", "sat.green", 5, ["ST"], "direction", "green greens"),
+    ("saturation", "vibrance", 10, ["PL"], "direction", "amplifies vibrance"),
+    ("color_grading", "shadows", (95, 14), ["PL", "ST"], "direction", "lime green in the shadows / slight greens in shadows"),
+    ("color_grading", "highlights", (35, 12), ["PL", "ST"], "direction", "warm brown highlights / warm but not green whites"),
 ]
 FUJIFILM_NOT_MODELLED = ["grain 25-30 (LP)"]
 
-RECIPE_TABLES = {"cyberpunk": CYBERPUNK, "fujifilm": FUJIFILM}
+# Classic Chrome: The Editing Studio gives ranges; the midpoint of each range is used.
+CLASSIC_CHROME = [
+    ("tone_regions", "highlights", -25, ["ES"], "numeric", "highlights -20 to -30"),
+    ("tone_regions", "shadows", 15, ["ES"], "numeric", "shadows +10 to +20"),
+    ("tone_regions", "blacks", 15, ["ES"], "numeric", "blacks +10 to +20"),
+    ("contrast", "amount", -15, ["ES"], "numeric", "contrast -10 to -20"),
+    ("exposure", "stops", 0.1, ["ES"], "numeric", "exposure 0 to +0.2"),
+    ("saturation", "vibrance", -18, ["ES"], "numeric", "vibrance -15 to -20"),
+    ("saturation", "sat", -10, ["ES"], "numeric", "saturation -10"),
+    ("hsl", "sat.green", -22, ["ES"], "numeric", "green saturation -20 to -25"),
+    ("hsl", "sat.blue", -18, ["ES"], "numeric", "blue saturation -15 to -20"),
+    ("hsl", "sat.red", -8, ["ES"], "numeric", "red saturation -5 to -10"),
+    ("hsl", "hue.blue", -15, ["JP"], "direction", "blues keep some vibrance and shift toward cyan"),
+    ("color_grading", "shadows", (210, 8), ["ES"], "direction", "very slight cool grey in the shadows"),
+]
+CLASSIC_CHROME_NOT_MODELLED = ["grain 15-20 amount, 20-25 size, 40-50 roughness (ES)"]
+
+RECIPE_TABLES = {"cyberpunk": CYBERPUNK, "fujifilm": FUJIFILM, "classic_chrome": CLASSIC_CHROME}
+
+
+CALIBRATION_DIR = Path(__file__).parent / "calibration"
+
+
+def calibration(name: str) -> dict:
+    f = CALIBRATION_DIR / f"{name}.json"
+    return json.loads(f.read_text()) if f.exists() else {}
+
+
+def calibrated(name: str) -> list:
+    """The recipe table with its calibration factors applied (direction-only rows)."""
+    fac = calibration(name).get("factors", {})
+    out = []
+    for tool, param, value, srcs, kind, note in RECIPE_TABLES[name]:
+        f = fac.get(f"{tool}.{param}", 1.0) if kind == "direction" else 1.0
+        if isinstance(value, tuple) and tool == "color_grading":
+            value = (value[0], value[1] * f)
+        elif isinstance(value, tuple):
+            value = tuple(v * f for v in value)
+        else:
+            value = value * f
+        out.append((tool, param, value, srcs, kind, note))
+    return out
 
 
 def settings(table) -> dict:
@@ -111,7 +161,7 @@ def settings(table) -> dict:
 
 
 def _make(name):
-    s = settings(RECIPE_TABLES[name])
+    s = settings(calibrated(name))
     return lambda img: develop(img, s)
 
 
@@ -122,9 +172,16 @@ fujifilm = RECIPES["fujifilm"]
 
 def describe(name: str) -> str:
     """Markdown table of a recipe with its sources (for docs and style cards)."""
-    rows = ["| tool | setting | value | source | kind | what the tutorial says |", "|---|---|---|---|---|---|"]
-    for tool, param, value, srcs, kind, note in RECIPE_TABLES[name]:
-        rows.append(f"| {tool} | {param} | {value} | {', '.join(srcs)} | {kind} | {note} |")
+    cal = calibration(name)
+    fac = cal.get("factors", {})
+    rows = ["| tool | setting | tutorial value | calibrated | source | kind | what the tutorial says |",
+            "|---|---|---|---|---|---|---|"]
+    for (tool, param, value, srcs, kind, note), (*_, v2, _s, _k, _n) in zip(RECIPE_TABLES[name], calibrated(name)):
+        f = fac.get(f"{tool}.{param}") if kind == "direction" else None
+        c = "" if f is None else (f"x{f:g} = {v2}" if f else "x0 (unused)")
+        rows.append(f"| {tool} | {param} | {value} | {c} | {', '.join(srcs)} | {kind} | {note} |")
+    if cal:
+        rows = [f"Calibration target: {cal.get('target_note', cal.get('target', ''))}", ""] + rows
     refs = sorted({s for row in RECIPE_TABLES[name] for s in row[3]})
     rows += ["", *[f"- **{k}**: [{SOURCES[k][0]}]({SOURCES[k][1]})" for k in refs]]
     return "\n".join(rows)
