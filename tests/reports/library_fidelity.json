@@ -1,121 +1,25 @@
 {
  "moody_forest": {
-  "mean": 4.4,
-  "p99": 22.1,
-  "hue_jump_pct": 2.31,
-  "worst_hue_jump_pct": 27.78
+  "mean": 11.5,
+  "p99": 44.6,
+  "hue_jump_pct": 0.0,
+  "worst_hue_jump_pct": 0.0
  },
  "golden_hour": {
-  "mean": 4.7,
-  "p99": 33.7,
-  "hue_jump_pct": 0.19,
-  "worst_hue_jump_pct": 1.42
- },
- "velvia": {
-  "mean": 2.0,
-  "p99": 11.8,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
- },
- "milky_way": {
-  "mean": 1.2,
-  "p99": 8.1,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
- },
- "blue_hour": {
-  "mean": 3.9,
-  "p99": 21.9,
-  "hue_jump_pct": 0.01,
-  "worst_hue_jump_pct": 0.11
- },
- "teal_orange": {
-  "mean": 1.4,
-  "p99": 14.8,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.01
- },
- "kodachrome": {
-  "mean": 2.7,
-  "p99": 14.2,
+  "mean": 6.6,
+  "p99": 49.3,
   "hue_jump_pct": 0.0,
   "worst_hue_jump_pct": 0.0
  },
  "matte_urban": {
-  "mean": 3.6,
-  "p99": 22.3,
-  "hue_jump_pct": 0.64,
-  "worst_hue_jump_pct": 3.53
- },
- "cinestill_800t": {
-  "mean": 2.2,
-  "p99": 15.2,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
- },
- "tokyo_night": {
-  "mean": 0.5,
-  "p99": 4.4,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
- },
- "portra_400": {
-  "mean": 4.7,
-  "p99": 20.5,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
- },
- "bright_airy": {
-  "mean": 2.9,
-  "p99": 13.0,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
- },
- "moody_portrait": {
-  "mean": 2.3,
-  "p99": 16.7,
-  "hue_jump_pct": 0.16,
-  "worst_hue_jump_pct": 1.94
- },
- "tri_x": {
-  "mean": 0.7,
-  "p99": 3.3,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
- },
- "golden_backlit": {
-  "mean": 2.3,
-  "p99": 12.7,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
+  "mean": 3.9,
+  "p99": 23.4,
+  "hue_jump_pct": 0.09,
+  "worst_hue_jump_pct": 0.52
  },
  "bright_food": {
-  "mean": 7.0,
-  "p99": 47.9,
-  "hue_jump_pct": 2.49,
-  "worst_hue_jump_pct": 14.39
- },
- "moody_food": {
-  "mean": 2.1,
-  "p99": 16.6,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.01
- },
- "ektar_100": {
-  "mean": 2.3,
-  "p99": 16.3,
-  "hue_jump_pct": 0.0,
-  "worst_hue_jump_pct": 0.0
- },
- "autumn": {
-  "mean": 4.8,
-  "p99": 20.8,
-  "hue_jump_pct": 0.09,
-  "worst_hue_jump_pct": 0.43
- },
- "winter": {
-  "mean": 2.9,
-  "p99": 11.5,
+  "mean": 13.6,
+  "p99": 56.5,
   "hue_jump_pct": 0.0,
   "worst_hue_jump_pct": 0.0
  }
