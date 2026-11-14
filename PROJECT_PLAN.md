@@ -24,6 +24,10 @@ Rationale and literature review:
 > "owner look". Amendment A4 records every phase gate outcome from the
 > execution run and the decisions waiting on the owner.
 > Precedence: A4 > A3 > A2 > A1 > earlier text.
+>
+> **Amendment A6** (§17, 2026-11-14) re-plans the product as a professional
+> editor: one slider-based pipeline for edits and looks, expert-edit training
+> data, raw files, local adjustments. Phases 19 to 26. Precedence: A6 > A5 > A4.
 
 ---
 
@@ -45,7 +49,7 @@ Rationale and literature review:
 14. [Non-goals](#14-non-goals)
 15. [Open questions for the project owner](#15-open-questions-for-the-project-owner)
 16. [Backlog and housekeeping](#16-backlog-and-housekeeping)
-17. [Amendments](#17-amendments) — **A1:** style-data policy, capture emulation · **A2:** landscapes first · **A3:** owner's own photos · **A4:** execution results, course corrections, owner decisions
+17. [Amendments](#17-amendments) — **A1:** style-data policy, capture emulation · **A2:** landscapes first · **A3:** owner's own photos · **A4:** execution results, course corrections, owner decisions · **A5:** new-style pipeline, shared base, Studio v2, twenty looks · **A6:** professional editor (Phases 19–26)
 
 ---
 
@@ -1813,3 +1817,368 @@ The owner found the tutorial Fujifilm bland.
   - The panel links the tutorials. The tutorial authors' own before/after photos stay on their
     pages; they are linked, never copied.
   - Cyberpunk has an example too (`--extra cyberpunk`).
+
+### A6 — Professional editor: slider-space looks, expert data, raw workflow
+
+*Adopted 2026-11-14 on the owner's instruction: "i want to be able to make
+professional edits with this app" and "i want the best possible result".
+Status: plan approved in outline; each phase starts only on the owner's
+explicit confirmation. Precedence: A6 > A5 > A4 > … .*
+
+#### A6.1 Motivation
+
+An audit of the hosted editor (2026-11-14) found that the controls do not do
+what their labels say, and that the looks cannot adapt to a photo. The
+measurements below use each look's mean parameters from the published weights
+(`studio/web/pages/models/styles.json`), not individual photos.
+
+| Control | Defect | Measurement |
+|---|---|---|
+| Curves | A point is blocked by its two neighbours; no combined RGB curve; straight segments | 9 fixed points, travel ≤ 32/255 |
+| Curves with Strength | Editing a curve freezes the look's curve; Strength then changes colour only | from code |
+| Strength | Scales internal parameters, not the picture | 50 % differs from the halfway image by up to 16/255 |
+| Warmth | Adds an offset where white balance should scale channels | ±13/255; black gains 13 in red |
+| Tint | Tooltip says right is green; the picture moves to magenta | grey changes by (+8, −8, +8) |
+| Saturation | −100 removes half the colour; on Tri-X, +100 restores colour | chroma 0.016 → 0.194 |
+| Vignette | Darkens only | range 0 to 60 |
+| All edits | A look change erases adjustments and undo history | from code |
+
+Three structural gaps sit beside these defects.
+
+- **No basic tools.** Exposure, contrast, highlights, shadows, whites, blacks,
+  per-colour control, crop, straighten and zoom are absent. Haze, clarity and
+  sky tools run only on the local server.
+- **Limited look model.** A look is $f(c) = M\,g(c) + b$: one monotone curve
+  per channel ($g$), then a 3×3 matrix. Channels interact only linearly, so a
+  look cannot treat one hue differently from another. Moody Forest and Bright
+  Food sit 8.8 and 10.4/255 from their recipes for this reason
+  (`tests/reports/library_fidelity.json`).
+- **No adaptive signal in the data.** Each tutorial look was trained on photos
+  graded by one fixed recipe. The targets carry no information about how an
+  edit should change with the photo.
+
+#### A6.2 Decisions (owner, 2026-11-14)
+
+1. **Licences.** The repository is a personal project. Research-licensed
+   datasets (MIT-Adobe FiveK, PPR10K) may be used for training, and weights
+   trained on them may be published on the public site. This supersedes the
+   open-data-only rule of A1 and A5 for model weights.
+2. **Retained limits.** Dataset photos and tutorial authors' photos are not
+   committed. The owner's photos stay private and uncommitted. Social media is
+   not scraped. Example panels keep openly licensed photos.
+3. **Look model.** Staged hybrid (A6.4): slider settings first, a residual
+   colour table only for looks where measurement shows a visible remaining
+   error, decided per look by the owner.
+4. **Process.** Each phase ends with a test report and a visual comparison.
+   The next phase starts on the owner's confirmation.
+
+#### A6.3 Image pipeline
+
+One pipeline serves the editor, the looks and training. The reference
+implementation is differentiable PyTorch (`photostyle/pipeline.py`); the
+WebGL2 implementation is tested against it.
+
+**Working space.** Linear-light Rec. 2020 primaries, D65 white, 16-bit float
+per channel. Linear light makes exposure and white balance physically
+correct (they are multiplications of radiance). A wide gamut avoids clipping
+colours that Display P3 phone photos and raw files contain. 16-bit float
+prevents banding when shadows are raised. Lightroom and darktable make the
+same class of choice (linear ProPhoto and linear Rec. 2020 respectively).
+
+**Order of operations.** For a pixel with linear colour $c \in \mathbb{R}^3$
+and slider vector $s$:
+
+1. **White balance.** $c \leftarrow \mathrm{diag}(k_R, k_G, k_B)\,c$, with
+   gains $k$ a function of temperature and tint, normalised so that luminance
+   is unchanged. Black stays black, unlike the current additive offset.
+2. **Exposure.** $c \leftarrow 2^{E} c$ for $E$ in stops.
+3. **Tone.** Contrast, highlights, shadows, whites, blacks and the tone curve
+   act on luminance $Y = w^\top c$ in a perceptual encoding $L = \psi(Y)$:
+   $L' = t(L; s)$, then $c \leftarrow c\,\psi^{-1}(L')/Y$. Scaling $c$ by a
+   luminance ratio preserves hue and relative chroma, which removes the hue
+   flips ("green skies") that per-channel curves caused. Per-channel curves
+   remain available as a separate, explicit control.
+4. **Colour.** In Oklab, a perceptual space with near-uniform hue:
+   - saturation and vibrance scale chroma $C$; at −100 chroma is zero;
+   - eight hue bands with partition-of-unity weights $w_k(h)$ shift hue,
+     chroma and lightness (HSL);
+   - colour grading adds a tint weighted by shadow, midtone and highlight
+     luminance masks;
+   - the black-and-white mixer maps to grey with per-band weights.
+5. **Residual colour table** (only for looks that have one): $c \leftarrow
+   R(c)$ in display encoding, with $R$ a 3D lattice near the identity.
+6. **Spatial finishing.** Local contrast, sharpening, noise reduction,
+   vignette, grain, halation.
+7. **Output.** Gamut mapping to sRGB or Display P3, encoding, dithering.
+
+Raw files receive a default rendering before step 1 (camera colour matrix and
+a fixed tone curve), analogous to a camera profile. Its form is chosen in
+Phase 22.
+
+**Composition of edits.** The picture is
+$D\big(x;\; s_\text{auto} + \alpha\, s_\text{look} + s_\text{user}\big)$,
+followed by $R_\alpha = \mathrm{id} + \alpha\,(R - \mathrm{id})$, where
+
+- $s_\text{auto}$ is the per-photo correction predicted by the base model,
+- $s_\text{look}$ is the look's slider vector,
+- $s_\text{user}$ is the owner's adjustment, kept when the look changes,
+- $\alpha$ is Strength. Scaling the look's settings is how a preset amount
+  behaves in Lightroom, and it is linear in the displayed slider values.
+
+The interface shows the summed value of each slider. Local adjustments reuse
+the same pipeline with spatially varying sliders: $s(p) = s + \sum_j m_j(p)\,
+s_j$ for masks $m_j$ and per-mask settings $s_j$.
+
+**Curve editor.** A curve is a monotone cubic interpolant (PCHIP) through a
+small number of freely placed points. PCHIP is used because it cannot
+overshoot between points, so tones never invert.
+
+#### A6.4 Look model
+
+| Kind of look | Representation | Training |
+|---|---|---|
+| Tutorial or preset look | constant $s_\text{look}$ taken from the recipe table or the author's preset file | none |
+| Film look | constant $s_\text{look}$, plus $R$ if needed | least-squares fit of $(s, R)$ to a film colour table |
+| Camera look (e.g. Leica) | as film look | fit to raw / embedded-JPEG pairs (feasibility unproven) |
+| Expert style | $s_\text{look} = h(\phi(x))$, adaptive | FiveK experts A–E |
+
+Adaptation to the photo moves from the looks into the **base correction
+model** $s_\text{auto} = h_0(\phi(x))$, where $\phi(x) \in \mathbb{R}^{1280}$
+is the existing frozen descriptor (ResNet-18 features plus per-channel CDFs).
+$h_0$ predicts only the correction sliders (white balance, exposure,
+contrast, highlights, shadows, whites, blacks, vibrance). This follows
+professional practice: normalise the photo, then apply the preset.
+
+**Loss.** For pairs $(x, y)$ of input and expert edit,
+$$\mathcal{L} = \mathbb{E}\big[\Delta E\big(D(x; h(\phi(x))),\, y\big)\big]
++ \lambda\,\lVert W s \rVert_1 ,$$
+with $\Delta E$ the Euclidean distance in Oklab. The $\ell_1$ term is
+required because the slider map is not injective: different settings (for
+example exposure against whites against a curve point) give nearly the same
+picture, so the image loss alone leaves $s$ undetermined. The penalty selects
+the sparsest explanation, with weights $W$ favouring the primary sliders.
+$\lambda$ is chosen on the validation split, not fixed in advance.
+
+**Residual table rule.** After the slider-only fit, the remaining error of
+each look is reported. A residual table is proposed for a look when its mean
+held-out error exceeds $\Delta E_{00} = 2$. A difference of 1 is the
+conventional just-noticeable difference; around 2 a difference is visible in
+side-by-side viewing. The owner decides per look.
+
+#### A6.5 Data
+
+| Purpose | Source | Notes |
+|---|---|---|
+| Per-photo correction | MIT-Adobe FiveK: 5,000 raw photos, five expert edits each | research licence; standard train/test split kept for comparison with published work |
+| Portraits | PPR10K: 11,161 raw portraits with expert retouches | non-commercial research licence |
+| Film looks | RawTherapee Film Simulation Collection (colour tables per stock) | its Portra emulation is reported not to match real Portra closely; each stock is checked visually |
+| Camera looks | raw.pixls.us raw files with embedded camera JPEGs | untested; previews may be too small or too compressed |
+| Tutorial looks | authors' preset files where available, else the existing recipe tables | preset files give exact numbers |
+| Robustness | synthetic pairs: open photos with exposure, white balance and contrast disturbed | augmentation for the base model |
+| Owner's taste | the owner's raw files with finished edits, if supplied | private |
+
+Constraints. The cloud container is ephemeral and its disk allowance is
+fixed: the training files of A5 no longer exist in it. Every dataset is
+therefore rebuilt by one idempotent command, raw files are converted to small
+16-bit linear proxies and then deleted, and trained weights are committed as
+soon as they pass review.
+
+Input-domain risk. The FiveK experts worked from Adobe's raw rendering, which
+differs from ours, and phone photos arrive already rendered. The base model
+is trained on both kinds of input (our raw decode, and the same photo with a
+camera-like default rendering) so that it serves both.
+
+#### A6.6 Evaluation
+
+- **Benchmark.** PSNR and $\Delta E_{00}$ on the FiveK test split against
+  expert C, with baselines: identity, the current renderer, and per-image
+  oracles (the best possible slider vector per photo, with and without the
+  residual table). The oracles bound what each model class can reach.
+  Published figures for image-adaptive colour-table methods are cited in the
+  Phase 21 report.
+- **Pipeline accuracy.** A synthetic chart (24 colour patches and grey ramps)
+  checks invariants: neutral stays neutral under exposure, +1 stop doubles
+  linear values, saturation −100 gives zero chroma, Strength 0 is the
+  identity, curves are monotone.
+- **Implementation agreement.** WebGL against PyTorch: at most 1 code value
+  of 255 per channel (the existing golden-test standard) and mean
+  $\Delta E_{00} \le 0.5$, half a just-noticeable difference.
+- **Reference editor.** Slider responses are compared with darktable run
+  headless, if it runs in the container. Lightroom cannot run here, so
+  agreement with Lightroom's slider scale is unverified unless the owner
+  supplies reference renders (A6.10).
+- **Owner's judgement.** A fixed set of about 60 photos across the seven
+  look categories, rated blind in A/B pairs. "Better" is defined by these
+  ratings where they disagree with the metrics.
+- **Performance.** A slider drag redraws within 16.7 ms on desktop (60 Hz)
+  and 33 ms on a phone (30 Hz) at the 1600 px preview. These are targets to
+  be measured, not results.
+
+Every test report is written to `tests/reports/` in markdown and states what
+was tested, why, the inputs and their rationale, and the runtime.
+
+#### A6.7 Phases
+
+Effort uses §7's scale (S, M, L). Phases 19 and 20 are independent and can
+run together. Phases 23 to 25 can be reordered by the owner.
+
+| Phase | Title | Effort | Depends on | Exit criterion |
+|---|---|---|---|---|
+| 19 | Editor foundations | L | – | Every control passes its invariant and agreement tests; edits survive look changes |
+| 20 | Datasets and evaluation | M | – | Data report accepted; benchmark harness reproduces the baselines |
+| 21 | Slider-space models | L | 19, 20 | Base model beats the current renderer on the benchmark and in the owner's ratings; all looks migrated |
+| 22 | Raw input and export | M | 19 | A raw file opens, edits and exports at full resolution with its colour profile |
+| 23 | Local adjustments | L | 19 | Gradient, radial, brush and range masks usable on a phone |
+| 24 | Finishing and optics | L | 19 | Grain, halation and sharpening pass visual review; lens blur go/no-go recorded |
+| 25 | Workflow and phone | M | 19 | Edits persist between visits; tested on the owner's phone |
+| 26 | Verification and release | M | all | Accuracy suite and documentation complete |
+
+#### Phase 19: Editor foundations
+
+1. [pending] Pipeline specification in `docs/pipeline.md`: every operator's
+   formula, range, default and position in the order, with the source of each
+   constant.
+2. [pending] Reference implementation `photostyle/pipeline.py`
+   (differentiable PyTorch, fully type-annotated), reusing the definitions in
+   `photostyle/develop.py` where they are kept.
+3. [pending] WebGL2 implementation.
+   - 16-bit float render targets, linear working space, dithered output.
+   - An 8-bit fallback path for devices without float render targets.
+4. [pending] Agreement and invariant tests (A6.6), with a report.
+5. [pending] Edit layer.
+   - $s_\text{user}$ persists across look changes.
+   - Undo history covers look changes.
+6. [pending] Panels.
+   - Basic: temperature, tint, exposure, contrast, highlights, shadows,
+     whites, blacks, vibrance, saturation.
+   - Curves: combined RGB and per-channel, free points, PCHIP.
+   - HSL (eight bands), colour grading (three ranges), black-and-white mixer.
+   - Vignette in both directions with midpoint and feather.
+7. [pending] Viewing tools: zoom and pan, clipping warnings, white-balance
+   eyedropper, pixel readout, crop and straighten.
+8. [pending] Transition: the 22 current looks keep working through the old
+   renderer until Phase 21 replaces them.
+
+Checkpoint: screenshots, the agreement report, and a preview build for the
+owner to try before it is deployed to the public site.
+
+#### Phase 20: Datasets and evaluation
+
+9. [pending] Measure the disk allowance; fix proxy sizes and formats to fit;
+   one idempotent rebuild command with tracked manifests.
+10. [pending] FiveK: raw files and the five expert edits, decoded through our
+    own raw path, with the standard split.
+11. [pending] PPR10K: raw files, expert retouches and subject masks.
+12. [pending] Film colour tables; preset files for the tutorial looks, parsed
+    to slider vectors.
+13. [pending] Camera-look feasibility: raw files with embedded JPEGs for
+    Leica and Fujifilm bodies; go/no-go recorded.
+14. [pending] Evaluation set (about 60 photos) and a blind A/B rating page.
+15. [pending] Benchmark harness with the baselines and oracles of A6.6.
+16. [pending] Reference-editor feasibility (darktable headless).
+
+Checkpoint: a data report with counts, sample sheets, disk use and the
+baseline scores.
+
+#### Phase 21: Slider-space models
+
+17. [pending] Oracle study: the error floor of the slider class against
+    expert C, with and without the residual table; choice of the correction
+    slider subset.
+18. [pending] Base correction model on FiveK expert C and PPR10K, with the
+    synthetic augmentation; benchmark and rating results.
+19. [pending] Tutorial looks migrated to constant slider vectors; examples
+    re-rendered; fidelity to the recipe is exact by construction and is
+    verified.
+20. [pending] Film looks fitted to the colour tables. The current
+    scan-trained Fujifilm is kept until the owner compares the two.
+21. [pending] Residual report per look; the owner decides which looks get a
+    residual table.
+22. [pending] Optional: expert styles A–E; camera looks if task 13 passed.
+23. [pending] Export format version 3 for the site; in-browser inference
+    updated.
+
+Checkpoint: metrics table, side-by-side sheets per look, rating results.
+
+#### Phase 22: Raw input and export
+
+24. [pending] Raw decoding in the browser (a raw decoder compiled to
+    WebAssembly; candidates evaluated for format coverage and size),
+    including DNG and iPhone ProRAW.
+25. [pending] Colour management: input profiles, working space, sRGB and
+    Display P3 output, profile embedded on export.
+26. [pending] Export: full resolution by tiles, JPEG quality, 16-bit PNG and
+    TIFF, resize, output sharpening, metadata kept, settings sidecar.
+27. [pending] Lightroom preset export of the slider part (approximate) and
+    `.cube` export.
+28. [pending] Memory limits on phones: maximum megapixels, tiling.
+
+#### Phase 23: Local adjustments
+
+29. [pending] Mask types: linear gradient, radial, brush, luminance range,
+    colour range.
+30. [pending] Per-mask settings through spatially varying sliders (A6.3).
+31. [pending] Learned masks for sky and subject in the browser, within a
+    download budget agreed with the owner; edge refinement by guided filter
+    (ported from `photostyle/regional.py`).
+32. [pending] Mask interface: overlay, feather, invert, intersect, touch.
+
+#### Phase 24: Finishing and optics
+
+33. [pending] Sharpening with an edge mask; basic luminance and colour noise
+    reduction; local contrast (clarity, texture); dehaze.
+34. [pending] Film texture: luminance-dependent grain scaled to output
+    resolution; halation (a red-weighted glow around highlights).
+35. [pending] Lens blur from an in-browser depth model, the analogue of Leica
+    LUX's aperture mode: feasibility, download size, go/no-go.
+36. [pending] Lens corrections and perspective. Spot removal is out of scope
+    unless the owner asks for it.
+
+#### Phase 25: Workflow and phone
+
+37. [pending] Copy, paste and sync of settings; user presets; snapshots;
+    history list.
+38. [pending] Persistence of photos and edits in the browser; offline use;
+    installable on the home screen.
+39. [pending] Phone interface: touch gestures, saving to the photo library,
+    a test checklist run by the owner on a physical device.
+40. [pending] One-click auto; match to a reference photo.
+
+#### Phase 26: Verification and release
+
+41. [pending] Accuracy suite and performance measurements, with reports.
+42. [pending] Documentation: pipeline mathematics, user guide, looks, data;
+    README index and directory diagram updated.
+43. [pending] Toolchain check against the project standard (`ruff`, `ty`,
+    `detect-secrets`, pre-commit).
+
+#### A6.8 Risks
+
+| Risk | Mitigation |
+|---|---|
+| Container reset loses datasets | One-command rebuild; weights committed after review |
+| Disk allowance too small for the raw files | Per-file download, proxy, delete; expert C first |
+| Float render targets missing on some phones | 8-bit fallback path with dithering |
+| Slider fit is ambiguous | $\ell_1$ preference with validated $\lambda$; oracle study first |
+| Our sliders differ from Lightroom's scale | Preset files for exact numbers; owner's reference renders; stated as approximate otherwise |
+| Download size grows (raw decoder, depth and mask models) | Lazy loading; a budget agreed before Phases 22 to 24 |
+| Film tables do not match the real stocks | Visual check per stock; the owner chooses per look |
+| No physical phone in the test environment | Owner-run checklist in Phase 25 |
+
+#### A6.9 Out of scope
+
+Library and catalogue management, spot healing and generative edits, layers
+and compositing, video, and a native app. A browser editor can reach
+professional quality for colour and tone, including raw files; it is not
+expected to match Lightroom or Capture One on these.
+
+#### A6.10 Open questions for the owner
+
+1. Can you supply your own raw files with finished edits, and roughly how
+   many? Fifty pairs would serve as an evaluation set and a measure of taste.
+2. Do you have Lightroom? A small set of reference renders (a chart with each
+   slider at fixed values) would let our sliders be calibrated to its scale.
+3. Which phone and browser should Phase 25 target?
+4. What download size is acceptable on a first visit, beyond the current
+   27 MB?
+5. After Phase 21, which of Phases 22 to 25 comes first?
