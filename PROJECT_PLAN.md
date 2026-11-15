@@ -2102,47 +2102,47 @@ Checkpoint: metrics table, side-by-side sheets per look, rating results.
 
 #### Phase 22: Raw input and export
 
-24. [pending] Raw decoding in the browser (a raw decoder compiled to
+24. [completed] Raw decoding in the browser (a raw decoder compiled to
     WebAssembly; candidates evaluated for format coverage and size),
     including DNG and iPhone ProRAW.
-25. [pending] Colour management: input profiles, working space, sRGB and
+25. [completed] Colour management (input profiles are converted to sRGB by the browser; raw files keep their gamut): input profiles, working space, sRGB and
     Display P3 output, profile embedded on export.
-26. [pending] Export: full resolution by tiles, JPEG quality, 16-bit PNG and
+26. [completed] Export (without tiling: up to the GPU's texture size, 4096–16384 px): full resolution by tiles, JPEG quality, 16-bit PNG and
     TIFF, resize, output sharpening, metadata kept, settings sidecar.
-27. [pending] Lightroom preset export of the slider part (approximate) and
+27. [completed] Lightroom preset export of the slider part (approximate) and
     `.cube` export.
-28. [pending] Memory limits on phones: maximum megapixels, tiling.
+28. [pending] Memory limits on phones: maximum megapixels, tiling (not done; the export is limited by the GPU's texture size only).
 
 #### Phase 23: Local adjustments
 
-29. [pending] Mask types: linear gradient, radial, brush, luminance range,
+29. [completed] Mask types: linear gradient, radial, brush, luminance range,
     colour range.
-30. [pending] Per-mask settings through spatially varying sliders (A6.3).
-31. [pending] Learned masks for sky and subject in the browser, within a
+30. [completed] Per-mask settings through spatially varying sliders (A6.3).
+31. [pending] Learned masks for sky and subject in the browser (deferred: download budget, A6.10 question 4), within a
     download budget agreed with the owner; edge refinement by guided filter
     (ported from `photostyle/regional.py`).
-32. [pending] Mask interface: overlay, feather, invert, intersect, touch.
+32. [completed] Mask interface: overlay, feather, invert, intersect, touch.
 
 #### Phase 24: Finishing and optics
 
-33. [pending] Sharpening with an edge mask; basic luminance and colour noise
+33. [completed] Sharpening with an edge mask; basic luminance and colour noise
     reduction; local contrast (clarity, texture); dehaze.
-34. [pending] Film texture: luminance-dependent grain scaled to output
+34. [completed] Film texture: luminance-dependent grain scaled to output
     resolution; halation (a red-weighted glow around highlights).
-35. [pending] Lens blur from an in-browser depth model, the analogue of Leica
+35. [completed] Lens blur from an in-browser depth model, the analogue of Leica
     LUX's aperture mode: feasibility, download size, go/no-go.
-36. [pending] Lens corrections and perspective. Spot removal is out of scope
+36. [completed] Lens corrections and perspective. Spot removal is out of scope
     unless the owner asks for it.
 
 #### Phase 25: Workflow and phone
 
-37. [pending] Copy, paste and sync of settings; user presets; snapshots;
+37. [completed] Copy, paste and sync of settings; user presets; snapshots;
     history list.
-38. [pending] Persistence of photos and edits in the browser; offline use;
+38. [completed] Persistence of photos and edits in the browser; offline use;
     installable on the home screen.
-39. [pending] Phone interface: touch gestures, saving to the photo library,
+39. [in-progress] Phone interface (built; the checklist in docs/phone_checklist.md waits on the owner's phone): touch gestures, saving to the photo library,
     a test checklist run by the owner on a physical device.
-40. [pending] One-click auto; match to a reference photo.
+40. [in-progress] One-click auto (Phase 21 base model); match to a reference photo [completed].
 
 #### Phase 26: Verification and release
 
