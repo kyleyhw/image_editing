@@ -2068,7 +2068,7 @@ owner to try before it is deployed to the public site.
    one idempotent rebuild command with tracked manifests.
 10. [completed] (from the HuggingFace copy: LibRaw renders, not our raw path; Phase 20 report) FiveK: raw files and the five expert edits, decoded through our
     own raw path, with the standard split.
-11. [pending] (blocked: Google Drive quota; file IDs kept for a retry) PPR10K: raw files, expert retouches and subject masks.
+11. [in-progress] (360p sources and retouches a–c are read in place as proxies by tools/fetch_ppr10k.py; Drive's per-file quota stops each zip after about 1 GB, so it resumes on later attempts; raw files and masks not fetched) PPR10K: raw files, expert retouches and subject masks.
 12. [completed] (film tables; tutorial preset files not found, the recipe tables are used) Film colour tables; preset files for the tutorial looks, parsed
     to slider vectors.
 13. [completed] (no-go: Leica previews too poor; Fujifilm needs the owner's RAF files) Camera-look feasibility: raw files with embedded JPEGs for

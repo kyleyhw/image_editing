@@ -219,6 +219,16 @@ a bit more sharpness", Temperature 6450), not the PPR10K experts a, b and c, and
 It was therefore not downloaded. It may still be useful later: exact modern Lightroom slider
 values paired with renders could calibrate our slider scales (A6.10, question 2).
 
+### Retry (15 November, afternoon)
+
+The quota had lifted. `tools/fetch_ppr10k.py` reads the four 360p zips in place over HTTP range
+requests (sources 12.1 GB, each expert about 4.6 GB, 11,161 files each; together more than the disk
+allowance) and keeps 270 px sRGB PNG proxies. Every file checked carries the standard sRGB
+IEC61966-2.1 profile (sources 16-bit, retouches 8-bit). After about 1 GB per zip (924 sources and
+1,832 expert-a retouches) Drive returned the quota page again; only ranges of about 100 bytes were
+still served. The tool resumes where it stopped, so later attempts continue the download. The
+official split (first 8,875 files train, last 2,286 test; README) is laid out by `--split`.
+
 ## 4. Film colour tables (task 12)
 
 **Source.** `http://rawtherapee.com/shared/HaldCLUT.zip` (the HTTPS address resets in this
