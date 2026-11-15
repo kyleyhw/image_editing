@@ -2064,38 +2064,38 @@ owner to try before it is deployed to the public site.
 
 #### Phase 20: Datasets and evaluation
 
-9. [pending] Measure the disk allowance; fix proxy sizes and formats to fit;
+9. [completed] Measure the disk allowance; fix proxy sizes and formats to fit;
    one idempotent rebuild command with tracked manifests.
-10. [pending] FiveK: raw files and the five expert edits, decoded through our
+10. [completed] (from the HuggingFace copy: LibRaw renders, not our raw path; Phase 20 report) FiveK: raw files and the five expert edits, decoded through our
     own raw path, with the standard split.
-11. [pending] PPR10K: raw files, expert retouches and subject masks.
-12. [pending] Film colour tables; preset files for the tutorial looks, parsed
+11. [pending] (blocked: Google Drive quota; file IDs kept for a retry) PPR10K: raw files, expert retouches and subject masks.
+12. [completed] (film tables; tutorial preset files not found, the recipe tables are used) Film colour tables; preset files for the tutorial looks, parsed
     to slider vectors.
-13. [pending] Camera-look feasibility: raw files with embedded JPEGs for
+13. [completed] (no-go: Leica previews too poor; Fujifilm needs the owner's RAF files) Camera-look feasibility: raw files with embedded JPEGs for
     Leica and Fujifilm bodies; go/no-go recorded.
-14. [pending] Evaluation set (about 60 photos) and a blind A/B rating page.
-15. [pending] Benchmark harness with the baselines and oracles of A6.6.
-16. [pending] Reference-editor feasibility (darktable headless).
+14. [pending] (needs the owner's ratings) Evaluation set (about 60 photos) and a blind A/B rating page.
+15. [completed] Benchmark harness with the baselines and oracles of A6.6.
+16. [completed] (go: darktable-cli 4.6.1 runs headless) Reference-editor feasibility (darktable headless).
 
 Checkpoint: a data report with counts, sample sheets, disk use and the
 baseline scores.
 
 #### Phase 21: Slider-space models
 
-17. [pending] Oracle study: the error floor of the slider class against
+17. [completed] (correction sliders; the colour and curve configurations hit the time limit) Oracle study: the error floor of the slider class against
     expert C, with and without the residual table; choice of the correction
     slider subset.
-18. [pending] Base correction model on FiveK expert C and PPR10K, with the
+18. [completed] (FiveK expert C only; PPR10K blocked) Base correction model on FiveK expert C and PPR10K, with the
     synthetic augmentation; benchmark and rating results.
-19. [pending] Tutorial looks migrated to constant slider vectors; examples
+19. [completed] Tutorial looks migrated to constant slider vectors; examples
     re-rendered; fidelity to the recipe is exact by construction and is
     verified.
-20. [pending] Film looks fitted to the colour tables. The current
+20. [completed] Film looks fitted to the colour tables. The current
     scan-trained Fujifilm is kept until the owner compares the two.
-21. [pending] Residual report per look; the owner decides which looks get a
+21. [completed] (every look below dE00 2: none needed) Residual report per look; the owner decides which looks get a
     residual table.
-22. [pending] Optional: expert styles A–E; camera looks if task 13 passed.
-23. [pending] Export format version 3 for the site; in-browser inference
+22. [pending] (experts A, B, D, E still downloading) Optional: expert styles A–E; camera looks if task 13 passed.
+23. [completed] Export format version 3 for the site; in-browser inference
     updated.
 
 Checkpoint: metrics table, side-by-side sheets per look, rating results.
@@ -2142,7 +2142,7 @@ Checkpoint: metrics table, side-by-side sheets per look, rating results.
     installable on the home screen.
 39. [in-progress] Phone interface (built; the checklist in docs/phone_checklist.md waits on the owner's phone): touch gestures, saving to the photo library,
     a test checklist run by the owner on a physical device.
-40. [in-progress] One-click auto (Phase 21 base model); match to a reference photo [completed].
+40. [completed] One-click auto (Phase 21 base model, the Auto-correct layer); match to a reference photo.
 
 #### Phase 26: Verification and release
 
