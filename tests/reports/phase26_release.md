@@ -101,8 +101,8 @@ options: fix the legacy diagnostics, or limit the hook to the maintained paths. 
 
 ## Not done
 
-- **Owner-dependent items:** the blind A/B ratings (Phase 20 task 14; the page is built), the phone
-  checklist (task 39), and the performance figures on real hardware.
+- **Owner-dependent items:** the phone checklist (task 39) and the performance figures on real
+  hardware. The blind A/B ratings are done ([report](phase20_rating.md)).
 - **PPR10K** (task 11): its host still refuses downloads.
 - **Tiled export and memory limits** (task 28) and **learned masks in the browser** (task 31):
   open, the latter waiting on the download-budget decision (A6.10).

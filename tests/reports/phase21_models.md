@@ -85,6 +85,9 @@ white balance is barely attempted.*
   smaller network did slightly better. The predicted slider medians are about a sixth of the
   oracle's; for example whites −38 against about −76 on the new scale. The model regresses toward
   a mild average edit, which is safe as a default but conservative.
+- **Owner's ratings.** In a blind A/B test on 60 other test photos the owner had no preference
+  between Auto-correct and the unedited photo (21–22, 17 ties; [rating report](phase20_rating.md)):
+  the gain toward expert C is not a gain in the owner's eyes.
 - What limits it is how much of each expert decision the frozen ImageNet descriptor can predict,
   not the slider set. Expected improvements, not tried here:
   - fine-tuning the backbone;

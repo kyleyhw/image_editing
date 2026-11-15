@@ -2073,7 +2073,7 @@ owner to try before it is deployed to the public site.
     to slider vectors.
 13. [completed] (no-go: Leica previews too poor; Fujifilm needs the owner's RAF files) Camera-look feasibility: raw files with embedded JPEGs for
     Leica and Fujifilm bodies; go/no-go recorded.
-14. [in-progress] (set and page built: 60 FiveK test photos in 7 groups, Auto-correct against unedited, `tools/make_rating_set.py`; waits on the owner's ratings) Evaluation set (about 60 photos) and a blind A/B rating page.
+14. [completed] (60 FiveK test photos, 7 groups; Auto-correct 21, unedited 22, ties 17: no preference, p = 1.0; tests/reports/phase20_rating.md) Evaluation set (about 60 photos) and a blind A/B rating page.
 15. [completed] Benchmark harness with the baselines and oracles of A6.6.
 16. [completed] (go: darktable-cli 4.6.1 runs headless) Reference-editor feasibility (darktable headless).
 
