@@ -9,6 +9,7 @@ import { downloadBlob } from "./api.js";
 import { bakeCube, renderPixels } from "./pipeline.js";
 import { encode8, encodePNG16, encodeTIFF16, lightroomXMP } from "./export.js";
 import { decodeRaw, displayCanvas, isRaw, linearRGBA } from "./raw.js";
+import * as store from "./store.js";
 
 const BASE = import.meta.env.BASE_URL;
 ort.env.wasm.numThreads = 1;              // GitHub Pages is not cross-origin isolated
@@ -130,7 +131,7 @@ function head(st, f) {
 
 export const browser = {
   kind: "browser",
-  caps: { scene: false, batch: false, create: false, remember: false },
+  caps: { scene: false, batch: false, create: false, remember: false, persist: true },
   formats: [["jpg", "JPEG"], ["png", "PNG"], ["png16", "PNG 16-bit"], ["tif16", "TIFF 16-bit"], ["cube", ".cube LUT"],
             ["xmp", "Lightroom preset"], ["json", "Settings (JSON)"]],
   accept: "image/*",
@@ -152,9 +153,16 @@ export const browser = {
   },
   styles: async () => styles.map((s) => ({ ...s.card, attribution: s.attribution })),
   photos: async () => [...photos.values()].map(({ id, name }) => ({ id, name })),
-  async upload(files) {
+  /** Photos kept from earlier visits (IndexedDB, this device only). */
+  async restore() {
+    const kept = await store.loadPhotos();
+    if (kept.length) await this.upload(kept.map((r) => new File([r.blob], r.name, { type: r.blob.type })), { ids: kept.map((r) => r.id), keep: false });
+    return kept.length;
+  },
+  async remove(id) { photos.delete(id); await store.deletePhoto(id); },
+  async upload(files, { ids = null, keep = true } = {}) {
     const added = [];
-    for (const file of files) {
+    for (const [k, file] of [...files].entries()) {
       let bitmap, raw = null, lin = null;
       try {
         if (isRaw(file)) {                       // raw: linear Rec. 2020 float preview, full data kept for export
@@ -163,7 +171,9 @@ export const browser = {
           bitmap = displayCanvas(lin);
         } else bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
       } catch (e) { console.warn(`${file.name}: ${e}`); continue; }
-      const id = `p${++seq}`;
+      const id = ids?.[k] ?? `p${++seq}`;
+      const num = Number(String(id).slice(1)); if (Number.isFinite(num)) seq = Math.max(seq, num);
+      if (keep) store.savePhoto(id, file.name, file, Date.now() + k);
       const preview = await toURL(canvasOf(bitmap, ...fit(bitmap.width, bitmap.height, PREVIEW_EDGE)));
       const thumb = await toURL(canvasOf(bitmap, ...fit(bitmap.width, bitmap.height, THUMB_EDGE)), 0.85);
       photos.set(id, { id, name: file.name, bitmap, preview, thumb, featP: null, raw, lin, exif: raw ? null : await readExif(file) });
@@ -188,7 +198,9 @@ export const browser = {
              strength: st.card.default_strength ?? 1, ood_score: ood, version: 1 };
   },
   async export(id, params, eff, opts) {
-    const { fmt = "jpg", quality = 92, edge = 0, space = "srgb", metadata = true } = opts;
+    const { fmt = "jpg", quality = 92, edge = 0, space = "srgb", metadata = true, share = false } = opts;
+    const save = (blob, name) => (share && navigator.canShare?.({ files: [new File([blob], name, { type: blob.type })] })
+      ? navigator.share({ files: [new File([blob], name, { type: blob.type })] }) : saveFile(blob, name));
     const p = photos.get(id), stem = `${p.name.replace(/\.[^.]+$/, "")}${params.style ? "_" + params.style : "_edit"}`;
     if (fmt === "cube") return save(new Blob([bakeCube(eff, 33, `Irodori ${params.style ?? "edit"}`)], { type: "text/plain" }), `${stem}.cube`);
     if (fmt === "json") return save(new Blob([JSON.stringify(params, null, 1)], { type: "application/json" }), `${stem}.json`);
@@ -204,7 +216,7 @@ export const browser = {
   },
 };
 
-function save(blob, name) {
+function saveFile(blob, name) {
   return downloadBlob({ headers: new Headers({ "content-disposition": `attachment; filename="${name}"` }), blob: async () => blob }, name);
 }
 

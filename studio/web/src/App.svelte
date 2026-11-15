@@ -9,7 +9,7 @@
   import CreateStyle from "./dialogs/CreateStyle.svelte";
   import Batch from "./dialogs/Batch.svelte";
   import ExportDialog from "./dialogs/ExportDialog.svelte";
-  import { S, boot, upload, selectPhoto, setStyle, undo, redo, resetAll, exportCurrent, commit } from "./lib/studio.svelte.js";
+  import { S, boot, upload, selectPhoto, setStyle, undo, redo, resetAll, exportCurrent, commit, copySettings, pasteSettings } from "./lib/studio.svelte.js";
   import { loadPrefs, savePrefs } from "./lib/prefs.js";
   import { I } from "./lib/icons.js";
 
@@ -35,6 +35,8 @@
     else if (k.toLowerCase() === "e" && !e.ctrlKey && !e.metaKey) exportCurrent({ fmt: prefs.exportFmt, ...prefs.exportOpts });
     else if (k.toLowerCase() === "y") { const m = ["split", "after", "before"]; S.mode = m[(m.indexOf(S.mode) + 1) % 3]; }
     else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.shiftKey ? redo() : undo(); e.preventDefault(); }
+    else if ((e.ctrlKey || e.metaKey) && e.shiftKey && k.toLowerCase() === "c") { copySettings(); e.preventDefault(); }
+    else if ((e.ctrlKey || e.metaKey) && e.shiftKey && k.toLowerCase() === "v") { pasteSettings(); e.preventDefault(); }
     else if (/^[1-9]$/.test(k) && S.styles[+k - 1]) setStyle(S.styles[+k - 1].name);
     else if (k === "0") S.mode = "before";
     else if (k === "Escape") { sheetOpen = false; if (S.tool) { S.tool = null; commit(); } }

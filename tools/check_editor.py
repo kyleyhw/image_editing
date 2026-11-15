@@ -188,6 +188,20 @@ def main() -> None:
                 res["xmp_has_exposure"] = 'crs:Exposure2012="+0.80"' in xmp and "ToneCurvePV2012" in xmp
                 cube = (args.out / "export.cube").read_text().splitlines()
                 res["cube_rows"] = sum(1 for ln in cube if ln and ln[0].isdigit())
+                # workflow: copy / paste, preset, snapshot, history, persistence across a reload
+                pg.keyboard.press("Control+Shift+C")
+                res["copied"] = S("!!window.__studio.S.clipboard")
+                pg.evaluate("() => window.__studio.setSlider('exposure', 0)")
+                pg.keyboard.press("Control+Shift+V")
+                pg.wait_for_timeout(300)
+                res["paste_restores_exposure"] = S("window.__studio.S.p.exposure") == 0.8
+                res["history_steps"] = S("document.querySelectorAll('.history li').length")
+                res["sw_registered"] = pg.evaluate("async () => !!(await navigator.serviceWorker?.getRegistration())")
+                pg.reload()
+                pg.wait_for_function("window.__studio && window.__studio.S.ready && window.__studio.S.id", timeout=180_000)
+                pg.wait_for_timeout(1500)
+                res["kept_after_reload"] = S("window.__studio.S.p.exposure") == 0.8
+                res["photos_after_reload"] = S("window.__studio.S.photos.length")
                 for k, rf in enumerate(args.raw):
                     t1 = time.time()
                     pg.set_input_files("#upload", str(rf))

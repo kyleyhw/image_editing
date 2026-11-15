@@ -38,18 +38,32 @@ Two ways to run it, one interface:
 | **Looks** (left) | Grouped by the kind of photo they suit (landscapes, cities, portraits, food, seasons). The chevron next to a look opens its example: an openly licensed photo of the subject its tutorial was written for, before/after the look, with links to the tutorials the recipe comes from (the authors' own before/after is on their pages). The same panel is under *Example & sources* in the Adjust panel. Every look is previewed on *your* photo. **Hover** a look to see it full size without committing; click it (or press `1`–`9`) to choose it. `0` / *Original* shows the unedited photo. On a phone the looks are a row under the photo. |
 | **Photos** (top) | Your open photos; **+** adds more (JPEG, PNG, TIFF, HEIC with `pillow-heif` and camera RAW when running locally). `←` `→` step through them. |
 | **Canvas** | Before / Split / After. Drag the divider; hold `\` to see the original. Changing look animates from the old edit to the new one. The room around the photo is lit by it, and the accent colour follows the edit. |
-| **Look card** (right) | Strength 0–150 % (0 % is exactly the original). The chips below say what the edit does (shadows, midtones, highlights, warmth, tint, saturation, vignette), measured through the renderer, so they stay true as you edit. A note appears when a photo is unlike what the look learned from. |
-| **Tone** | Histogram of the edited photo, and R / G / B curves: drag a point. Curves stay monotone, so tones never invert. The dashed line is the model's curve once you have changed it; *Model curve* puts it back. |
-| **Colour**, **Light** | Warmth, tint, saturation and vignette on top of the model's edit. Double-click a slider to reset it. |
+| **Look** (right) | Choose a look, or *None*. Strength 0–150 % scales the look (0 % is exactly the original). Your own presets appear under *My presets*. The chips say what the look does, measured through the renderer. A note appears when a photo is unlike what the look learned from. |
+| **Adjustments** | Your adjustments are separate from the look: they stay when you change look, and every change (look included) can be undone. Each section shows a dot when edited and has its own *Reset*. Type a value into any number box; double-click a slider to reset it; Shift + arrow keys move by ten steps. The mathematics of every control is in [pipeline.md](pipeline.md). |
+| **Basic** | White balance (temperature, tint, and a picker: `W`, then click something that should be neutral grey), exposure in stops, contrast, highlights, shadows, whites, blacks, vibrance, saturation. Tone controls change brightness only, so they never shift colours. *Match to another photo* sets brightness, contrast, white balance and saturation to resemble one of your other photos. |
+| **Curves** | Lightroom-style point curves: RGB, then R, G, B. Click to add a point, drag it, double-click (or drag it off the side) to remove it. |
+| **Masks** | Adjust part of the photo: linear gradient, radial, brush, luminance range or colour range (up to four). Each has its own temperature, tint, exposure, tone, saturation, clarity, texture and dehaze; drag its handles on the photo; `O` shows the masked area. A gradient or radial can be limited to a luminance range. |
+| **Colour mixer**, **Colour grading**, **Black & white**, **Calibration** | Hue, saturation and luminance of eight colours; tints for shadows, mids, highlights and the whole photo with balance and blending; a black-and-white conversion with an eight-colour mix; camera-profile style primaries. |
+| **Detail** | Texture, clarity, dehaze, sharpening (with masking) and luminance and colour noise reduction. Judge sharpening and noise at 100 % (`Z`). |
+| **Crop & straighten** | Aspect presets, a straighten slider (keeps the largest crop that fits), and a crop frame with corner handles (`C`). |
+| **Vignette**, **Effects** | Exposure-like vignette (− darkens, + brightens) with midpoint, feather and roundness; film grain (amount, size, roughness) and halation (the red glow film shows around lights). |
+| **Snapshots & history** | Name a state to come back to; click any step in the history to return to it. *Copy* / *Paste* (`Ctrl/Cmd+Shift+C` / `V`) move settings between photos; *Sync all* applies them to every photo (each keeps its own crop and masks); *Save preset* keeps settings for later. |
+| **Viewing** | Zoom with the wheel or a pinch, `Z` or double-click for 100 % / fit, drag to pan. *Clipping* (`J`) shows clipped highlights in red and shadows in blue. The readout shows the edited pixel's values under the pointer. |
 | **Scene** (local) | Haze (+ add / − remove), near and far clarity, and sky exposure / warmth / saturation. Uses a depth model and a learned sky mask, computed once per photo (about 2 s). Applied to the photo before the look, and carried into exports. |
-| **Export** | JPEG at full resolution; `.cube` (curves + colour, for Resolve, Premiere, Photoshop, OBS…); JSON (the full edit). Locally also XMP (Lightroom / ACR preset carrying the per-channel curves only); in the browser also PNG. |
+| **Export** | JPEG (with quality and the photo's EXIF), PNG, 16-bit PNG and 16-bit TIFF (the full precision of the pipeline), a `.cube` LUT (the colour part of the edit), a Lightroom preset (`.xmp`: sliders, curves, crop; Lightroom's own maths makes it similar, not identical) and the settings as JSON. The settings button next to *Export* sets the long edge, the colour space (sRGB, or Display P3 for wide-colour screens) and, on a phone, *Share* to save to the photo library. |
+| **Raw files** | DNG (including iPhone ProRAW), CR2/CR3, NEF, ARW, RAF and others open in the browser too: they are decoded on your device (LibRaw in WebAssembly) into linear, wide-gamut data, so highlights above white can be recovered. A raw file starts with contrast +20, standing in for the tone curve a camera applies. |
+| **Kept between visits** | In the browser, your photos and edits are kept on this device (IndexedDB) until you remove them (✕ next to a photo). The site works offline once loaded and can be installed to the home screen. |
 | **Remember / Personalise** (local) | *Remember* stores your corrected version as a training example for that look; *Personalise* fine-tunes a copy (`<style>_personal`) on those. The original look is never changed. |
 | **New style** (local) | Three routes. **An idea:** describe the look; Studio searches openly licensed photos, you click the ones whose look you like, it adds more like them, you drop any you don't want, then it trains (see *Creating a new style* below). **Before/after pairs** (best; same file names in both sets; 20+ pairs recommended). **Photos in a look** you already have (20+). Training runs in the background on the CPU. |
 | **Batch** (local) | Apply the current look to the whole library. *Series consistency* pulls every photo's edit toward the set's average: 0 % edits each photo on its own; 100 % applies one shared edit. |
 
-Keyboard shortcuts: `\` original · `Y` cycle compare mode · `[` `]`
-strength ±5 % · `R` reset to model · `Ctrl/Cmd+Z` undo (`+Shift` redo) · `E`
-export · `←` `→` previous/next photo · `1`–`9` looks · `0` original.
+Keyboard shortcuts: `\` original · `Y` cycle compare mode · `[` `]` strength ±5 % ·
+`Shift+R` reset all · `Ctrl/Cmd+Z` undo (`+Shift` redo) · `Ctrl/Cmd+Shift+C` / `V` copy / paste
+settings · `E` export · `W` white-balance picker · `C` crop · `J` clipping · `Z` zoom 100 % / fit ·
+`O` show mask · `←` `→` previous/next photo · `1`–`9` looks · `0` original.
+
+On a phone, follow the [phone checklist](phone_checklist.md) to check the things the automated
+tests cannot.
 
 ### Hosting (GitHub Pages)
 
@@ -139,10 +153,10 @@ out = apply_scene(img_tensor, SceneParams(haze=-0.4, clarity_far=-0.3, clarity_n
 
 - **Global colour and tone** (curves, colour balance, saturation, black
   point): yes. This is where the model is strongest.
-- **Region-aware light**: Studio's Scene panel covers sky light and
-  depth-aware haze and clarity. A graduated filter and
-  shadow/midtone/highlight toning are in the regional renderer
-  (`photostyle.regional`, Python only for now).
+- **Local adjustments**: gradients, radials, brushes and luminance and colour ranges, each with
+  its own exposure, white balance, tone, saturation, clarity and dehaze. Locally, the Scene panel
+  adds a learned sky mask and depth-aware haze; the hosted site has no learned masks yet (they
+  need a model download, which is still to be agreed).
 - **Generative changes** (removing objects, replacing skies, relighting a
   face): no, by design.
 

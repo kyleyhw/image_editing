@@ -1,5 +1,6 @@
 <script>
-  import { S, commit, resetAll, rememberEdit, personalise, pretty, setStyle, resetGroup } from "../lib/studio.svelte.js";
+  import { S, commit, resetAll, rememberEdit, personalise, pretty, setStyle, resetGroup, copySettings, pasteSettings, syncAll, savePreset, applyPreset, deletePreset } from "../lib/studio.svelte.js";
+  import HistoryPanel from "../panels/HistoryPanel.svelte";
   import { describe, effectiveFrom } from "../lib/render.js";
   import { SLIDERS } from "../lib/pipeline.js";
   import Section from "./Section.svelte";
@@ -38,9 +39,13 @@
 
   <section class="grp">
     <div class="grp-head">Look</div>
-    <select class="wide" aria-label="Look" value={S.style || ""} onchange={(e) => setStyle(e.currentTarget.value)}>
+    <select class="wide" aria-label="Look" value={S.style || ""} onchange={(e) => {
+        const v = e.currentTarget.value;
+        if (v.startsWith("preset:")) { applyPreset(S.presets.find((p) => p.name === v.slice(7))); e.currentTarget.value = S.style || ""; }
+        else setStyle(v); }}>
       <option value="">None</option>
       {#each S.styles as s (s.name)}<option value={s.name}>{s.title || pretty(s.name)}</option>{/each}
+      {#if S.presets.length}<optgroup label="My presets">{#each S.presets as pr (pr.name)}<option value={`preset:${pr.name}`}>{pr.name}</option>{/each}</optgroup>{/if}
     </select>
     {#if card?.description}<p class="desc">{card.description}</p>{/if}
     {#if S.style}
@@ -74,8 +79,14 @@
   <Section title="Effects" open={false} edited={edited(G.fx)} onreset={() => resetGroup(G.fx)}><EffectsPanel /></Section>
   <Section title="Calibration" open={false} edited={edited(G.cal)} onreset={() => resetGroup(G.cal)}><CalibrationPanel /></Section>
   {#if S.caps.scene}<Section title="Scene" open={false}><ScenePanel /></Section>{/if}
+  <Section title="Snapshots & history" open={false}><HistoryPanel /></Section>
 
   <footer class="insp-foot">
+    <button class="btn" title="Copy settings (Ctrl+Shift+C)" onclick={copySettings} disabled={!S.id}>Copy</button>
+    <button class="btn" title="Paste settings (Ctrl+Shift+V)" onclick={pasteSettings} disabled={!S.id || !S.clipboard}>Paste</button>
+    {#if S.photos.length > 1}<button class="btn" title="Apply the copied settings to every photo" onclick={syncAll} disabled={!S.clipboard}>Sync all</button>{/if}
+    <button class="btn" onclick={() => { const n = prompt("Preset name"); if (n) savePreset(n.trim()); }} disabled={!S.id}>Save preset</button>
+    {#if S.presets.length}<button class="btn" title="Delete a preset" onclick={() => { const n = prompt(`Delete which preset? (${S.presets.map((p) => p.name).join(", ")})`); if (n) deletePreset(n.trim()); }}>Delete preset</button>{/if}
     <button id="btnReset" class="btn" onclick={resetAll} disabled={!S.id}>Reset all</button>
     {#if S.caps.remember}
       <button id="btnRemember" class="btn" title="Use this edit to personalise the look" onclick={rememberEdit} disabled={!S.params}>Remember</button>

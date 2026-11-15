@@ -1,5 +1,5 @@
 <script>
-  import { S } from "../lib/studio.svelte.js";
+  import { S, matchTo } from "../lib/studio.svelte.js";
   import Sliders from "./Sliders.svelte";
   import { I } from "../lib/icons.js";
   const T = { temp: "linear-gradient(90deg,#3d78d8,#c9c9c9 50%,#e0b53e)", tint: "linear-gradient(90deg,#46b04a,#c9c9c9 50%,#c24fc4)" };
@@ -14,3 +14,12 @@
 <Sliders names={["exposure", "contrast", "highlights", "shadows", "whites", "blacks"]} />
 <div class="sub-head"><span>Presence</span></div>
 <Sliders names={["vibrance", "saturation"]} />
+{#if S.photos.length > 1}
+  <div class="row-between">
+    <span class="hint">Match brightness, contrast, white balance and saturation to</span>
+    <select aria-label="Match to photo" value="" onchange={(e) => { if (e.currentTarget.value) matchTo(e.currentTarget.value); e.currentTarget.value = ""; }}>
+      <option value="">another photo…</option>
+      {#each S.photos.filter((p) => p.id !== S.id) as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+    </select>
+  </div>
+{/if}

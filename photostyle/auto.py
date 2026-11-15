@@ -191,9 +191,10 @@ def load_pairs(root: Path, split: str, expert: str, edge: int, limit: int | None
     (xs, ys, file stems)."""
     from PIL import Image
 
-    src = sorted((root / split / "original").glob("*.*"))
+    IMG = (".png", ".jpg", ".jpeg", ".tif", ".tiff")
+    src = sorted(f for f in (root / split / "original").iterdir() if f.suffix.lower() in IMG)
     tdir = root / split / f"expert_{expert}"
-    pairs = [(f, next(iter(tdir.glob(f.stem + ".*")), None)) for f in src]
+    pairs = [(f, next((g for g in tdir.glob(f.stem + ".*") if g.suffix.lower() in IMG), None)) for f in src]
     pairs = [(a, b) for a, b in pairs if b is not None][:limit]
     H, W = edge * 3 // 4, edge
     xs = torch.zeros(len(pairs), 3, H, W)

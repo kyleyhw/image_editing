@@ -9,6 +9,7 @@ import { api, loadImage, pollJob, json } from "./api.js";
 import { B, initBackend } from "./backend.js";
 import { effectiveFrom, mixEffective } from "./render.js";
 import { draw, makeGL, outputSize, pixelScale, setImage, wbGains, DEFAULTS, SPEC } from "./pipeline.js";
+import * as store from "./store.js";
 
 export const ZERO_SCENE = () => ({ haze: 0, clarity_near: 0, clarity_far: 0, sky_exposure: 0, sky_warmth: 0, sky_saturation: 0 });
 const NO_LOOK = "";
@@ -45,6 +46,9 @@ export const S = $state({
   imgVersion: 0,             // bumps when a new photo is on the GPU
   frame: 0,                  // bumps after every draw (histogram)
   undo: [], redo: [], last: "",
+  presets: [],               // the user's own presets (localStorage)
+  clipboard: null,           // copied settings
+  snapshots: [],             // named states of this photo
 });
 
 export const view = { img: null, sceneImg: null, main: null, thumb: null, thumbCanvas: null, tween: null, shown: null,
@@ -62,6 +66,11 @@ export async function boot() {
   const b = await initBackend((m) => Object.assign(S.model, m));
   Object.assign(S, { backend: b.kind, caps: b.caps, formats: b.formats, accept: b.accept });
   if (b.kind === "browser") S.model.ready = false;
+  S.presets = store.loadPresets(); S.clipboard = store.loadClip();
+  if (b.caps.persist) {
+    for (const [id, e] of await store.loadEdits()) edits.set(id, e);
+    await b.restore?.();
+  }
   await loadStyles(); await loadPhotos();
   S.ready = true;
   if (S.photos.length) await selectPhoto(S.photos[0].id);
@@ -164,7 +173,13 @@ async function restore(s) {
 export function undo() { if (S.undo.length) { S.redo.push(snap()); restore(S.undo.pop()); } }
 export function redo() { if (S.redo.length) { S.undo.push(snap()); restore(S.redo.pop()); } }
 export function resetAll() { S.p = {}; S.strength = S.params?.strength ?? 1; commit(); }
-function remember() { if (S.id) edits.set(S.id, { p: S.p, style: S.style, strength: S.strength }); }
+let saveTimer = 0;
+function remember() {
+  if (!S.id) return;
+  const id = S.id, e = { p: $state.snapshot(S.p), style: S.style, strength: S.strength, snapshots: $state.snapshot(S.snapshots) };
+  edits.set(id, e);
+  if (S.caps.persist) { clearTimeout(saveTimer); saveTimer = setTimeout(() => store.saveEdit(id, e), 400); }
+}
 
 // ------------------------------------------------------------------ data flow
 export async function loadStyles() {
@@ -193,7 +208,7 @@ export async function selectPhoto(id) {
   S.id = id; view.sceneImg = null; view.tween = null; view.shown = null;
   S.scene = ZERO_SCENE(); S.byStyle = {}; S.peek = null; S.zoom = 0; S.pan = [0, 0]; S.tool = null;
   const kept = edits.get(id);
-  S.p = kept?.p ?? {};
+  S.p = kept?.p ?? {}; S.snapshots = kept?.snapshots ?? [];
   if (kept) S.style = kept.style;
   const img = await loadImage(photoURL(id, 1600));
   view.img = img;
@@ -353,4 +368,126 @@ export function endStroke(j) {
   b.painting = false;
   b.data = b.canvas.toDataURL("image/png").split(",")[1];
   updateMask(j, { data: b.data }); commit();
+}
+
+// ------------------------------------------------------------------ workflow (Phase 25)
+const OWN = (p) => { const { crop: _c, masks: _m, ...rest } = p; return rest; };   // settings that transfer between photos
+
+/** Copy the edit (look, strength and global adjustments; not crop or masks, which belong to a photo). */
+export function copySettings() {
+  S.clipboard = { p: $state.snapshot(OWN(S.p)), style: S.style, strength: S.strength };
+  store.saveClip(S.clipboard); S.message = "Settings copied.";
+}
+export async function pasteSettings() {
+  if (!S.clipboard) return;
+  S.p = { ...S.clipboard.p, ...(S.p.crop ? { crop: S.p.crop } : {}), ...(S.p.masks ? { masks: S.p.masks } : {}) };
+  if (S.clipboard.style !== S.style) { S.style = S.clipboard.style; await loadLook(); }
+  S.strength = S.clipboard.strength; commit();
+}
+/** Apply the copied settings to every photo (each keeps its own crop and masks). */
+export function syncAll() {
+  if (!S.clipboard) return;
+  for (const ph of S.photos) {
+    const e = edits.get(ph.id) || { p: {} };
+    const p = { ...S.clipboard.p, ...(e.p?.crop ? { crop: e.p.crop } : {}), ...(e.p?.masks ? { masks: e.p.masks } : {}) };
+    const ne = { ...e, p, style: S.clipboard.style, strength: S.clipboard.strength };
+    edits.set(ph.id, ne); if (S.caps.persist) store.saveEdit(ph.id, ne);
+  }
+  pasteSettings();
+  S.message = `Settings applied to ${S.photos.length} photos.`;
+}
+
+export function savePreset(name) {
+  if (!name) return;
+  const pr = { name, p: $state.snapshot(OWN(S.p)), style: S.style, strength: S.strength };
+  S.presets = [...S.presets.filter((x) => x.name !== name), pr];
+  store.savePresets($state.snapshot(S.presets));
+}
+export async function applyPreset(pr) {
+  S.p = { ...pr.p, ...(S.p.crop ? { crop: S.p.crop } : {}), ...(S.p.masks ? { masks: S.p.masks } : {}) };
+  if (pr.style !== S.style) { S.style = pr.style; await loadLook(); }
+  S.strength = pr.strength; commit();
+}
+export function deletePreset(name) { S.presets = S.presets.filter((x) => x.name !== name); store.savePresets($state.snapshot(S.presets)); }
+
+export function takeSnapshot(name) {
+  S.snapshots = [...S.snapshots, { name: name || `Snapshot ${S.snapshots.length + 1}`, p: $state.snapshot(S.p), style: S.style, strength: S.strength }];
+  remember();
+}
+export async function restoreSnapshot(sn) {
+  S.p = sn.p; if (sn.style !== S.style) { S.style = sn.style; await loadLook(); }
+  S.strength = sn.strength; commit();
+}
+export function deleteSnapshot(i) { S.snapshots = S.snapshots.filter((_, k) => k !== i); remember(); }
+
+/** The history as labelled steps (what changed between consecutive states). */
+export function historySteps() {
+  const states = [...S.undo, S.last].filter(Boolean).map((x) => JSON.parse(x));
+  const label = (a, b) => {
+    if (!a) return "Opened";
+    if (a.style !== b.style) return `Look: ${b.style ? pretty(b.style) : "none"}`;
+    if (a.strength !== b.strength) return `Strength ${Math.round(b.strength * 100)} %`;
+    const keys = new Set([...Object.keys(a.p || {}), ...Object.keys(b.p || {})]);
+    const ch = [...keys].filter((k) => JSON.stringify(a.p?.[k]) !== JSON.stringify(b.p?.[k]));
+    if (!ch.length) return JSON.stringify(a.scene) !== JSON.stringify(b.scene) ? "Scene" : "Edit";
+    const name = (k) => (k === "curves" ? "Curve" : k === "crop" ? "Crop" : k === "masks" ? "Mask" : (SPEC.sliders.find((x) => x.name === k)?.label ?? k));
+    return ch.length > 2 ? `${name(ch[0])} and ${ch.length - 1} more` : ch.map(name).join(", ");
+  };
+  return states.map((st, i) => ({ i, label: label(states[i - 1], st) }));
+}
+/** Go back (or forward) to history step i. */
+export function gotoStep(i) {
+  const n = S.undo.length;
+  if (i < n) for (let k = n; k > i; k--) undo();
+}
+
+/** Remove a photo (and its kept copy). */
+export async function removePhoto(id) {
+  await B.remove?.(id); edits.delete(id); await loadPhotos();
+  if (S.id === id) { if (S.photos.length) await selectPhoto(S.photos[0].id); else { S.id = null; view.img = null; } }
+}
+
+// ------------------------------------------------------------------ match a reference photo
+/** Statistics of an image in Oklab: mean L, std L, mean a, mean b, mean chroma. */
+function stats(px) {
+  const m = SPEC.m, n = px.length / 4;
+  let sL = 0, sL2 = 0, sa = 0, sb = 0, sc = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const rgb = [px[i], px[i + 1], px[i + 2]].map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+    const w = [0, 1, 2].map((r) => m.srgb_to_w[3 * r] * rgb[0] + m.srgb_to_w[3 * r + 1] * rgb[1] + m.srgb_to_w[3 * r + 2] * rgb[2]);
+    const l = [0, 1, 2].map((r) => Math.cbrt(m.w_to_lms[3 * r] * w[0] + m.w_to_lms[3 * r + 1] * w[1] + m.w_to_lms[3 * r + 2] * w[2]));
+    const L = m.lms_to_lab[0] * l[0] + m.lms_to_lab[1] * l[1] + m.lms_to_lab[2] * l[2];
+    const a = m.lms_to_lab[3] * l[0] + m.lms_to_lab[4] * l[1] + m.lms_to_lab[5] * l[2];
+    const b = m.lms_to_lab[6] * l[0] + m.lms_to_lab[7] * l[1] + m.lms_to_lab[8] * l[2];
+    sL += L; sL2 += L * L; sa += a; sb += b; sc += Math.hypot(a, b);
+  }
+  const mL = sL / n;
+  return { L: mL, sd: Math.sqrt(Math.max(0, sL2 / n - mL * mL)), a: sa / n, b: sb / n, C: sc / n };
+}
+function smallPixels(img, p, look) {
+  const w = 96, h = Math.max(1, Math.round((96 * img.naturalHeight) / img.naturalWidth));
+  view.thumbCanvas.width = w; view.thumbCanvas.height = h; setImage(view.thumb, img);
+  draw(view.thumb, { p, look, K: S.params?.knots ?? 9 }, { mode: 2, dither: 0 });
+  const px = new Uint8Array(4 * w * h); view.thumb.gl.readPixels(0, 0, w, h, view.thumb.gl.RGBA, view.thumb.gl.UNSIGNED_BYTE, px);
+  return px;
+}
+/** Match the overall brightness, contrast, white balance and saturation of another photo:
+ * coordinate search on exposure, contrast, temperature, tint and saturation, measured on 96 px
+ * renders through the real pipeline (so the match includes the look and every other setting). */
+export async function matchTo(refId) {
+  const ref = await loadImage(photoURL(refId, 400)), cur = view.img, look = lookOf(S.params, S.strength);
+  const t = stats(smallPixels(ref, edits.get(refId)?.p ?? {}, null));
+  const p = { ...S.p }, err = (q) => { const s = stats(smallPixels(cur, q, look)); return [s.L - t.L, s.sd - t.sd, s.a - t.a, s.b - t.b, s.C - t.C]; };
+  const solve = (k, idx, lo, hi, sign = 1) => {                 // bisection on one slider for one statistic
+    let a = lo, b = hi;
+    for (let it = 0; it < 12; it++) { const m = (a + b) / 2; if (sign * err({ ...p, [k]: m })[idx] > 0) b = m; else a = m; }
+    p[k] = Math.round(((a + b) / 2) * 100) / 100;
+  };
+  for (let pass = 0; pass < 2; pass++) {
+    solve("exposure", 0, -3, 3); solve("contrast", 1, -100, 100); solve("temp", 3, -100, 100); solve("tint", 2, -100, 100);
+    solve("saturation", 4, -100, 100);
+  }
+  for (const k of ["contrast", "temp", "tint", "saturation"]) p[k] = Math.round(p[k]);
+  S.p = p; commit();
+  S.message = "Matched to the reference photo.";
 }

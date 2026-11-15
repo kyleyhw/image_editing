@@ -1,5 +1,5 @@
 <script>
-  import { S, view, photoURL, renderThumb, selectPhoto, setStyle, setPeek, pretty } from "../lib/studio.svelte.js";
+  import { S, view, photoURL, renderThumb, selectPhoto, setStyle, setPeek, pretty, removePhoto } from "../lib/studio.svelte.js";
   import LookExample from "./LookExample.svelte";
   let { onCreate } = $props();
   const GUIDE = "https://github.com/kyleyhw/image_editing/blob/master/docs/user_guide.md#creating-a-new-style-idea--references--style";
@@ -40,6 +40,8 @@
       {#each S.photos as p (p.id)}
         <li><button class="item" class:on={p.id === S.id} onclick={() => selectPhoto(p.id)} title={p.name}>
           <img class="item-thumb" src={photoURL(p.id, 240)} alt="" /><span class="item-name">{p.name}</span>
+          {#if S.caps.persist}<span class="item-x" role="button" tabindex="-1" title="Remove this photo" aria-label={`Remove ${p.name}`}
+            onclick={(e) => { e.stopPropagation(); removePhoto(p.id); }} onkeydown={() => {}}>✕</span>{/if}
         </button></li>
       {/each}
     </ul>

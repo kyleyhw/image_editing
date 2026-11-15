@@ -1,0 +1,16 @@
+{
+  "name": "Irodori",
+  "short_name": "Irodori",
+  "description": "Photo editor with looks from grading tutorials. Runs on your device.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#08080a",
+  "theme_color": "#08080a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "file_handlers": [{ "action": "./", "accept": { "image/*": [".jpg", ".jpeg", ".png", ".dng", ".cr2", ".cr3", ".nef", ".arw", ".raf"] } }]
+}

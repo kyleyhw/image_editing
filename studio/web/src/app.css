@@ -340,3 +340,11 @@ progress { width: 100%; accent-color: var(--accent); }
 .mask-svg .ln { stroke: #fff; stroke-width: 1.5; fill: none; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
 .mask-svg .ln.dash { stroke-dasharray: 5 4; }
 .brush-cursor { position: absolute; border: 1.5px solid #fff; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,.5); }
+input.text { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border-radius: var(--r-s); border: 1px solid var(--line); background: var(--field); color: var(--text); font-size: 12px; }
+.history { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; }
+.history button { width: 100%; text-align: left; border: 0; background: none; color: var(--muted); font-size: 12px; padding: 3px 6px; border-radius: 4px; cursor: pointer; }
+.history button:hover { background: var(--field); color: var(--text); }
+.history button.on { color: var(--text); background: var(--field-hover); }
+.item-x { margin-left: auto; padding: 0 6px; color: var(--faint); font-size: 11px; opacity: 0; }
+.item:hover .item-x { opacity: 1; }
+.insp-foot { flex-wrap: wrap; }

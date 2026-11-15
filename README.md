@@ -178,6 +178,7 @@ is shipped as a documented negative result.
 | Document | Contents |
 |---|---|
 | [`docs/user_guide.md`](docs/user_guide.md) | How to use Studio, the command line and the new-style pipeline. |
+| [`docs/phone_checklist.md`](docs/phone_checklist.md) | Ten-minute checklist for testing the editor on a real phone. |
 | [`docs/pipeline.md`](docs/pipeline.md) | The image pipeline: working space, white balance, hue-preserving tone, Oklab colour, vignette, geometry, with the mathematics. |
 | [`tests/reports/`](tests/reports/) | One report per phase (learning curve, renderers, regional, conditioning, unpaired, atmosphere, sky, Clean Cool, new-style pipeline). |
 | [`CHANGELOG.md`](CHANGELOG.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) | What changed; how to work on the project. |
