@@ -73,6 +73,7 @@ class RangeFile(io.RawIOBase):
                 raise OSError(f"HTTP {r.status_code}")
             except (OSError, requests.RequestException) as e:
                 print(f"  retry {attempt + 1} at {start}: {e}", flush=True)
+                self.s = requests.Session()      # a fresh connection: a kept-alive one can stay on a throttled server
                 time.sleep(min(120, 4 ** attempt))
         raise OSError(f"range {start}+{n} failed")
 
