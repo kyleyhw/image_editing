@@ -83,6 +83,8 @@ def cases() -> list[tuple[str, dict]]:
     out.append(("curves", {"curves": {"rgb": [[0, 0.08], [0.3, 0.25], [0.7, 0.78], [1, 0.95]],
                                       "r": [[0, 0], [0.5, 0.55], [1, 1]], "b": [[0, 0.1], [1, 0.9]]}}))
     out.append(("crop + straighten", {"crop": {"x": 0.1, "y": 0.05, "w": 0.7, "h": 0.8, "angle": 4.0}}))
+    out.append(("crop + perspective + lens", {"crop": {"x": 0.05, "y": 0.05, "w": 0.9, "h": 0.9, "angle": -2.0, "vertical": 40,
+                                                       "horizontal": -20, "distortion": 50, "scale": 110}}))
     for k, v in [("clarity", 80), ("clarity", -80), ("texture", 80), ("dehaze", 60), ("dehaze", -60), ("sharpen", 120),
                  ("nr_luma", 100), ("nr_colour", 100), ("halation", 100), ("grain", 80)]:
         out.append((f"spatial {k} {v:+d}", {k: v}))

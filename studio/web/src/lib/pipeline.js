@@ -113,15 +113,47 @@ function calMatrix(p) {
   return { on, m: m.map((row) => [row[0] * sr, row[1] * sg, row[2] * sb]) };
 }
 
-/** 3x3 geometry matrix (output uv -> source uv), as pipeline.geometry_matrix. */
-export function geometryMatrix(W, H, crop) {
-  const c = { x: 0, y: 0, w: 1, h: 1, angle: 0, ...(crop || {}) }, th = (c.angle * Math.PI) / 180;
-  const mm = (A, B) => A.map((r) => [0, 1, 2].map((j) => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
+const GEO = { x: 0, y: 0, w: 1, h: 1, angle: 0, vertical: 0, horizontal: 0, distortion: 0, scale: 100 };
+const mm3 = (A, B) => A.map((r) => [0, 1, 2].map((j) => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
+/** Output uv -> centred source coordinates in half-long-edge units (pipeline.geometry_affine). */
+export function geometryAffine(W, H, crop) {
+  const c = { ...GEO, ...(crop || {}) }, th = (c.angle * Math.PI) / 180, n = Math.max(W, H) / 2, s = 100 / Math.max(c.scale, 1);
   const toPx = [[c.w * W, 0, c.x * W], [0, c.h * H, c.y * H], [0, 0, 1]];
   const centre = [[1, 0, -W / 2], [0, 1, -H / 2], [0, 0, 1]];
   const rot = [[Math.cos(th), -Math.sin(th), 0], [Math.sin(th), Math.cos(th), 0], [0, 0, 1]];
-  const back = [[1 / W, 0, 0.5], [0, 1 / H, 0.5], [0, 0, 1]];
-  return mm(back, mm(rot, mm(centre, toPx)));
+  return mm3([[s / n, 0, 0], [0, s / n, 0], [0, 0, 1]], mm3(rot, mm3(centre, toPx)));
+}
+function geoTerms(W, H, crop) {
+  const c = { ...GEO, ...(crop || {}) }, G = SPEC.geometry, n = Math.max(W, H) / 2;
+  return { kh: (G.perspective_k * c.horizontal) / 100, kv: (G.perspective_k * c.vertical) / 100, kd: (G.distortion_k * c.distortion) / 100,
+           rmax2: (W * W + H * H) / (4 * n * n), nx: n / W, ny: n / H };
+}
+/** Source uv of output uv: affine, then perspective, then lens correction (pipeline.geometry_map). */
+export function geometryMap(W, H, crop, u, v) {
+  const A = geometryAffine(W, H, crop), t = geoTerms(W, H, crop);
+  let x = A[0][0] * u + A[0][1] * v + A[0][2], y = A[1][0] * u + A[1][1] * v + A[1][2];
+  const w = 1 + t.kh * x + t.kv * y; x /= w; y /= w;
+  const k = 1 - (t.kd * (x * x + y * y)) / t.rmax2;
+  return [0.5 + x * k * t.nx, 0.5 + y * k * t.ny];
+}
+/** Output uv of a source uv (Newton's method on geometryMap; used for on-photo handles). */
+export function geometryInverse(W, H, crop, su, sv) {
+  let u = 0.5, v = 0.5;
+  for (let i = 0; i < 20; i++) {
+    const [a, b] = geometryMap(W, H, crop, u, v), e = 1e-4;
+    const [au, bu] = geometryMap(W, H, crop, u + e, v), [av, bv] = geometryMap(W, H, crop, u, v + e);
+    const J = [[(au - a) / e, (av - a) / e], [(bu - b) / e, (bv - b) / e]], det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+    if (Math.abs(det) < 1e-12) break;
+    const da = su - a, db = sv - b;
+    u += (J[1][1] * da - J[0][1] * db) / det; v += (-J[1][0] * da + J[0][0] * db) / det;
+    if (Math.abs(da) + Math.abs(db) < 1e-7) break;
+  }
+  return [u, v];
+}
+/** The affine part as a map to source uv (exact without perspective or distortion). */
+export function geometryMatrix(W, H, crop) {
+  const n = Math.max(W, H) / 2;
+  return mm3([[n / W, 0, 0.5], [0, n / H, 0.5], [0, 0, 1]], geometryAffine(W, H, crop));
 }
 export const outputSize = (W, H, crop) => [Math.max(1, Math.round((crop?.w ?? 1) * W)), Math.max(1, Math.round((crop?.h ?? 1) * H))];
 
@@ -140,7 +172,7 @@ const FS = `#version 300 es
 precision highp float;
 const float TONE_REC = ${SPEC.tone.recovery};
 uniform sampler2D img; uniform sampler2D orig;
-uniform int mode; uniform float split; uniform mat3 geo; uniform int clipWarn; uniform float dither; uniform int linIn;
+uniform int mode; uniform float split; uniform mat3 geo; uniform vec4 geoP; uniform vec2 geoN; uniform int clipWarn; uniform float dither; uniform int linIn;
 uniform int lookOn; uniform vec4 lk[13]; uniform int K; uniform mat3 lM; uniform vec3 lBias; uniform float lVig;
 uniform mat3 srgbToW, wToSrgb, wToLms, lmsToW, lmsToLab, labToLms, wToOut; uniform vec3 luma, srgbY, outY;
 uniform vec3 wb; uniform float expo; uniform vec4 tone[8];
@@ -228,7 +260,12 @@ float maskAt(int j, vec2 q, float L, float h, float C) {
 float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
 void main() {
-  vec2 suv = stage == 1 ? uv : (geo * vec3(uv, 1.0)).xy;
+  vec2 suv = uv;
+  if (stage != 1) {                                 // crop, straighten, scale, perspective, lens (pipeline.geometry_map)
+    vec3 q = geo * vec3(uv, 1.0); q.xy /= 1.0 + geoP.x * q.x + geoP.y * q.y;
+    q.xy *= 1.0 - geoP.z * dot(q.xy, q.xy) / geoP.w;
+    suv = 0.5 + q.xy * geoN;
+  }
   bool inside = all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)));
   vec3 x = inside ? texture(img, suv).rgb : vec3(0.0);
   if (mode == 1 || (mode == 0 && uv.x < split)) {
@@ -602,7 +639,9 @@ export function draw(R, e, opts = {}) {
   gl.viewport(0, 0, R.canvas.width, R.canvas.height);
   gl.uniform1i(u("mode"), mode); gl.uniform1f(u("split"), split);
   gl.uniform1i(u("clipWarn"), clipWarn); gl.uniform1f(u("dither"), dither); gl.uniform1i(u("linIn"), R.linear ? 1 : 0);
-  gl.uniformMatrix3fv(u("geo"), true, new Float32Array(geometryMatrix(R.src[0], R.src[1], p.crop).flat()));
+  gl.uniformMatrix3fv(u("geo"), true, new Float32Array(geometryAffine(R.src[0], R.src[1], p.crop).flat()));
+  const gt = geoTerms(R.src[0], R.src[1], p.crop);
+  gl.uniform4f(u("geoP"), gt.kh, gt.kv, gt.kd, gt.rmax2); gl.uniform2f(u("geoN"), gt.nx, gt.ny);
   gl.uniform2f(u("frame"), R.canvas.width, R.canvas.height);
 
   const lk = e.look;

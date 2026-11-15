@@ -7,7 +7,10 @@
   import { I } from "../lib/icons.js";
   const ASPECTS = [["free", "Free"], ["orig", "Original"], ["1", "1 : 1"], ["0.8", "4 : 5"], ["1.25", "5 : 4"],
                    ["1.5", "3 : 2"], ["0.6667", "2 : 3"], ["1.7778", "16 : 9"], ["0.5625", "9 : 16"]];
-  const crop = () => ({ x: 0, y: 0, w: 1, h: 1, angle: 0, aspect: "free", ...(S.p.crop || {}) });
+  const crop = () => ({ x: 0, y: 0, w: 1, h: 1, angle: 0, aspect: "free", vertical: 0, horizontal: 0, distortion: 0, scale: 100, ...(S.p.crop || {}) });
+  /** @type {{k: string, label: string, lo: number, hi: number}[]} */
+  const TRANSFORM = [{ k: "vertical", label: "Vertical", lo: -100, hi: 100 }, { k: "horizontal", label: "Horizontal", lo: -100, hi: 100 },
+                     { k: "distortion", label: "Distortion", lo: -100, hi: 100 }, { k: "scale", label: "Scale", lo: 50, hi: 150 }];
   const dims = () => [view.img?.naturalWidth || 1, view.img?.naturalHeight || 1];
 
   /** Fit a rectangle of pixel aspect `r` (w/h), as large as possible inside the straightened frame. */
@@ -38,3 +41,10 @@
 <Slider label="Straighten" min={-45} max={45} step={0.1} value={crop().angle} disabled={!S.id}
         oninput={setAngle} onchange={commit} />
 <p class="hint">Drag the frame or its corners in the photo. Straightening keeps the largest crop that fits.</p>
+<div class="sub-head"><span>Transform</span></div>
+{#each TRANSFORM as t (t.k)}
+  <Slider label={t.label} min={t.lo} max={t.hi} reset={t.k === "scale" ? 100 : 0} value={crop()[t.k]} disabled={!S.id}
+          oninput={(v) => setCrop({ ...crop(), [t.k]: v })} onchange={commit} />
+{/each}
+<p class="hint">Vertical and horizontal correct converging lines (a building shot looking up); distortion corrects barrel
+  (+) or pincushion (−) lens distortion; scale enlarges the picture to hide the edges these leave.</p>

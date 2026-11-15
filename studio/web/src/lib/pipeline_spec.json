@@ -2402,6 +2402,10 @@
    "dehaze"
   ]
  },
+ "geometry": {
+  "perspective_k": 0.5,
+  "distortion_k": 0.2
+ },
  "detail": {
   "sigma_px": 1.0,
   "sigma_mid": 0.004,

@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { S, view, initGL, render, pretty, drawnP, neutralise, setCrop, commit, effective, updateMask, paint, endStroke } from "./lib/studio.svelte.js";
-  import { geometryMatrix, SPEC } from "./lib/pipeline.js";
+  import { geometryMap, geometryInverse, SPEC } from "./lib/pipeline.js";
   import { applyLook } from "./lib/render.js";
 
   let canvas, wrap, divider, zoomer, cropBox = $state(null), rect = $state(null), cursor = $state(null);
@@ -18,14 +18,9 @@
   $effect(() => { S.zoom; S.pan; requestAnimationFrame(place); });
 
   // ---------------------------------------------------------------- source <-> screen (masks live in source coordinates)
-  const geo = () => geometryMatrix(view.img?.naturalWidth || 1, view.img?.naturalHeight || 1, drawnP().crop);
-  function inv3(m) {
-    const [[a, b, c], [d, e, f], [g, h, i]] = m, A = e * i - f * h, Bq = -(d * i - f * g), C = d * h - e * g, det = a * A + b * Bq + c * C;
-    return [[A / det, -(b * i - c * h) / det, (b * f - c * e) / det], [Bq / det, (a * i - c * g) / det, -(a * f - c * d) / det], [C / det, -(a * h - b * g) / det, (a * e - b * d) / det]];
-  }
-  const apply = (M, u, v) => [M[0][0] * u + M[0][1] * v + M[0][2], M[1][0] * u + M[1][1] * v + M[1][2]];
-  const toSrc = (u, v) => apply(geo(), u, v);
-  const toScreen = (su, sv) => { const [u, v] = apply(inv3(geo()), su, sv); return [u * (rect?.width ?? 0), v * (rect?.height ?? 0)]; };
+  const dims = () => [view.img?.naturalWidth || 1, view.img?.naturalHeight || 1];
+  const toSrc = (u, v) => geometryMap(...dims(), drawnP().crop, u, v);
+  const toScreen = (su, sv) => { const [u, v] = geometryInverse(...dims(), drawnP().crop, su, sv); return [u * (rect?.width ?? 0), v * (rect?.height ?? 0)]; };
   const fromScreen = (e) => { const r = canvas.getBoundingClientRect(); return toSrc((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); };
 
   // handles of the selected linear / radial mask
@@ -104,7 +99,7 @@
   /** The colour entering the adjustments at a point: the original, through the look if there is one. */
   function sourceColour(u, v) {
     const img = view.img, c = document.createElement("canvas"), W = img.naturalWidth, H = img.naturalHeight;
-    const A = geometryMatrix(W, H, drawnP().crop), sx = (A[0][0] * u + A[0][1] * v + A[0][2]) * W, sy = (A[1][0] * u + A[1][1] * v + A[1][2]) * H;
+    const [gu, gv] = geometryMap(W, H, drawnP().crop, u, v), sx = gu * W, sy = gv * H;
     c.width = 5; c.height = 5;
     const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(img, sx - 2.5, sy - 2.5, 5, 5, 0, 0, 5, 5);
     const d = x.getImageData(0, 0, 5, 5).data, m = [0, 0, 0];

@@ -743,18 +743,51 @@ def apply_vignette(c: torch.Tensor, p: Params) -> torch.Tensor:
 
 
 # --------------------------------------------------------------------------- 0 geometry
-def geometry_matrix(width: int, height: int, crop: Mapping[str, float] | None) -> NDArray[np.float64]:
-    """3x3 matrix taking output uv (0..1, v down) to source uv. ``crop`` holds x, y, w, h (fractions
-    of the source frame) and angle (degrees, + is clockwise): the source is rotated about its
-    centre, then the rectangle is cut from it."""
-    c = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0, "angle": 0.0, **(crop or {})}
+GEO_DEFAULTS = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0, "angle": 0.0, "vertical": 0.0, "horizontal": 0.0,
+                "distortion": 0.0, "scale": 100.0}
+PERSPECTIVE_K = 0.5       # vertical / horizontal +-100: projective term +-0.5 per half-frame (about +-25 deg of tilt)
+DISTORTION_K = 0.2        # distortion +-100: radial term +-0.2 at the frame corner (strong barrel / pincushion)
+
+
+def geometry_affine(width: int, height: int, crop: Mapping[str, float] | None) -> NDArray[np.float64]:
+    """3x3 matrix taking output uv (0..1, v down) to centred source coordinates q, in units of half
+    the long edge, after the crop rectangle, the straighten rotation (+ clockwise) and the scale."""
+    c = {**GEO_DEFAULTS, **(crop or {})}
     W, H = float(width), float(height)
+    n = max(W, H) / 2
     th = math.radians(c["angle"])
     to_px = np.array([[c["w"] * W, 0, c["x"] * W], [0, c["h"] * H, c["y"] * H], [0, 0, 1]])
     centre = np.array([[1, 0, -W / 2], [0, 1, -H / 2], [0, 0, 1]])
     rot = np.array([[math.cos(th), -math.sin(th), 0], [math.sin(th), math.cos(th), 0], [0, 0, 1]])
-    back = np.array([[1 / W, 0, 0.5], [0, 1 / H, 0.5], [0, 0, 1]])
-    return back @ rot @ centre @ to_px
+    s = 100.0 / max(float(c["scale"]), 1.0)
+    norm = np.array([[s / n, 0, 0], [0, s / n, 0], [0, 0, 1]])
+    return norm @ rot @ centre @ to_px
+
+
+def geometry_map(width: int, height: int, crop: Mapping[str, float] | None, u: torch.Tensor, v: torch.Tensor
+                 ) -> tuple[torch.Tensor, torch.Tensor]:
+    """Source uv of output uv. After the affine part: perspective correction as a homography
+    (x, y) -> (x, y) / (1 + kh x + kv y), then radial lens correction q (1 - kd r^2) with r = 1 at the
+    frame corner. Positive distortion corrects barrel distortion (edges sample nearer the centre)."""
+    c = {**GEO_DEFAULTS, **(crop or {})}
+    A = torch.as_tensor(geometry_affine(width, height, c), dtype=u.dtype)
+    x = A[0, 0] * u + A[0, 1] * v + A[0, 2]
+    y = A[1, 0] * u + A[1, 1] * v + A[1, 2]
+    kh, kv = PERSPECTIVE_K * c["horizontal"] / 100, PERSPECTIVE_K * c["vertical"] / 100
+    w = 1 + kh * x + kv * y
+    x, y = x / w, y / w
+    n = max(width, height) / 2
+    rmax2 = (width * width + height * height) / (4 * n * n)
+    k = 1 - DISTORTION_K * c["distortion"] / 100 * (x * x + y * y) / rmax2
+    x, y = x * k, y * k
+    return 0.5 + x * n / width, 0.5 + y * n / height
+
+
+def geometry_matrix(width: int, height: int, crop: Mapping[str, float] | None) -> NDArray[np.float64]:
+    """The affine part as a map to source uv (exact when there is no perspective or distortion)."""
+    n = max(width, height) / 2
+    back = np.array([[n / width, 0, 0.5], [0, n / height, 0.5], [0, 0, 1]])
+    return back @ geometry_affine(width, height, crop)
 
 
 def output_size(width: int, height: int, crop: Mapping[str, float] | None) -> tuple[int, int]:
@@ -763,15 +796,15 @@ def output_size(width: int, height: int, crop: Mapping[str, float] | None) -> tu
 
 
 def apply_geometry(x: torch.Tensor, crop: Mapping[str, float] | None) -> torch.Tensor:
-    """Crop and straighten (B, 3, H, W) by bilinear resampling; corners outside the source are black."""
-    if not crop or all(crop.get(k, d) == d for k, d in (("x", 0), ("y", 0), ("w", 1), ("h", 1), ("angle", 0))):
+    """Crop, straighten, scale, perspective and lens correction of (B, C, H, W) by bilinear
+    resampling; points outside the source are black."""
+    if not crop or all(float(crop.get(k, d)) == d for k, d in GEO_DEFAULTS.items()):
         return x
     B, _, H, W = x.shape
     ow, oh = output_size(W, H, crop)
-    A = torch.as_tensor(geometry_matrix(W, H, crop), dtype=x.dtype)
-    v, u = torch.meshgrid((torch.arange(oh) + 0.5) / oh, (torch.arange(ow) + 0.5) / ow, indexing="ij")
-    src = torch.einsum("ij,jhw->ihw", A, torch.stack([u, v, torch.ones_like(u)]))
-    grid = torch.stack([src[0] * 2 - 1, src[1] * 2 - 1], -1).unsqueeze(0).expand(B, -1, -1, -1).to(x)
+    v, u = torch.meshgrid((torch.arange(oh, dtype=torch.float64) + 0.5) / oh, (torch.arange(ow, dtype=torch.float64) + 0.5) / ow, indexing="ij")
+    su, sv = geometry_map(W, H, crop, u, v)
+    grid = torch.stack([su * 2 - 1, sv * 2 - 1], -1).unsqueeze(0).expand(B, -1, -1, -1).to(x)
     return torch.nn.functional.grid_sample(x, grid, mode="bilinear", padding_mode="zeros", align_corners=False)
 
 
@@ -856,6 +889,7 @@ def spec() -> dict:
               "vib_c0": VIB_C0, "hsl_hue_deg": HSL_HUE_DEG, "hsl_lum": HSL_LUM, "chroma_full": CHROMA_FULL,
               "grade_c": GRADE_C, "grade_l": GRADE_L, "bw_mix": BW_MIX, "vig_stops": VIG_STOPS},
         "masks": {"max": MAX_MASKS, "local": LOCAL_SLIDERS},
+        "geometry": {"perspective_k": PERSPECTIVE_K, "distortion_k": DISTORTION_K},
         "detail": {"sigma_px": SIGMA_PX, "sigma_mid": SIGMA_MID, "sigma_big": SIGMA_BIG, "clarity": CLARITY_K,
                    "texture": TEXTURE_K, "sharpen": SHARPEN_K, "sharpen_tau": SHARPEN_TAU, "nr_sigma": NR_SIGMA,
                    "dehaze_w": DEHAZE_W, "dehaze_t0": DEHAZE_T0, "dehaze_veil": DEHAZE_VEIL, "veil_max": VEIL_MAX, "halation_thr": HALATION_THR,
