@@ -1,0 +1,52 @@
+{
+ "rows": [
+  {
+   "size": "preview 1600 x 1067",
+   "group": "per-pixel (tone, curves, colour, grading)",
+   "browser_ms": 1182.4,
+   "reference_cpu_ms": 795.2
+  },
+  {
+   "size": "preview 1600 x 1067",
+   "group": "+ detail (texture, clarity, sharpen, NR)",
+   "browser_ms": 2621.8,
+   "reference_cpu_ms": 1748.2
+  },
+  {
+   "size": "preview 1600 x 1067",
+   "group": "+ dehaze, grain, halation",
+   "browser_ms": 2709.5,
+   "reference_cpu_ms": 1839.3
+  },
+  {
+   "size": "preview 1600 x 1067",
+   "group": "+ two masks",
+   "browser_ms": 2774.3,
+   "reference_cpu_ms": 2087.9
+  },
+  {
+   "size": "export 4000 x 3000 (12 MP)",
+   "group": "per-pixel (tone, curves, colour, grading)",
+   "browser_ms": 7852
+  },
+  {
+   "size": "export 4000 x 3000 (12 MP)",
+   "group": "+ detail (texture, clarity, sharpen, NR)",
+   "browser_ms": 19801.8
+  },
+  {
+   "size": "export 4000 x 3000 (12 MP)",
+   "group": "+ dehaze, grain, halation",
+   "browser_ms": 19355.6
+  },
+  {
+   "size": "export 4000 x 3000 (12 MP)",
+   "group": "+ two masks",
+   "browser_ms": 20621.3
+  }
+ ],
+ "repeats": 5,
+ "renderer": "SwiftShader (CPU emulation of WebGL2)",
+ "threads": 4,
+ "runtime_s": 506.0
+}

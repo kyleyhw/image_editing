@@ -3,7 +3,9 @@
 The browser pipeline (studio/web/src/lib/pipeline.js) is timed in headless Chromium at the editor's
 preview size (1600 px long edge, browser.js PREVIEW_EDGE) and at a 12-megapixel export size, for
 groups of settings that switch on progressively more passes. Each timing is the median of REPEATS
-draws, each followed by gl.finish() so the GPU work is included. The reference renderer
+draws, each followed by a one-pixel readPixels, which blocks until the frame is drawn (gl.finish()
+does not wait in Chromium's GPU process: it gave 0.1-0.4 ms). Each frame is checked to be
+non-black. The reference renderer
 (photostyle/pipeline.py, PyTorch on the CPU) is timed at the preview size for comparison.
 
 The test machine has no GPU: Chromium renders WebGL2 with SwiftShader, a CPU emulation. The
@@ -51,14 +53,18 @@ import * as PL from "data:text/javascript;base64,%s";
 const img = new Image(); img.src = "data:image/png;base64,%s"; await img.decode();
 const c = document.getElementById("c"); c.width = img.width; c.height = img.height;
 const R = PL.makeGL(c); PL.setImage(R, img);
+const px = new Uint8Array(4);
 window.time = (p, n) => {
   const t = [];
   for (let i = 0; i <= n; i++) {
     const t0 = performance.now();
-    PL.draw(R, { p, look: null, brushes: [], depth: null }, { mode: 2, dither: 0 }); R.gl.finish();
+    PL.draw(R, { p, look: null, brushes: [], depth: null }, { mode: 2, dither: 0 });
+    R.gl.readPixels(0, 0, 1, 1, R.gl.RGBA, R.gl.UNSIGNED_BYTE, px);   // blocks until the frame is drawn
     t.push(performance.now() - t0);
   }
-  return t.slice(1);
+  const all = new Uint8Array(4 * c.width * c.height); R.gl.readPixels(0, 0, c.width, c.height, R.gl.RGBA, R.gl.UNSIGNED_BYTE, all);
+  let sum = 0; for (let k = 0; k < all.length; k += 4) sum += all[k];
+  return { t: t.slice(1), mean: sum / (all.length / 4) };
 };
 window.ready = true;
 </script>"""
@@ -86,8 +92,9 @@ def main() -> None:
             page.set_content(PAGE % (base64.b64encode(browser_module().encode()).decode(), base64.b64encode(buf.getvalue()).decode()))
             page.wait_for_function("window.ready === true", timeout=300_000)
             for name, p in cumulative:
-                t = page.evaluate("([p, n]) => window.time(p, n)", [p, REPEATS])
-                rows.append({"size": size_name, "group": name, "browser_ms": round(statistics.median(t), 1)})
+                r = page.evaluate("([p, n]) => window.time(p, n)", [p, REPEATS])
+                assert r["mean"] > 1, "the draw produced a black frame"          # the input is uniform noise, mean about 127
+                rows.append({"size": size_name, "group": name, "browser_ms": round(statistics.median(r["t"]), 1)})
                 print(f"{size_name:28s} {name:42s} {rows[-1]['browser_ms']:8.1f} ms", flush=True)
             page.close()
         b.close()

@@ -94,6 +94,33 @@ white balance is barely attempted.*
 - Published FiveK numbers are not comparable: they use Adobe's renders of the raw files as inputs,
   whereas this copy's originals are LibRaw renders (Phase 20 report).
 
+### Expert styles <a id="expert-styles"></a>
+
+*Added after the FiveK download of experts A, B, D and E finished (task 22).* One model per
+retoucher predicts the ten correction sliders and the 24 colour-mixer sliders (34 outputs). The
+configuration is the shipped Auto-correct one (head width 64, dropout 0.3, weight decay 1e-3,
+12 epochs, λ = 0.003), not re-tuned per expert. Each model sees 3,499 training pairs; the scores are
+on the 1,000 test photos against that expert's own edits.
+
+| Expert | Unedited PSNR | Model PSNR | Unedited ΔE00 | Model ΔE00 |
+|---|---|---|---|---|
+| A | 20.78 dB | 21.99 dB | 9.60 | 8.04 |
+| B | 22.80 dB | 24.70 dB | 8.47 | 6.62 |
+| C | 20.39 dB | 22.43 dB | 9.95 | 7.88 |
+| D | 19.85 dB | 22.06 dB | 11.02 | 8.37 |
+| E | 18.95 dB | 22.87 dB | 12.15 | 8.02 |
+
+**Interpretation.**
+
+- Every model moves the photos toward its expert, by 1.2 dB (A) to 3.9 dB (E). The gain is
+  largest where the expert departs most from the unedited photo (E, D): a strong, consistent style
+  is easier to predict than a subtle one.
+- For expert C, adding the colour mixer gains 0.06 dB over Auto-correct's ten sliders (22.43
+  against 22.37 dB) at the same ΔE00. The experts' edits are mostly tone and white balance; the
+  colour mixer adds expressiveness to the look rather than accuracy.
+- The five models are the editor's **Expert styles** group (`expert_a` … `expert_e`, 0.35 MB of
+  weights each before float16 encoding).
+
 ### Tutorial looks as slider settings
 
 Rendering each recipe through the pipeline differs from the old `develop.py` renders by 2–18/255
@@ -137,7 +164,6 @@ can be edited like any other. Each is credited to the collection in its card.
 
 ## Not done
 
-- **Expert styles A–E.** Their data is still downloading, about 4–6 h at the time of writing.
 - **The colour and curve oracle configurations.** Stopped at the time limit.
 - **Residual colour tables.** Not built: every fitted look is below the threshold, so none is
   needed.
@@ -150,3 +176,4 @@ can be edited like any other. Each is credited to the collection in its card.
 | Shipped training run | 393 s, after caching |
 | Oracle, correction configuration | about 25 min |
 | Range probe | about 15 min |
+| Expert styles, per expert (two in parallel, loading included) | 1,970–2,100 s; C 322 s with cached pairs |

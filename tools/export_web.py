@@ -96,8 +96,8 @@ def export_v3(src: Path, out: Path, auto: list[Path]) -> None:
     from photostyle.recipes import RECIPE_TABLES
 
     d = json.loads(src.read_text())
-    if d.get("version", 1) >= 3:
-        styles = [s for s in d["styles"]]
+    if d.get("version", 1) >= 3:              # film stocks and expert styles are regenerated below
+        styles = [s for s in d["styles"] if s["card"].get("category") not in ("Film stocks", "Expert styles")]
     else:
         styles = d["styles"]
     out_styles = []

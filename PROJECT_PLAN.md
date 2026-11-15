@@ -2073,7 +2073,7 @@ owner to try before it is deployed to the public site.
     to slider vectors.
 13. [completed] (no-go: Leica previews too poor; Fujifilm needs the owner's RAF files) Camera-look feasibility: raw files with embedded JPEGs for
     Leica and Fujifilm bodies; go/no-go recorded.
-14. [pending] (needs the owner's ratings) Evaluation set (about 60 photos) and a blind A/B rating page.
+14. [in-progress] (set and page built: 60 FiveK test photos in 7 groups, Auto-correct against unedited, `tools/make_rating_set.py`; waits on the owner's ratings) Evaluation set (about 60 photos) and a blind A/B rating page.
 15. [completed] Benchmark harness with the baselines and oracles of A6.6.
 16. [completed] (go: darktable-cli 4.6.1 runs headless) Reference-editor feasibility (darktable headless).
 
@@ -2094,7 +2094,7 @@ baseline scores.
     scan-trained Fujifilm is kept until the owner compares the two.
 21. [completed] (every look below dE00 2: none needed) Residual report per look; the owner decides which looks get a
     residual table.
-22. [pending] (experts A, B, D, E still downloading) Optional: expert styles A–E; camera looks if task 13 passed.
+22. [completed] (expert styles A–E shipped; camera looks not built: task 13 was a no-go with public samples) Optional: expert styles A–E; camera looks if task 13 passed.
 23. [completed] Export format version 3 for the site; in-browser inference
     updated.
 
@@ -2146,10 +2146,10 @@ Checkpoint: metrics table, side-by-side sheets per look, rating results.
 
 #### Phase 26: Verification and release
 
-41. [pending] Accuracy suite and performance measurements, with reports.
-42. [pending] Documentation: pipeline mathematics, user guide, looks, data;
+41. [completed] (performance measured under SwiftShader only; real-device figures wait on the phone checklist) Accuracy suite and performance measurements, with reports.
+42. [completed] Documentation: pipeline mathematics, user guide, looks, data;
     README index and directory diagram updated.
-43. [pending] Toolchain check against the project standard (`ruff`, `ty`,
+43. [completed] (A6 code clean; 125 legacy ty diagnostics reported, not fixed) Toolchain check against the project standard (`ruff`, `ty`,
     `detect-secrets`, pre-commit).
 
 #### A6.8 Risks
