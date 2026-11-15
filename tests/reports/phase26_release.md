@@ -93,6 +93,11 @@ options: fix the legacy diagnostics, or limit the hook to the maintained paths. 
 - `styles.json` version 3: 39 looks (Fujifilm head, 21 tutorial slider looks, 12 film stocks,
   5 expert styles) and 6 slider models; 1.7 MB.
 - Deployed to GitHub Pages from `master` (the workflow builds the site and the ONNX backbone).
+  Verified live: `styles.json` version 3 with 39 looks and 6 models, and the 22.4 MB backbone.
+- **CI failure found and fixed.** The first deploy failed at the ONNX export: with no Python pin,
+  the runner's uv chose CPython 3.14, for which onnxruntime 1.23.2 has no wheels. The project now
+  pins 3.11 in `.python-version` (the local interpreter), and the workflow also runs when the pin
+  or `uv.lock` changes.
 
 ## Not done
 
