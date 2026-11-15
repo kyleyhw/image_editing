@@ -28,6 +28,7 @@
     else if (k === "[" || k === "]") { S.strength = Math.max(0, Math.min(1.5, S.strength + (k === "]" ? 0.05 : -0.05))); commit(); }
     else if (k.toLowerCase() === "r" && e.shiftKey && !e.ctrlKey && !e.metaKey) resetAll();
     else if (k.toLowerCase() === "j" && !e.ctrlKey && !e.metaKey) S.clip = S.clip ? 0 : 1;
+    else if (k.toLowerCase() === "o" && !e.ctrlKey && !e.metaKey) S.showMask = !S.showMask;
     else if (k.toLowerCase() === "z" && !e.ctrlKey && !e.metaKey) { if (S.zoom) { S.zoom = 0; S.pan = [0, 0]; } else S.zoom = 1; }
     else if (k.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey) S.tool = S.tool === "wb" ? null : "wb";
     else if (k.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey) { S.tool = S.tool === "crop" ? null : "crop"; if (!S.tool) commit(); }

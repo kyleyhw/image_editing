@@ -328,3 +328,15 @@ progress { width: 100%; accent-color: var(--accent); }
 .form label { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
 .form label.toggle { display: flex; }
 .form input[type=number] { width: 80px; height: 28px; padding: 0 8px; border-radius: var(--r-s); border: 1px solid var(--line); background: var(--field); color: var(--text); }
+.mask-add { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.btn.small { height: 24px; padding: 0 8px; font-size: 11.5px; }
+.mask-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.mask-list li { display: flex; align-items: center; gap: 4px; }
+.mask-chip { flex: 1; text-align: left; height: 26px; padding: 0 8px; border-radius: var(--r-s); border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.mask-chip.on { color: var(--text); border-color: var(--accent); background: var(--field); }
+.toggle.small { font-size: 11.5px; color: var(--muted); }
+.mask-svg { position: absolute; pointer-events: none; overflow: visible; }
+.mask-svg .h { pointer-events: all; cursor: grab; fill: #fff; stroke: rgba(0,0,0,.6); stroke-width: 1.5; }
+.mask-svg .ln { stroke: #fff; stroke-width: 1.5; fill: none; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
+.mask-svg .ln.dash { stroke-dasharray: 5 4; }
+.brush-cursor { position: absolute; border: 1.5px solid #fff; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,.5); }

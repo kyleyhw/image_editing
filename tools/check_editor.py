@@ -121,6 +121,30 @@ def main() -> None:
                 pg.wait_for_timeout(500)
                 res["detail_changes_picture"] = sig() != before
                 pg.screenshot(path=str(args.out / "editor_detail.png"))
+                # masks: linear gradient with local exposure, radial with local contrast, a brush stroke
+                pg.click("summary:has-text('Masks')")
+                pg.click("button:has-text('+ Linear')")
+                pg.wait_for_timeout(200)
+                before = sig()
+                msk = pg.locator(".inspector .stack .slider").filter(has_text="Exposure").last
+                msk.locator(".num").fill("-1.5")
+                msk.locator(".num").press("Enter")
+                pg.wait_for_timeout(400)
+                res["mask_linear_changes_picture"] = sig() != before
+                pg.keyboard.press("o")
+                pg.wait_for_timeout(300)
+                pg.screenshot(path=str(args.out / "editor_mask_linear.png"))
+                pg.keyboard.press("o")
+                pg.click("button:has-text('+ Brush')")
+                vb = pg.locator("#view").bounding_box()
+                pg.mouse.move(vb["x"] + vb["width"] * 0.3, vb["y"] + vb["height"] * 0.7)
+                pg.mouse.down()
+                for k in range(12):
+                    pg.mouse.move(vb["x"] + vb["width"] * (0.3 + 0.03 * k), vb["y"] + vb["height"] * 0.7)
+                pg.mouse.up()
+                pg.wait_for_timeout(300)
+                res["brush_painted"] = S("(window.__studio.S.p.masks[1].data || '').length > 100")
+                res["masks"] = S("window.__studio.S.p.masks.length")
                 # crop
                 w0 = S("document.getElementById('view').width")
                 pg.click("summary:has-text('Crop & straighten')")

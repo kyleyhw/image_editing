@@ -1,20 +1,69 @@
 <script>
   import { onMount } from "svelte";
-  import { S, view, initGL, render, pretty, drawnP, neutralise, setCrop, commit, effective } from "./lib/studio.svelte.js";
-  import { geometryMatrix } from "./lib/pipeline.js";
+  import { S, view, initGL, render, pretty, drawnP, neutralise, setCrop, commit, effective, updateMask, paint, endStroke } from "./lib/studio.svelte.js";
+  import { geometryMatrix, SPEC } from "./lib/pipeline.js";
   import { applyLook } from "./lib/render.js";
 
-  let canvas, wrap, divider, zoomer, cropBox = $state(null);
+  let canvas, wrap, divider, zoomer, cropBox = $state(null), rect = $state(null), cursor = $state(null);
+  const sel = $derived(S.p.masks?.[S.maskSel]);
   onMount(() => initGL(canvas));
 
   // Re-render on any change that affects the picture.
   $effect(() => {
-    S.params; S.strength; S.mode; S.split; S.holdBefore; S.peek; S.clip; S.tool;
+    S.params; S.strength; S.mode; S.split; S.holdBefore; S.peek; S.clip; S.tool; S.showMask; S.maskSel;
     JSON.stringify(S.p);
     render();
     requestAnimationFrame(place);
   });
   $effect(() => { S.zoom; S.pan; requestAnimationFrame(place); });
+
+  // ---------------------------------------------------------------- source <-> screen (masks live in source coordinates)
+  const geo = () => geometryMatrix(view.img?.naturalWidth || 1, view.img?.naturalHeight || 1, drawnP().crop);
+  function inv3(m) {
+    const [[a, b, c], [d, e, f], [g, h, i]] = m, A = e * i - f * h, Bq = -(d * i - f * g), C = d * h - e * g, det = a * A + b * Bq + c * C;
+    return [[A / det, -(b * i - c * h) / det, (b * f - c * e) / det], [Bq / det, (a * i - c * g) / det, -(a * f - c * d) / det], [C / det, -(a * h - b * g) / det, (a * e - b * d) / det]];
+  }
+  const apply = (M, u, v) => [M[0][0] * u + M[0][1] * v + M[0][2], M[1][0] * u + M[1][1] * v + M[1][2]];
+  const toSrc = (u, v) => apply(geo(), u, v);
+  const toScreen = (su, sv) => { const [u, v] = apply(inv3(geo()), su, sv); return [u * (rect?.width ?? 0), v * (rect?.height ?? 0)]; };
+  const fromScreen = (e) => { const r = canvas.getBoundingClientRect(); return toSrc((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); };
+
+  // handles of the selected linear / radial mask
+  const handles = $derived.by(() => {
+    S.frame; rect; const m = sel;
+    if (!m || S.tool !== "mask" || !rect) return null;
+    if (m.type === "linear") {
+      const a = toScreen(m.x0, m.y0), b = toScreen(m.x1, m.y1), d = [b[0] - a[0], b[1] - a[1]], n = Math.hypot(...d) || 1, q = [-d[1] / n * 2000, d[0] / n * 2000];
+      return { kind: "linear", a, b, mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], q };
+    }
+    if (m.type === "radial") {
+      const W = view.img?.naturalWidth || 1, H = view.img?.naturalHeight || 1, an = ((m.angle ?? 0) * Math.PI) / 180;
+      const pt = (u, v) => toScreen(m.cx + (u * Math.cos(an) - v * Math.sin(an)) / W, m.cy + (u * Math.sin(an) + v * Math.cos(an)) / H);
+      const rx = m.rx * W, ry = m.ry * H, f = (m.feather ?? 50) / 100;
+      const ring = (k) => Array.from({ length: 49 }, (_, i) => pt(k * rx * Math.cos((i / 48) * 2 * Math.PI), k * ry * Math.sin((i / 48) * 2 * Math.PI)));
+      return { kind: "radial", c: toScreen(m.cx, m.cy), ex: pt(rx, 0), ey: pt(0, ry), outer: ring(1), inner: ring(1 - f) };
+    }
+    return null;
+  });
+  let hdrag = null;
+  function hDown(e, which) { e.stopPropagation(); hdrag = { which, start: fromScreen(e), m: { ...sel } }; e.currentTarget.setPointerCapture(e.pointerId); }
+  function hMove(e) {
+    if (!hdrag) return;
+    const [u, v] = fromScreen(e), m = hdrag.m, du = u - hdrag.start[0], dv = v - hdrag.start[1];
+    const W = view.img?.naturalWidth || 1, H = view.img?.naturalHeight || 1;
+    if (hdrag.which === "a") updateMask(S.maskSel, { x0: u, y0: v });
+    else if (hdrag.which === "b") updateMask(S.maskSel, { x1: u, y1: v });
+    else if (hdrag.which === "mid") updateMask(S.maskSel, { x0: m.x0 + du, y0: m.y0 + dv, x1: m.x1 + du, y1: m.y1 + dv });
+    else if (hdrag.which === "c") updateMask(S.maskSel, { cx: m.cx + du, cy: m.cy + dv });
+    else {
+      const an = ((m.angle ?? 0) * Math.PI) / 180, px = (u - m.cx) * W, py = (v - m.cy) * H;
+      const lu = px * Math.cos(an) + py * Math.sin(an), lv = -px * Math.sin(an) + py * Math.cos(an);
+      if (hdrag.which === "ex") updateMask(S.maskSel, { rx: Math.max(0.01, Math.abs(lu) / W), ...(e.shiftKey ? {} : { angle: (Math.atan2(py, px) * 180) / Math.PI }) });
+      else updateMask(S.maskSel, { ry: Math.max(0.01, Math.abs(lv) / H) });
+    }
+  }
+  function hUp() { if (hdrag) commit(); hdrag = null; }
+  const pts = (arr) => arr.map((p) => p.join(",")).join(" ");
 
   /** Fit scale: displayed px per image px when the whole photo fits the stage. */
   function fitScale() {
@@ -32,6 +81,7 @@
       divider.style.top = `${Math.max(0, r.top - w.top)}px`;
       divider.style.height = `${Math.min(r.height, w.height)}px`;
     }
+    rect = { left: r.left - w.left, top: r.top - w.top, width: r.width, height: r.height };
     if (S.tool === "crop" && S.p.crop) {
       const c = S.p.crop;
       cropBox = { left: r.left - w.left + c.x * r.width, top: r.top - w.top + c.y * r.height, width: c.w * r.width, height: c.h * r.height };
@@ -79,12 +129,30 @@
     }
     const [u, v] = uvOf(e);
     if (S.tool === "wb") { neutralise(sourceColour(u, v)); S.tool = null; return; }
+    if (S.tool === "pickhue" && sel) { pickHue(u, v); return; }
+    if (S.tool === "mask" && sel?.type === "brush") { painting = true; const [su, sv] = fromScreen(e); paint(S.maskSel, su, sv); canvas.setPointerCapture(e.pointerId); return; }
     start = [e.clientX, e.clientY]; pan0 = S.pan.slice();
     dragging = S.zoom ? "pan" : null;
     canvas.setPointerCapture(e.pointerId);
   }
+  let painting = false;
+  function pickHue(u, v) {
+    // Oklab hue of the colour entering the adjustments here (via the spec's matrices)
+    const rgb = sourceColour(u, v).map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)), m = SPEC.m;
+    const w = [0, 1, 2].map((r) => m.srgb_to_w[3 * r] * rgb[0] + m.srgb_to_w[3 * r + 1] * rgb[1] + m.srgb_to_w[3 * r + 2] * rgb[2]);
+    const lms = [0, 1, 2].map((r) => Math.cbrt(m.w_to_lms[3 * r] * w[0] + m.w_to_lms[3 * r + 1] * w[1] + m.w_to_lms[3 * r + 2] * w[2]));
+    const a = m.lms_to_lab[3] * lms[0] + m.lms_to_lab[4] * lms[1] + m.lms_to_lab[5] * lms[2];
+    const b = m.lms_to_lab[6] * lms[0] + m.lms_to_lab[7] * lms[1] + m.lms_to_lab[8] * lms[2];
+    updateMask(S.maskSel, { range: { ...(sel.range || {}), hue: ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360 } });
+    S.tool = null; commit();
+  }
   function move(e) {
     readout(e);
+    if (S.tool === "mask" && sel?.type === "brush" && rect) {
+      const r = canvas.getBoundingClientRect(), d = (S.brush.size / 100) * Math.max(r.width, r.height) * 2;
+      cursor = { x: e.clientX - r.left + rect.left - d / 2, y: e.clientY - r.top + rect.top - d / 2, d };
+    } else cursor = null;
+    if (painting) { const [su, sv] = fromScreen(e); paint(S.maskSel, su, sv); return; }
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, [e.clientX, e.clientY]);
     if (dragging === "pinch" && pointers.size === 2) {
@@ -92,7 +160,7 @@
       setZoom(Math.max(0.05, Math.min(8, zoom0 * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch0)));
     } else if (dragging === "pan") S.pan = [pan0[0] + e.clientX - start[0], pan0[1] + e.clientY - start[1]];
   }
-  function up(e) { pointers.delete(e.pointerId); if (pointers.size < 2 && dragging === "pinch") dragging = null; if (dragging === "pan") dragging = null; }
+  function up(e) { if (painting) { painting = false; endStroke(S.maskSel); } pointers.delete(e.pointerId); if (pointers.size < 2 && dragging === "pinch") dragging = null; if (dragging === "pan") dragging = null; }
   const currentZoom = () => S.zoom || fitScale() * (window.devicePixelRatio || 1);
   function setZoom(z) { S.zoom = Math.abs(z - fitScale() * (window.devicePixelRatio || 1)) < 1e-3 ? 0 : z; if (!S.zoom) S.pan = [0, 0]; }
   function wheel(e) {
@@ -138,12 +206,32 @@
 <svelte:window onresize={place} />
 
 <div class="stage" class:has-photo={!!S.id}>
-  <div id="canvasWrap" bind:this={wrap} onwheel={wheel} class:picking={S.tool === "wb"} class:zoomed={!!S.zoom}>
+  <div id="canvasWrap" bind:this={wrap} onwheel={wheel} class:picking={S.tool === "wb" || S.tool === "pickhue"} class:zoomed={!!S.zoom}>
     <div class="zoomer" bind:this={zoomer}>
       <canvas id="view" bind:this={canvas} aria-label="Photo preview" class:ready={!!S.id && S.imgVersion > 0}
               onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}
               onpointerleave={() => (S.readout = null)} ondblclick={dbl}></canvas>
     </div>
+    {#if handles && rect}
+      <svg class="mask-svg" style={`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px`}
+           onpointermove={hMove} onpointerup={hUp} role="presentation">
+        {#if handles.kind === "linear"}
+          {#each [handles.a, handles.mid, handles.b] as p, i}
+            <line class="ln" class:dash={i !== 1} x1={p[0] - handles.q[0]} y1={p[1] - handles.q[1]} x2={p[0] + handles.q[0]} y2={p[1] + handles.q[1]} />
+          {/each}
+          <circle class="h" cx={handles.a[0]} cy={handles.a[1]} r="7" role="presentation" onpointerdown={(e) => hDown(e, "a")} />
+          <circle class="h" cx={handles.mid[0]} cy={handles.mid[1]} r="6" role="presentation" onpointerdown={(e) => hDown(e, "mid")} />
+          <circle class="h" cx={handles.b[0]} cy={handles.b[1]} r="7" role="presentation" onpointerdown={(e) => hDown(e, "b")} />
+        {:else}
+          <polyline class="ln" points={pts(handles.outer)} />
+          <polyline class="ln dash" points={pts(handles.inner)} />
+          <circle class="h" cx={handles.c[0]} cy={handles.c[1]} r="7" role="presentation" onpointerdown={(e) => hDown(e, "c")} />
+          <circle class="h" cx={handles.ex[0]} cy={handles.ex[1]} r="6" role="presentation" onpointerdown={(e) => hDown(e, "ex")} />
+          <circle class="h" cx={handles.ey[0]} cy={handles.ey[1]} r="6" role="presentation" onpointerdown={(e) => hDown(e, "ey")} />
+        {/if}
+      </svg>
+    {/if}
+    {#if cursor}<div class="brush-cursor" style={`left:${cursor.x}px;top:${cursor.y}px;width:${cursor.d}px;height:${cursor.d}px`}></div>{/if}
     {#if cropBox}
       <div class="cropbox" style={`left:${cropBox.left}px;top:${cropBox.top}px;width:${cropBox.width}px;height:${cropBox.height}px`}
            role="application" aria-label="Crop frame" onpointerdown={(e) => cropDown(e, "move")} onpointermove={cropMove} onpointerup={cropUp}>
@@ -161,6 +249,7 @@
     </div>
     {#if showing}<div class="peek-tag">{showing}</div>{/if}
     {#if S.tool === "wb"}<div class="peek-tag">Click something that should be neutral grey</div>{/if}
+    {#if S.tool === "pickhue"}<div class="peek-tag">Click the colour this mask should select</div>{/if}
     {#if S.readout}<div class="readout">R {S.readout.rgb[0]} · G {S.readout.rgb[1]} · B {S.readout.rgb[2]}</div>{/if}
     {#if S.id && S.style && !S.params}<div class="thinking"><span></span>Reading the photo…</div>{/if}
     {#if S.sceneBusy}<div class="thinking small"><span></span>Updating scene…</div>{/if}

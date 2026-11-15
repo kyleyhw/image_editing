@@ -86,6 +86,7 @@ def cases() -> list[tuple[str, dict]]:
     for k, v in [("clarity", 80), ("clarity", -80), ("texture", 80), ("dehaze", 60), ("dehaze", -60), ("sharpen", 120),
                  ("nr_luma", 100), ("nr_colour", 100), ("halation", 100), ("grain", 80)]:
         out.append((f"spatial {k} {v:+d}", {k: v}))
+    out += mask_cases()
     rng = np.random.default_rng(SEED + 1)
     for i in range(12):
         p: dict = {}
@@ -103,6 +104,28 @@ def cases() -> list[tuple[str, dict]]:
     return out
 
 
+def brush_png() -> str:
+    """A soft disc, as a painted brush mask would be (base64 PNG, grey)."""
+    yy, xx = np.mgrid[0:96, 0:128]
+    d = np.hypot(xx - 40, yy - 50) / 30
+    a = (np.clip(1.2 - d, 0, 1) * 255).astype(np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(a).save(buf, "PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def mask_cases() -> list[tuple[str, dict]]:
+    lin = {"type": "linear", "x0": 0.5, "y0": 0.0, "x1": 0.5, "y1": 0.6, "sliders": {"exposure": 1.0, "temp": 40}}
+    rad = {"type": "radial", "cx": 0.55, "cy": 0.45, "rx": 0.25, "ry": 0.3, "angle": 20, "feather": 40, "invert": True,
+           "sliders": {"contrast": 60, "saturation": -80, "highlights": -70}}
+    lum = {"type": "all", "range": {"lum": [0.55, 1.0], "feather": 10}, "sliders": {"shadows": 50, "whites": -40}}
+    hue = {"type": "all", "range": {"hue": 140, "hue_width": 35}, "sliders": {"tint": 40, "saturation": 60}}
+    br = {"type": "brush", "data": brush_png(), "sliders": {"exposure": -0.8, "clarity": 50}}
+    return [("mask linear", {"masks": [lin]}), ("mask radial inverted", {"masks": [rad], "highlights": 30}),
+            ("mask luminance range", {"masks": [lum]}), ("mask colour range", {"masks": [hue]}),
+            ("mask brush", {"masks": [br]}), ("masks combined", {"masks": [lin, rad, lum, hue], "contrast": 20})]
+
+
 def browser_module() -> str:
     """pipeline.js with its JSON import inlined, so a plain page can import it."""
     src = (ROOT / "studio/web/src/lib/pipeline.js").read_text()
@@ -113,11 +136,17 @@ def browser_module() -> str:
 PAGE = """<!doctype html><meta charset=utf-8><canvas id=c></canvas><script type=module>
 import * as PL from "data:text/javascript;base64,%s";
 const img = new Image(); img.src = "data:image/png;base64,%s"; await img.decode();
-window.renderCase = (p) => {
+window.renderCase = async (p) => {
   const c = document.getElementById("c"), [w, h] = PL.outputSize(img.width, img.height, p.crop);
   c.width = w; c.height = h;
   const R = window.R && window.R.canvas === c ? window.R : (window.R = PL.makeGL(c));
-  PL.setImage(R, img); PL.draw(R, { p, look: null }, { mode: 2, dither: 0 });
+  const brushes = [];
+  for (const [j, m] of (p.masks || []).entries()) if (m.type === "brush") {
+    const b = new Image(); b.src = "data:image/png;base64," + m.data; await b.decode();
+    const cv = document.createElement("canvas"); cv.width = b.width; cv.height = b.height; cv.getContext("2d").drawImage(b, 0, 0);
+    brushes[j] = { canvas: cv, version: Math.random() };
+  }
+  PL.setImage(R, img); PL.draw(R, { p, look: null, brushes }, { mode: 2, dither: 0 });
   const px = new Uint8Array(w * h * 4); R.gl.readPixels(0, 0, w, h, R.gl.RGBA, R.gl.UNSIGNED_BYTE, px);
   return { w, h, data: Array.from(px) };
 };
@@ -168,7 +197,7 @@ def main() -> None:
                 d = d[2:-2, 2:-2]
                 got, ref8 = got[2:-2, 2:-2], ref8[2:-2, 2:-2]
             de = ciede2000(srgb_to_lab(ref8 / 255), srgb_to_lab(got / 255))
-            spatial = name.startswith("spatial")
+            spatial = name.startswith("spatial") or name == "mask brush"
             # spatial operators blur differently on the GPU (downsampled pyramid) than the reference
             # (one full-resolution Gaussian); their target is on the mean only: mean dE00 <= 0.5
             ok = de.mean() <= 0.5 if spatial else (d.max() <= 1 and de.mean() <= 0.5)

@@ -72,11 +72,11 @@ export function pchipEval(xs, ys, m, t) {
        + (-2 * u ** 3 + 3 * u ** 2) * ys[i + 1] + (u ** 3 - u ** 2) * h * m[i + 1];
 }
 
-export function tonePoints(p) {
+export function tonePoints(p, monotone = true) {
   const T = SPEC.tone, y = T.x.slice();
   for (const [k, row] of Object.entries(T.rows)) { const v = get(p, k) / 100; row.forEach((r, i) => (y[i] += v * r)); }
   y[y.length - 1] -= T.recovery * Math.max(0, -get(p, "highlights") / 100);
-  for (let i = 1; i < y.length; i++) y[i] = Math.max(y[i], y[i - 1] + T.mono_eps);
+  if (monotone) for (let i = 1; i < y.length; i++) y[i] = Math.max(y[i], y[i - 1] + T.mono_eps);
   return y;
 }
 
@@ -138,6 +138,7 @@ void main() { uv = vec2(pos.x * 0.5 + 0.5, 0.5 - pos.y * 0.5); gl_Position = vec
 
 const FS = `#version 300 es
 precision highp float;
+const float TONE_REC = ${SPEC.tone.recovery};
 uniform sampler2D img; uniform sampler2D orig;
 uniform int mode; uniform float split; uniform mat3 geo; uniform int clipWarn; uniform float dither; uniform int linIn;
 uniform int lookOn; uniform vec4 lk[13]; uniform int K; uniform mat3 lM; uniform vec3 lBias; uniform float lVig;
@@ -149,6 +150,9 @@ uniform float sat, vib; uniform vec4 band[8]; uniform vec4 hsl[8]; uniform int b
 uniform vec4 grade[4]; uniform vec2 gradeBal; uniform int colourOn;
 uniform vec4 vig; uniform float vigRound; uniform vec2 frame;
 uniform vec4 kc; uniform vec4 kc2; uniform vec4 kc3;
+uniform int nMasks; uniform vec4 mkA[4]; uniform vec4 mkB[4]; uniform vec4 mkC[4]; uniform vec4 mkR[4]; uniform vec4 mkWB[4];
+uniform vec4 mkT0[4]; uniform vec4 mkT1[4]; uniform vec4 mkS[4]; uniform vec4 mkH; uniform float hiG; uniform int toneLocal; uniform vec2 srcSize; uniform int showMask;
+uniform sampler2D br0; uniform sampler2D br1; uniform sampler2D br2; uniform sampler2D br3;
 uniform int stage; uniform int spatialOn; uniform sampler2D tPx; uniform sampler2D tMid; uniform sampler2D tBig;
 uniform vec4 det; uniform vec4 det2; uniform vec4 haze; uniform vec3 halTint; uniform vec4 grain; uniform float outH;
 in vec2 uv; out vec4 o;
@@ -200,6 +204,27 @@ float vnoise(vec2 q, float cell, uint seed) {
 }
 vec3 toLab(vec3 c) { return lmsToLab * cbrt3(wToLms * c); }
 vec3 fromLab(vec3 l) { vec3 m = labToLms * l; return lmsToW * (m * m * m); }
+float brushAt(int j, vec2 q) {
+  if (j == 0) return texture(br0, q).r; if (j == 1) return texture(br1, q).r; if (j == 2) return texture(br2, q).r; return texture(br3, q).r;
+}
+float sm1(float t) { t = clamp(t, 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+// mask j at source uv q (as pipeline.mask_shape * mask_range, inverted if asked)
+float maskAt(int j, vec2 q, float L, float h, float C) {
+  vec4 a = mkA[j], b = mkB[j], cc = mkC[j], r = mkR[j];
+  float m = 1.0;
+  if (a.x == 1.0) {                                  // linear: full at (x0, y0), none at (x1, y1)
+    vec2 d = (b.zw - b.xy) * srcSize, pq = (q - b.xy) * srcSize;
+    m = 1.0 - sm1(dot(pq, d) / max(dot(d, d), 1e-9));
+  } else if (a.x == 2.0) {                           // radial
+    vec2 pq = (q - b.xy) * srcSize; float ca = cos(cc.x), sa = sin(cc.x);
+    float u = (pq.x * ca + pq.y * sa) / max(b.z * srcSize.x, 1e-6), v = (-pq.x * sa + pq.y * ca) / max(b.w * srcSize.y, 1e-6);
+    float f = max(a.z, 0.01); m = 1.0 - sm1((sqrt(u * u + v * v) - (1.0 - f)) / f);
+  } else if (a.x == 3.0) m = brushAt(int(a.w), q);
+  if (cc.y > 0.5) { float fe = max(r.z, 1e-3); m *= sm1((L - r.x + fe) / fe) * sm1((r.y + fe - L) / fe); }
+  if (cc.z > 0.5) { float d = abs(mod(h - r.w + 3.14159265358979, 6.28318530717959) - 3.14159265358979), wd = cc.w;
+                    m *= (1.0 - sm1((d - wd) / (0.5 * wd))) * sm1(C / 0.03); }
+  return a.y > 0.5 ? 1.0 - m : m;
+}
 float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
 void main() {
@@ -223,25 +248,54 @@ void main() {
   }
   vec3 c = (linIn == 1 && lookOn == 0) ? lin0 : srgbToW * dec3(clamp(x, 0.0, 1.0));
   c *= wb * expo;
+  float mk[4] = float[4](0.0, 0.0, 0.0, 0.0);
+  if (nMasks > 0) {
+    float Lm = enc(dot(luma, c)); vec3 lb = toLab(c); float hm = atan(lb.z, lb.y), Cm = length(lb.yz);
+    for (int j = 0; j < 4; j++) { if (j >= nMasks) break; mk[j] = maskAt(j, suv, Lm, hm, Cm);
+      c *= exp(mk[j] * mkWB[j].rgb) * exp2(mk[j] * mkWB[j].a); }
+  }
   if (stage == 1) { o = vec4(c, enc(dot(luma, c))); return; }
+  vec4 mS = vec4(0.0); for (int j = 0; j < 4; j++) mS += mk[j] * mkS[j];     // local saturation, clarity, texture, dehaze (summed)
 
   float dL = 0.0;
   if (spatialOn == 1) {                             // detail and dehaze from the local means (pipeline.py 3a)
     vec2 fuv = vec2(suv.x, 1.0 - suv.y);             // render targets store the image top at t = 1
     float Lpx = texture(tPx, fuv).r; vec4 mid = texture(tMid, fuv); vec4 big = texture(tBig, fuv);
-    float A = haze.x, amt = haze.y;
+    float A = haze.x, amt = haze.y + mS.w;
     if (amt > 0.0) { float t = 1.0 - haze.z * amt * clamp(big.g / A, 0.0, 1.0); c = (c - A * (1.0 - t)) / max(t, haze.w); }
     else if (amt < 0.0) { float v = -amt * kc3.x; c = c * (1.0 - v) + min(A, kc3.y) * v; }
     if (det2.z > 0.0) { vec3 l = toLab(c), lm = toLab(mid.rgb); c = fromLab(vec3(l.x, mix(l.yz, lm.yz, det2.z))); }
     float L0 = enc(dot(luma, c)), L0c = clamp(L0, 0.0, 1.0);
-    dL = det.x * (L0 - big.r) * 4.0 * L0c * (1.0 - L0c) + det.y * (L0 - mid.a);
+    dL = (det.x + kc3.w * mS.y) * (L0 - big.r) * 4.0 * L0c * (1.0 - L0c) + (det.y + det2.w * mS.z) * (L0 - mid.a);
     float tau = det.w, e = abs(L0 - mid.a), msk = clamp((e - tau + 0.01) / 0.02, 0.0, 1.0);
     dL += det.z * (L0 - Lpx) * msk;
     float nd = (L0 - Lpx) / kc2.w; dL -= det2.x * exp(-nd * nd) * (L0 - Lpx);
   }
 
   // tone: curve on perceptual luminance; colour scaled by the luminance ratio
-  float Y = dot(luma, c), Lp = toneEval(max(enc(Y) + dL, 0.0)), Yp = dec(max(Lp, 0.0));
+  float Y = dot(luma, c), Lt = max(enc(Y) + dL, 0.0), Lp;
+  if (toneLocal == 1) {                             // per-pixel ordinates (pipeline.apply_tone with masks)
+    float ys[8], ms[8];
+    for (int i = 0; i < 8; i++) {
+      float v = tone[i].w;
+      for (int j = 0; j < 4; j++) v += mk[j] * (i < 4 ? mkT0[j][i] : mkT1[j][i - 4]);
+      if (i == 7) {                                 // highlight recovery acts on the summed highlights value
+        float hp = hiG + mk[0] * mkH.x + mk[1] * mkH.y + mk[2] * mkH.z + mk[3] * mkH.w;
+        v += TONE_REC * (max(0.0, -hiG) - max(0.0, -hp));
+      }
+      ys[i] = i == 0 ? v : max(v, ys[i - 1] + ${SPEC.tone.mono_eps});
+    }
+    float d[7];
+    for (int i = 0; i < 7; i++) d[i] = (ys[i + 1] - ys[i]) / (tone[i + 1].x - tone[i].x);
+    ms[0] = d[0]; ms[7] = d[6];
+    for (int i = 1; i < 7; i++) {
+      float h0 = tone[i].x - tone[i - 1].x, h1 = tone[i + 1].x - tone[i].x, w1 = 2.0 * h1 + h0, w2 = h1 + 2.0 * h0;
+      ms[i] = d[i - 1] * d[i] > 0.0 ? (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]) : 0.0;
+    }
+    int k = 0; for (int i = 0; i < 6; i++) { if (Lt > tone[i + 1].x) k = i + 1; }
+    Lp = hermite(vec4(tone[k].x, ys[k], ms[k], 0.0), vec4(tone[k + 1].x, ys[k + 1], ms[k + 1], 0.0), Lt);
+  } else Lp = toneEval(Lt);
+  float Yp = dec(max(Lp, 0.0));
   float kr = Yp / max(Y, kc.x);
   c = kr * c + (Yp - kr * Y);
 
@@ -264,6 +318,7 @@ void main() {
     float vw = 1.0 - clamp(C / kc.z, 0.0, 1.0);
     C *= max(1.0 + sat, 0.0) * max(1.0 + vib * vw * vw, 0.0);
     C *= max(1.0 + ds, 0.0);
+    for (int j = 0; j < 4; j++) { if (j >= nMasks) break; C *= max(1.0 + mk[j] * mkS[j].x, 0.0); }
     h += radians(dh * kc.w) * cw;
     L *= 1.0 + dl * kc2.x * cw;
     if (bwOn == 1) { L *= 1.0 + mix * kc2.y * cw; C = 0.0; }
@@ -304,6 +359,7 @@ void main() {
     float Yn = dec(clamp(Lg + grain.w * grain.x * wmid * n, 0.0, 1.0)), kg = Yn / max(Yg, kc.x);
     outc = enc3(clamp(kg * lin + (Yn - kg * Yg), 0.0, 1.0));
   }
+  if (showMask >= 0) outc = mix(outc, vec3(1.0, 0.2, 0.25), 0.55 * mk[showMask]);
   outc += dither * (rnd(gl_FragCoord.xy) - rnd(gl_FragCoord.yx + 17.0)) / 255.0;
   o = vec4(outc, 1.0);
 }`;
@@ -416,6 +472,56 @@ function hazeLight(R, expo) {
   return Math.max(1e-3, R.q99 * expo);
 }
 
+const MASK_TYPES = { all: 0, linear: 1, radial: 2, brush: 3 };
+const TONE_KEYS = ["contrast", "highlights", "shadows", "whites", "blacks"];
+let blankTex = null;
+/** Mask uniforms (as pipeline.mask_shape / mask_range / local_field) and brush textures. */
+function setMasks(R, masks, brushes, showMask) {
+  const { gl, u } = R, n = masks.length, A = [], Bv = [], C = [], Rr = [], WB = [], T0 = [], T1 = [], Sv = [], H = [0, 0, 0, 0];
+  masks.forEach((m, j) => {
+    const sl = m.sliders || {}, rg = m.range || {}, t = m.type || "all";
+    A.push(MASK_TYPES[t] ?? 0, m.invert ? 1 : 0, (m.feather ?? 50) / 100, j);
+    Bv.push(...(t === "linear" ? [m.x0, m.y0, m.x1, m.y1] : t === "radial" ? [m.cx, m.cy, m.rx, m.ry] : [0, 0, 0, 0]));
+    C.push(((m.angle ?? 0) * Math.PI) / 180, rg.lum ? 1 : 0, rg.hue != null ? 1 : 0, ((rg.hue_width ?? 30) * Math.PI) / 180);
+    Rr.push(rg.lum?.[0] ?? 0, rg.lum?.[1] ?? 1, (rg.feather ?? 10) / 100, ((rg.hue ?? 0) * Math.PI) / 180);
+    const g = (sl.temp || sl.tint) ? wbGains(sl.temp || 0, sl.tint || 0) : [1, 1, 1];
+    WB.push(Math.log(g[0]), Math.log(g[1]), Math.log(g[2]), sl.exposure || 0);
+    const dy = SPEC.tone.x.map(() => 0);
+    for (const k of TONE_KEYS) { const v = (sl[k] || 0) / 100; SPEC.tone.rows[k].forEach((r, i) => (dy[i] += v * r)); }
+    T0.push(...dy.slice(0, 4)); T1.push(...dy.slice(4, 8));
+    Sv.push((K.sat_gain * (sl.saturation || 0)) / 100, (sl.clarity || 0) / 100, (sl.texture || 0) / 100, (sl.dehaze || 0) / 100);
+    H[j] = (sl.highlights || 0) / 100;
+  });
+  const pad = (a) => { const f = new Float32Array(16); f.set(a); return f; };
+  gl.uniform1i(u("nMasks"), n);
+  for (const [name, a] of [["mkA", A], ["mkB", Bv], ["mkC", C], ["mkR", Rr], ["mkWB", WB], ["mkT0", T0], ["mkT1", T1], ["mkS", Sv]]) gl.uniform4fv(u(name), pad(a));
+  gl.uniform4fv(u("mkH"), new Float32Array(H)); gl.uniform1f(u("hiG"), get(R.lastP, "highlights") / 100);
+  gl.uniform1i(u("toneLocal"), masks.some((m) => TONE_KEYS.some((k) => m.sliders?.[k])) ? 1 : 0);
+  gl.uniform2f(u("srcSize"), R.src[0], R.src[1]); gl.uniform1i(u("showMask"), showMask < n ? showMask : -1);
+  if (!blankTex) blankTex = new WeakMap();
+  let blank = blankTex.get(gl);
+  if (!blank) {
+    blank = gl.createTexture(); gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, blank);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255])); blankTex.set(gl, blank);
+  }
+  R.brushTex ??= [null, null, null, null]; R.brushVer ??= [-1, -1, -1, -1];
+  for (let j = 0; j < 4; j++) {
+    const b = masks[j]?.type === "brush" ? brushes[j] : null;
+    gl.activeTexture(gl.TEXTURE8 + j);
+    if (b?.canvas) {
+      if (!R.brushTex[j]) R.brushTex[j] = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, R.brushTex[j]);
+      if (R.brushVer[j] !== b.version) {
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, b.canvas);
+        for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+        R.brushVer[j] = b.version;
+      }
+    } else gl.bindTexture(gl.TEXTURE_2D, blank);
+    gl.uniform1i(u(`br${j}`), 8 + j);
+  }
+}
+
 const SPATIAL_KEYS = ["texture", "clarity", "dehaze", "sharpen", "nr_luma", "nr_colour", "halation"];
 
 export function makeGL(canvas) {
@@ -489,6 +595,7 @@ function upload(R, tex, unit, img) {
 export function draw(R, e, opts = {}) {
   const { gl, u } = R, p = e.p || {};
   gl.useProgram(R.prog);
+  R.lastP = p;
   const { mode = 2, split = 0.5, clipWarn = 0, dither = 1, space = "srgb" } = opts;   // also: pxScale, fb
   gl.uniformMatrix3fv(u("wToOut"), true, new Float32Array(space === "p3" ? SPEC.m.w_to_p3 : SPEC.m.w_to_srgb));
   gl.uniform3fv(u("outY"), new Float32Array(space === "p3" ? SPEC.m.p3_y : SPEC.m.srgb_y));
@@ -510,8 +617,8 @@ export function draw(R, e, opts = {}) {
 
   gl.uniform3fv(u("wb"), new Float32Array(wbGains(get(p, "temp"), get(p, "tint"))));
   gl.uniform1f(u("expo"), 2 ** get(p, "exposure"));
-  const tx = SPEC.tone.x, ty = tonePoints(p), tm = pchipSlopes(tx, ty);
-  gl.uniform4fv(u("tone"), new Float32Array(tx.flatMap((x, i) => [x, ty[i], tm[i], 0])));
+  const tx = SPEC.tone.x, ty = tonePoints(p), tm = pchipSlopes(tx, ty), raw = tonePoints(p, false);
+  gl.uniform4fv(u("tone"), new Float32Array(tx.flatMap((x, i) => [x, ty[i], tm[i], raw[i]])));   // w: before the monotone fix
 
   const cpv = new Float32Array(4 * 4 * CURVE_PTS), cn = [0, 0, 0, 0];
   ["rgb", "r", "g", "b"].forEach((key, c) => {
@@ -539,18 +646,21 @@ export function draw(R, e, opts = {}) {
   gl.uniform2f(u("gradeBal"), get(p, "grade_balance") / 200, 0.5 + get(p, "grade_blending") / 100);
   // the colour stage is skipped when every colour slider is at its default (exact identity, cheaper)
   const colourKeys = SLIDERS.filter((s) => /^(hsl_|grade_|bw|cal_|vibrance|saturation)/.test(s.name));
-  gl.uniform1i(u("colourOn"), colourKeys.some((s) => get(p, s.name) !== s.default) ? 1 : 0);
+  gl.uniform1i(u("colourOn"), colourKeys.some((s) => get(p, s.name) !== s.default) || (p.masks || []).some((m) => m.sliders?.saturation) ? 1 : 0);
   gl.uniform4f(u("vig"), get(p, "vig_amount") / 100, get(p, "vig_midpoint") / 100, get(p, "vig_feather") / 100, 0);
   gl.uniform1f(u("vigRound"), get(p, "vig_roundness") / 100);
   gl.uniform4f(u("kc"), K.eps_y, K.chroma_full, K.vib_c0, K.hsl_hue_deg);
   const D = SPEC.detail;
   gl.uniform4f(u("kc2"), K.hsl_lum, K.bw_mix, K.vig_stops, D.nr_sigma);
-  gl.uniform4f(u("kc3"), D.dehaze_veil, D.veil_max, D.halation_k, 0);
-  const on = SPATIAL_KEYS.some((k) => get(p, k) !== 0);
+  gl.uniform4f(u("kc3"), D.dehaze_veil, D.veil_max, D.halation_k, D.clarity);
+  const masks = (p.masks || []).slice(0, SPEC.masks.max);
+  const ml = (k) => masks.some((m) => m.sliders?.[k]);
+  setMasks(R, masks, e.brushes || [], opts.showMask ?? -1);
+  const on = SPATIAL_KEYS.some((k) => get(p, k) !== 0) || ml("clarity") || ml("texture") || ml("dehaze");
   gl.uniform1i(u("spatialOn"), on ? 1 : 0); gl.uniform1i(u("stage"), 0);
   const g100 = (k) => get(p, k) / 100;
   gl.uniform4f(u("det"), D.clarity * g100("clarity"), D.texture * g100("texture"), D.sharpen * g100("sharpen"), D.sharpen_tau * g100("sharpen_masking"));
-  gl.uniform4f(u("det2"), g100("nr_luma"), g100("halation"), g100("nr_colour"), 0);
+  gl.uniform4f(u("det2"), g100("nr_luma"), g100("halation"), g100("nr_colour"), D.texture);
   gl.uniform3fv(u("halTint"), new Float32Array(D.halation_tint));
   gl.uniform4f(u("haze"), on ? hazeLight(R, 2 ** get(p, "exposure")) : 1, g100("dehaze"), D.dehaze_w, D.dehaze_t0);
   const pxs = opts.pxScale ?? 1;

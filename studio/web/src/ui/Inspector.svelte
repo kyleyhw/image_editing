@@ -14,6 +14,7 @@
   import DetailPanel from "../panels/DetailPanel.svelte";
   import EffectsPanel from "../panels/EffectsPanel.svelte";
   import GeometryPanel from "../panels/GeometryPanel.svelte";
+  import MasksPanel from "../panels/MasksPanel.svelte";
   import ScenePanel from "../panels/ScenePanel.svelte";
   import HistogramPanel from "../panels/HistogramPanel.svelte";
   import LookExample from "./LookExample.svelte";
@@ -63,6 +64,7 @@
   {/if}
   <Section title="Basic" edited={edited(G.basic)} onreset={() => resetGroup(G.basic)}><BasicPanel /></Section>
   <Section title="Curves" edited={!!S.p.curves} onreset={() => resetGroup(["curves"])}><CurvesPanel /></Section>
+  <Section title="Masks" open={false} edited={!!S.p.masks?.length} onreset={() => resetGroup(["masks"])}><MasksPanel /></Section>
   <Section title="Colour mixer" open={false} edited={edited(G.mixer)} onreset={() => resetGroup(G.mixer)}><MixerPanel /></Section>
   <Section title="Colour grading" open={false} edited={edited(G.grading)} onreset={() => resetGroup(G.grading)}><GradingPanel /></Section>
   <Section title="Detail" open={false} edited={edited(G.detail)} onreset={() => resetGroup(G.detail)}><DetailPanel /></Section>

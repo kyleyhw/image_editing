@@ -33,7 +33,10 @@ export const S = $state({
   scene: ZERO_SCENE(),       // scene tools (server-rendered, applied before the grade)
   sceneBusy: false, busy: false,
   mode: "split", split: 0.5, holdBefore: false, ch: "rgb",
-  tool: null,                // null | "crop" | "wb" (eyedropper)
+  tool: null,                // null | "crop" | "wb" (eyedropper) | "mask" (edit the selected mask on the photo)
+  maskSel: -1,               // selected mask (index into S.p.masks)
+  showMask: false,           // tint the selected mask's area (O)
+  brush: { size: 6, hardness: 50, flow: 60, erase: false },   // size in % of the long edge
   clip: 0,                   // clipping warning: 0 off, 1 shadows/highlights
   zoom: 0,                   // 0 = fit, else scale (1 = 100 %)
   pan: [0, 0],
@@ -44,7 +47,8 @@ export const S = $state({
   undo: [], redo: [], last: "",
 });
 
-export const view = { img: null, sceneImg: null, main: null, thumb: null, thumbCanvas: null, tween: null, shown: null };
+export const view = { img: null, sceneImg: null, main: null, thumb: null, thumbCanvas: null, tween: null, shown: null,
+                      brushes: new Map() };   // mask id -> {canvas, version, data} (painted masks, source space)
 const edits = new Map();     // photo id -> {p, style, strength}: each photo keeps its own edit
 
 export function initGL(canvas) {
@@ -65,7 +69,7 @@ export async function boot() {
 
 const lookOf = (params, strength) => (params ? effectiveFrom(params, strength) : null);
 /** Everything the renderer needs for the current edit. */
-export const effective = () => ({ p: S.p, look: lookOf(S.params, S.strength), K: S.params?.knots ?? 9 });
+export const effective = () => ({ p: S.p, look: lookOf(S.params, S.strength), K: S.params?.knots ?? 9, brushes: brushList() });
 export const modeCode = () => (S.holdBefore || S.mode === "before" ? 1 : S.mode === "after" ? 2 : 0);
 export const hasLook = () => !!S.style;
 
@@ -97,8 +101,8 @@ export function render() {
   sizeCanvas();
   const full = B.fullSize?.(S.id), c = view.main.canvas;
   const pxScale = full ? pixelScale(c.width, view.main.src, Math.max(...full), drawnP().crop) : 1;
-  draw(view.main, e, { mode: S.peek === "__original" ? 1 : S.peek ? 2 : modeCode(), split: S.split,
-                       clipWarn: S.clip ? 1 : 0, pxScale });
+  draw(view.main, { ...e, brushes: brushList() }, { mode: S.peek === "__original" ? 1 : S.peek ? 2 : modeCode(), split: S.split,
+                       clipWarn: S.clip ? 1 : 0, pxScale, showMask: S.showMask ? S.maskSel : -1 });
   untrack(() => S.frame++);          // no dependency: effects that call render() must not loop
 }
 function sizeCanvas() {
@@ -277,3 +281,76 @@ export function renderThumb(img, params, w, target) {
 const NAMES = { fivek: "FiveK", fujifilm: "Fujifilm" };
 /** Display name of a style: "clean_cool" -> "Clean Cool". */
 export const pretty = (n) => n.split("_").map((w) => NAMES[w] || w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
+// ------------------------------------------------------------------ masks (local adjustments)
+const MASK_DEFAULTS = {
+  linear: () => ({ x0: 0.5, y0: 0.15, x1: 0.5, y1: 0.55 }),
+  radial: () => ({ cx: 0.5, cy: 0.5, rx: 0.22, ry: 0.22, angle: 0, feather: 50 }),
+  brush: () => ({}),
+  all: () => ({}),
+};
+let maskSeq = 0;
+export function addMask(type, range = null) {
+  const masks = [...(S.p.masks || [])];
+  if (masks.length >= SPEC.masks.max) { S.message = `At most ${SPEC.masks.max} masks.`; return; }
+  masks.push({ id: `m${Date.now().toString(36)}${maskSeq++}`, type, invert: false, ...MASK_DEFAULTS[type](),
+               ...(range ? { range } : {}), sliders: {} });
+  S.p = { ...S.p, masks }; S.maskSel = masks.length - 1; S.tool = type === "all" ? null : "mask"; commit();
+}
+export function updateMask(j, patch) {
+  const masks = (S.p.masks || []).map((m, i) => (i === j ? { ...m, ...patch } : m));
+  S.p = { ...S.p, masks };
+}
+export function setMaskSlider(j, k, v) {
+  const m = S.p.masks[j], sl = { ...(m.sliders || {}) };
+  if (v === 0) delete sl[k]; else sl[k] = v;
+  updateMask(j, { sliders: sl });
+}
+export function removeMask(j) {
+  const masks = (S.p.masks || []).filter((_, i) => i !== j);
+  const { masks: _, ...rest } = S.p;
+  S.p = masks.length ? { ...rest, masks } : rest;
+  S.maskSel = Math.min(S.maskSel, masks.length - 1); if (S.maskSel < 0) S.tool = S.tool === "mask" ? null : S.tool;
+  commit();
+}
+
+/** The painted-mask canvases for the current masks (rebuilt from their stored PNG after undo). */
+function brushList() {
+  return (S.p.masks || []).map((m) => {
+    if (m.type !== "brush") return null;
+    let b = view.brushes.get(m.id);
+    if (!b) { b = { canvas: newBrushCanvas(), version: 0, data: undefined }; view.brushes.set(m.id, b); }
+    if (m.data !== b.data && !b.painting) {                  // restore from the stored PNG (undo, another photo)
+      b.data = m.data;
+      const ctx = b.canvas.getContext("2d"); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, b.canvas.width, b.canvas.height);
+      if (m.data) { const im = new Image(); im.onload = () => { ctx.drawImage(im, 0, 0, b.canvas.width, b.canvas.height); b.version++; render(); }; im.src = "data:image/png;base64," + m.data; }
+      b.version++;
+    }
+    return b;
+  });
+}
+function newBrushCanvas() {
+  // source space, 1024 px on the long side (enough for a soft mask; it is sampled with filtering)
+  const W = view.img?.naturalWidth || 1024, H = view.img?.naturalHeight || 768, s = 1024 / Math.max(W, H);
+  const c = document.createElement("canvas"); c.width = Math.round(W * s); c.height = Math.round(H * s);
+  const x = c.getContext("2d"); x.fillStyle = "#000"; x.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+/** Paint a dab at source uv (u, v) into mask j. Soft round brush; hardness sets the solid core. */
+export function paint(j, u, v) {
+  const m = S.p.masks[j], b = view.brushes.get(m.id); if (!b) return;
+  b.painting = true;
+  const c = b.canvas, x = c.getContext("2d"), r = (S.brush.size / 100) * Math.max(c.width, c.height);
+  const g = x.createRadialGradient(u * c.width, v * c.height, r * (S.brush.hardness / 100) * 0.99, u * c.width, v * c.height, r);
+  const col = S.brush.erase ? "0,0,0" : "255,255,255", a = S.brush.flow / 100;
+  g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(1, `rgba(${col},0)`);
+  x.fillStyle = g; x.beginPath(); x.arc(u * c.width, v * c.height, r, 0, 2 * Math.PI); x.fill();
+  b.version++;
+  render();
+}
+export function endStroke(j) {
+  const m = S.p.masks[j], b = view.brushes.get(m.id); if (!b) return;
+  b.painting = false;
+  b.data = b.canvas.toDataURL("image/png").split(",")[1];
+  updateMask(j, { data: b.data }); commit();
+}
