@@ -57,3 +57,13 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ty.environment]
+python-version = "3.11"   # the project venv's interpreter (uv.lock resolves for it)
+
+[tool.ty.terminal]
+error-on-warning = true
+
+[tool.ty.analysis]
+# onnx and onnxruntime are run-time extras (`uv run --with onnx --with onnxruntime`), not project dependencies
+allowed-unresolved-imports = ["onnx", "onnx.**", "onnxruntime"]

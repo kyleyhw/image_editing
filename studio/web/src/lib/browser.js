@@ -196,6 +196,10 @@ export const browser = {
   fullSize: (id) => { const p = photos.get(id); return p?.raw ? [p.raw.width, p.raw.height] : [p?.bitmap.width, p?.bitmap.height]; },
   async predict(id, style) {
     const p = photos.get(id), st = styles.find((s) => s.card.name === style);
+    // Expert styles: a slider model predicts the look's settings for this photo; from there on the
+    // look is an ordinary slider look.
+    if (st.card.kind === "model") return { style, kind: "sliders", sliders: await this.sliders(id, st.card.model),
+                                           strength: st.card.default_strength ?? 1, version: 3 };
     if (!st.head) return { style, kind: "sliders", sliders: st.sliders, strength: st.card.default_strength ?? 1, version: 3 };
     const { theta, ood } = head(st, await features(p));
     return { style, renderer: st.card.renderer, knots: st.card.knots, theta,

@@ -24,6 +24,9 @@ import json
 import threading
 import time
 from pathlib import Path
+from typing import Any
+
+from playwright.sync_api import ConsoleMessage, FloatRect, Locator
 
 ROOT = Path(__file__).resolve().parent.parent
 CHROMIUM = "/opt/pw-browsers/chromium"
@@ -38,12 +41,19 @@ def serve(port: int) -> http.server.ThreadingHTTPServer:
                 path = path[len("/image_editing"):]
             return str(ROOT / "site" / path.lstrip("/"))
 
-        def log_message(self, *a: object) -> None:
+        def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 (the base class's name)
             pass
 
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), functools.partial(H))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv
+
+
+def bb(loc: Locator) -> FloatRect:
+    """The element's box; the elements tested are always visible, so a missing box is a failure."""
+    r = loc.bounding_box()
+    assert r is not None, f"{loc} has no bounding box"
+    return r
 
 
 def main() -> None:
@@ -66,7 +76,11 @@ def main() -> None:
             pg = b.new_page(viewport={"width": vw, "height": vh}, accept_downloads=True)
             errs: list[str] = []
             pg.on("pageerror", lambda e: errs.append(str(e)))
-            pg.on("console", lambda m: m.type in ("error", "warning") and errs.append(f"{m.type}: {m.text}"))
+            def on_console(m: ConsoleMessage) -> None:
+                if m.type in ("error", "warning"):
+                    errs.append(f"{m.type}: {m.text}")
+
+            pg.on("console", on_console)
             pg.goto(url)
             pg.wait_for_function("window.__studio && window.__studio.S.model.ready", timeout=180_000)
             pg.click(".sample >> nth=0")
@@ -101,7 +115,7 @@ def main() -> None:
                 # curves: click on the canvas adds a point
                 cv = pg.locator("#curves")
                 cv.scroll_into_view_if_needed()
-                box = cv.bounding_box()
+                box = bb(cv)
                 cv.click(position={"x": box["width"] * 0.3, "y": box["height"] * 0.45})
                 pg.wait_for_timeout(300)
                 res["curve_points"] = S("(window.__studio.S.p.curves?.rgb || []).length")
@@ -141,7 +155,7 @@ def main() -> None:
                 pg.screenshot(path=str(args.out / "editor_mask_linear.png"))
                 pg.keyboard.press("o")
                 pg.click("button:has-text('+ Brush')")
-                vb = pg.locator("#view").bounding_box()
+                vb = bb(pg.locator("#view"))
                 pg.mouse.move(vb["x"] + vb["width"] * 0.3, vb["y"] + vb["height"] * 0.7)
                 pg.mouse.down()
                 for k in range(12):
@@ -173,7 +187,7 @@ def main() -> None:
                 pg.keyboard.press("z")
                 # white-balance picker on the photo centre
                 pg.keyboard.press("w")
-                vb = pg.locator("#view").bounding_box()
+                vb = bb(pg.locator("#view"))
                 pg.mouse.click(vb["x"] + vb["width"] * 0.5, vb["y"] + vb["height"] * 0.4)
                 pg.wait_for_timeout(300)
                 res["wb_picked"] = S("[window.__studio.S.p.temp ?? 0, window.__studio.S.p.tint ?? 0]")

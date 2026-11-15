@@ -21,7 +21,6 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import torch
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -87,7 +86,7 @@ def fit(xs: torch.Tensor, ys: torch.Tensor, bw: bool, steps: int = 220) -> tuple
         opt.step()
     with torch.no_grad():
         v = torch.maximum(torch.minimum(z * u, hi), lo)
-        sl = {n: round(float(v[i]), 2 if n == "exposure" else 1) for i, n in enumerate(names)}
+        sl: dict = {n: round(float(v[i]), 2 if n == "exposure" else 1) for i, n in enumerate(names)}
         sl = {k: x for k, x in sl.items() if abs(x) >= (0.01 if k == "exposure" else 0.5)}
         if bw:
             sl["bw"] = 1.0

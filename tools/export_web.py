@@ -123,6 +123,19 @@ def export_v3(src: Path, out: Path, auto: list[Path]) -> None:
                     "source": "RawTherapee Film Simulation Collection (Pat David, Pavlov Dmitry, Michael Ezra), CC BY-SA 4.0"}
             out_styles.append({"card": card, "attribution": [card["source"]], "sliders": fl["sliders"]})
             print(f"film    {name}")
+    base = 200 + len(out_styles)
+    for k, path in enumerate(p for p in auto if p.stem.startswith("style_")):   # expert styles (Phase 21 task 22)
+        e = path.stem.split("_")[1]
+        rep_path = Path(f"tests/reports/phase21_style_{e}.json")
+        rep = json.loads(rep_path.read_text()) if rep_path.exists() else {}
+        score = f" Held-out test: {rep['test']['de00']:.2f} dE00 from the expert's edit." if "test" in rep else ""
+        card = {"name": f"expert_{e}", "title": f"FiveK expert {e.upper()}", "category": "Expert styles", "kind": "model",
+                "model": path.stem, "default_strength": 1.0, "order": base + k,
+                "description": f"The editing style of retoucher {e.upper()} of the MIT-Adobe FiveK dataset: tone, white balance "
+                               f"and colour-mixer settings predicted for each photo by a model trained on their edits.{score}",
+                "source": "MIT-Adobe FiveK (Bychkovsky et al. 2011), research licence"}
+        out_styles.append({"card": card, "attribution": [card["source"]]})
+        print(f"expert  {card['name']}")
     models = {}
     for path in auto:
         m = SliderModel.load(path)

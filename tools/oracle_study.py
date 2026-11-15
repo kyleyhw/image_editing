@@ -47,7 +47,7 @@ def main() -> None:
     t0 = time.time()
     xs, ys, names = A.load_pairs(ROOT / "data/fivek", args.split, args.expert, args.edge, args.n)
     print(f"{len(xs)} pairs at {xs.shape[2]}x{xs.shape[3]}", flush=True)
-    res = {"n": len(xs), "edge": args.edge, "expert": args.expert}
+    res: dict = {"n": len(xs), "edge": args.edge, "expert": args.expert}
     res["identity"] = {"dok": float(A.oklab_distance(xs, ys).mean() * 100), "psnr": float(np.mean([A.psnr(x, y) for x, y in zip(xs, ys)])),
                        "de00": de00(xs, ys)}
     print("identity", res["identity"], flush=True)

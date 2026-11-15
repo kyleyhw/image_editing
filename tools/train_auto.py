@@ -131,6 +131,7 @@ def main() -> None:
         if best is None or sc["de00"] < best[1]["de00"]:
             best = (lam, sc, model)
             model.save(out)                       # keep the best so far (runs are long)
+    assert best is not None
     lam, sc, model = best
     report["chosen_lambda"] = lam
     report["val"] = sc
