@@ -263,12 +263,18 @@ def lens_blur(c: torch.Tensor, depth: torch.Tensor, p: Params, src_edge: int) ->
 # photostyle/develop.py (e.g. shadows +100 lifts the shadow point by 0.10).
 TONE_X = [0.0, 0.06, 0.18, 0.4614, 0.75, 0.92, 1.0, 1.35]
 TONE_ROWS: dict[str, list[float]] = {
-    "blacks":     [0.08, 0.04, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0],
-    "shadows":    [0.0, 0.04, 0.10, 0.02, 0.0, 0.0, 0.0, 0.0],
+    "blacks":     [0.24, 0.12, 0.03, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "shadows":    [0.0, 0.06, 0.15, 0.03, 0.0, 0.0, 0.0, 0.0],
     "contrast":   [0.0, -0.03, -0.06, 0.0, 0.06, 0.03, 0.0, 0.0],
-    "highlights": [0.0, 0.0, 0.0, 0.02, 0.10, 0.06, 0.03, 0.0],
-    "whites":     [0.0, 0.0, 0.0, 0.0, 0.0, 0.04, 0.08, 0.08],
+    "highlights": [0.0, 0.0, 0.0, 0.03, 0.15, 0.09, 0.045, 0.0],
+    "whites":     [0.0, 0.0, 0.0, 0.0, 0.0, 0.12, 0.24, 0.24],
 }
+# Scale of the rows: fitted per photo to the MIT-Adobe FiveK expert C edits with the limits lifted
+# (Phase 21 range probe, 32 photos), the experts needed whites and blacks of about -230 and -200 in
+# the first version of these rows (median), and highlights and shadows beyond +-100 in 12 % of
+# photos. Whites and blacks were therefore made 3x and highlights and shadows 1.5x stronger, so
+# the experts' typical edits fall inside +-100 (and the sliders come closer to Lightroom's, whose
+# whites / blacks are strong).
 # highlights - additionally pulls the over-white point down to white (full recovery of +1 stop at -100)
 TONE_RECOVERY = 0.35
 MONO_EPS = 1e-4
