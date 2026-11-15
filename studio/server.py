@@ -236,26 +236,48 @@ def batch_predict(body: dict):
 
 @app.post("/api/export")
 def export(body: dict):
+    """Full-resolution export: the look (if any), then the photo's adjustments through
+    photostyle.pipeline, the same pipeline the browser preview runs."""
+    from photostyle import pipeline as PL
+    from photostyle.export import write_cube
+
     d = _photo_dir(body["id"])
-    p = EditParams.from_json(json.dumps(body["params"]))
+    raw = body["params"]
+    edit = raw.get("edit") or {}
+    p = EditParams.from_json(json.dumps(raw)) if raw.get("style") else None
     fmt = body.get("format", "jpg")
-    stem = Path(json.loads((d / "meta.json").read_text())["name"] or "photo").stem + f"_{p.style}"
+    stem = Path(json.loads((d / "meta.json").read_text())["name"] or "photo").stem + (f"_{p.style}" if p else "_edit")
     exp = d / "exports"
     exp.mkdir(exist_ok=True)
     if fmt == "jpg":
         src = next(d.glob("original.*"))
         img, info = load_image(src)
+        if p:
+            img = engine.render(img, p)
+        if edit:
+            with torch.no_grad():
+                img = to_pil(PL.render(to_tensor(img), edit))
         path = exp / f"{stem}.jpg"
-        save_image(engine.render(img, p), path, info)
+        save_image(img, path, info)
     elif fmt == "cube":
+        size = 33
+        g = torch.linspace(0, 1, size)
+        b_, g_, r_ = torch.meshgrid(g, g, g, indexing="ij")
+        lut = torch.stack([r_, g_, b_], -1)                                     # [b, g, r] -> rgb, red fastest
+        if p:
+            from photostyle.export import bake_lut
+            lut = bake_lut(p.make_renderer(), p.vector()[0], size)
+        colour_only = {k: v for k, v in edit.items() if k not in ("crop", "vig_amount")}
+        with torch.no_grad():
+            lut = PL.render(lut.reshape(-1, 1, 3).permute(2, 0, 1), colour_only).permute(1, 2, 0).reshape(size, size, size, 3)
         path = exp / f"{stem}.cube"
-        p.to_cube(path)
-    elif fmt == "xmp":
+        write_cube(lut, path, title=f"Irodori {p.style if p else 'edit'}")
+    elif fmt == "xmp" and p:
         path = exp / f"{stem}.xmp"
         p.to_xmp(path)
     else:
         path = exp / f"{stem}.json"
-        p.to_json(path)
+        path.write_text(json.dumps(raw, indent=1))
     return FileResponse(path, filename=path.name)
 
 
