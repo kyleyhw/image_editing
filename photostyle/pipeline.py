@@ -55,8 +55,14 @@ LMS_TO_LAB = np.array([[0.2104542553, 0.7936177850, -0.0040720468],
                        [1.9779984951, -2.4285922050, 0.4505937099],
                        [0.0259040371, 0.7827717662, -0.8086757660]])
 
+# Display P3 (D65, the gamut of current phone and laptop screens), SMPTE EG 432-1.
+P3_TO_XYZ = np.array([[0.4865709486, 0.2656676932, 0.1982172852],
+                      [0.2289745641, 0.6917385218, 0.0792869141],
+                      [0.0000000000, 0.0451133819, 1.0439443689]])
+
 SRGB_TO_W = np.linalg.inv(REC2020_TO_XYZ) @ SRGB_TO_XYZ        # working space = linear Rec. 2020
 W_TO_SRGB = np.linalg.inv(SRGB_TO_W)
+W_TO_P3 = np.linalg.inv(P3_TO_XYZ) @ REC2020_TO_XYZ
 W_TO_LMS = XYZ_TO_LMS @ REC2020_TO_XYZ
 LMS_TO_W = np.linalg.inv(W_TO_LMS)
 LAB_TO_LMS = np.linalg.inv(LMS_TO_LAB)
@@ -480,10 +486,11 @@ def apply_geometry(x: torch.Tensor, crop: Mapping[str, float] | None) -> torch.T
 
 
 # --------------------------------------------------------------------------- output
-def gamut_clip(c: torch.Tensor) -> torch.Tensor:
-    """Bring linear sRGB into [0, 1] by moving each out-of-range colour toward its own luminance
-    (hue and luminance kept, chroma reduced) rather than clipping channels, which shifts hue."""
-    Y = _mat(SRGB_TO_XYZ[1:2], c).clamp(0, 1)
+def gamut_clip(c: torch.Tensor, y_row: NDArray[np.float64] = SRGB_TO_XYZ[1]) -> torch.Tensor:
+    """Bring linear output RGB into [0, 1] by moving each out-of-range colour toward its own
+    luminance (hue and luminance kept, chroma reduced) rather than clipping channels, which shifts
+    hue. ``y_row`` is the luminance row of the output primaries."""
+    Y = _mat(y_row[None, :], c).clamp(0, 1)
     d = c - Y
     up = torch.where(d > 1e-9, (1 - Y) / d.clamp_min(1e-9), torch.full_like(d, 1e9))
     dn = torch.where(d < -1e-9, -Y / d.clamp_max(-1e-9), torch.full_like(d, 1e9))
@@ -491,10 +498,11 @@ def gamut_clip(c: torch.Tensor) -> torch.Tensor:
     return (Y + t * d).clamp(0, 1)
 
 
-def render(img: torch.Tensor, params: Params | None = None, legacy: Any = None) -> torch.Tensor:
+def render(img: torch.Tensor, params: Params | None = None, legacy: Any = None, output: str = "srgb") -> torch.Tensor:
     """Apply the pipeline. ``img`` is display-encoded sRGB in [0, 1], (3, H, W) or (B, 3, H, W).
     ``legacy`` is an optional callable applied first to the display-encoded image (the Phase-A5
-    looks, until Phase 21 replaces them)."""
+    looks, until Phase 21 replaces them). ``output`` is "srgb" or "p3" (Display P3: same transfer
+    curve, wider primaries)."""
     p = dict(params or {})
     single = img.dim() == 3
     x = img.unsqueeze(0) if single else img
@@ -509,7 +517,10 @@ def render(img: torch.Tensor, params: Params | None = None, legacy: Any = None) 
     c = apply_curves(c, p.get("curves"))
     c = apply_colour(c, p)
     c = apply_vignette(c, p)
-    out = srgb_encode(gamut_clip(_mat(W_TO_SRGB, c)))
+    if output == "p3":
+        out = srgb_encode(gamut_clip(_mat(W_TO_P3, c), P3_TO_XYZ[1]))
+    else:
+        out = srgb_encode(gamut_clip(_mat(W_TO_SRGB, c)))
     return out[0] if single else out
 
 
@@ -527,7 +538,8 @@ def spec() -> dict:
         "grade_ranges": GRADE_RANGES, "grade_dirs": dirs,
         "m": {"srgb_to_w": m(SRGB_TO_W), "w_to_srgb": m(W_TO_SRGB), "w_to_lms": m(W_TO_LMS),
               "lms_to_w": m(LMS_TO_W), "lms_to_lab": m(LMS_TO_LAB), "lab_to_lms": m(LAB_TO_LMS),
-              "luma": m(LUMA), "srgb_y": m(SRGB_TO_XYZ[1]), "w_to_xyz": m(REC2020_TO_XYZ)},
+              "luma": m(LUMA), "srgb_y": m(SRGB_TO_XYZ[1]), "w_to_xyz": m(REC2020_TO_XYZ),
+              "w_to_p3": m(W_TO_P3), "p3_y": m(P3_TO_XYZ[1])},
         "wb": {"mired_per_unit": WB_MIRED_PER_UNIT, "ref_k": WB_REF_K, "tint_stops": TINT_STOPS},
         "tone": {"x": TONE_X, "rows": TONE_ROWS, "recovery": TONE_RECOVERY, "mono_eps": MONO_EPS},
         "k": {"eps_y": EPS_Y, "cal_shift": CAL_SHIFT, "cal_shadow": CAL_SHADOW, "sat_gain": SAT_GAIN,

@@ -6,7 +6,9 @@
 // Models come from tools/export_web.py. Photos stay in memory on this device.
 import * as ort from "onnxruntime-web/wasm";
 import { downloadBlob } from "./api.js";
-import { bakeCube, renderFull } from "./pipeline.js";
+import { bakeCube, renderPixels } from "./pipeline.js";
+import { encode8, encodePNG16, encodeTIFF16, lightroomXMP } from "./export.js";
+import { decodeRaw, displayCanvas, isRaw, linearRGBA } from "./raw.js";
 
 const BASE = import.meta.env.BASE_URL;
 ort.env.wasm.numThreads = 1;              // GitHub Pages is not cross-origin isolated
@@ -129,7 +131,8 @@ function head(st, f) {
 export const browser = {
   kind: "browser",
   caps: { scene: false, batch: false, create: false, remember: false },
-  formats: [["jpg", "JPEG"], ["png", "PNG"], ["cube", ".cube LUT"], ["json", "Params JSON"]],
+  formats: [["jpg", "JPEG"], ["png", "PNG"], ["png16", "PNG 16-bit"], ["tif16", "TIFF 16-bit"], ["cube", ".cube LUT"],
+            ["xmp", "Lightroom preset"], ["json", "Settings (JSON)"]],
   accept: "image/*",
   async init(onModel) {
     const data = await (await fetch(`${BASE}models/styles.json`)).json();
@@ -152,13 +155,19 @@ export const browser = {
   async upload(files) {
     const added = [];
     for (const file of files) {
-      let bitmap;
-      try { bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch { continue; }
+      let bitmap, raw = null, lin = null;
+      try {
+        if (isRaw(file)) {                       // raw: linear Rec. 2020 float preview, full data kept for export
+          raw = await decodeRaw(file);
+          lin = linearRGBA(raw);
+          bitmap = displayCanvas(lin);
+        } else bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+      } catch (e) { console.warn(`${file.name}: ${e}`); continue; }
       const id = `p${++seq}`;
       const preview = await toURL(canvasOf(bitmap, ...fit(bitmap.width, bitmap.height, PREVIEW_EDGE)));
       const thumb = await toURL(canvasOf(bitmap, ...fit(bitmap.width, bitmap.height, THUMB_EDGE)), 0.85);
-      photos.set(id, { id, name: file.name, bitmap, preview, thumb, featP: null });
-      added.push({ id, name: file.name });
+      photos.set(id, { id, name: file.name, bitmap, preview, thumb, featP: null, raw, lin, exif: raw ? null : await readExif(file) });
+      added.push({ id, name: file.name, raw: !!raw });
     }
     return added;
   },
@@ -167,24 +176,46 @@ export const browser = {
     return this.upload([new File([blob], s.file, { type: "image/jpeg" })]);
   },
   photoURL: (id, edge) => (edge <= THUMB_EDGE ? photos.get(id)?.thumb : photos.get(id)?.preview),
+  /** The texture source for editing: linear float data for raw files, else null (use the preview). */
+  source: (id) => photos.get(id)?.lin ?? null,
+  isRaw: (id) => !!photos.get(id)?.raw,
   async predict(id, style) {
     const p = photos.get(id), st = styles.find((s) => s.card.name === style);
     const { theta, ood } = head(st, await features(p));
     return { style, renderer: st.card.renderer, knots: st.card.knots, theta,
              strength: st.card.default_strength ?? 1, ood_score: ood, version: 1 };
   },
-  async export(id, params, eff, fmt) {
+  async export(id, params, eff, opts) {
+    const { fmt = "jpg", quality = 92, edge = 0, space = "srgb", metadata = true } = opts;
     const p = photos.get(id), stem = `${p.name.replace(/\.[^.]+$/, "")}${params.style ? "_" + params.style : "_edit"}`;
     if (fmt === "cube") return save(new Blob([bakeCube(eff, 33, `Irodori ${params.style ?? "edit"}`)], { type: "text/plain" }), `${stem}.cube`);
     if (fmt === "json") return save(new Blob([JSON.stringify(params, null, 1)], { type: "application/json" }), `${stem}.json`);
-    const { canvas, release } = renderFull(p.bitmap, eff);
+    if (fmt === "xmp") return save(new Blob([lightroomXMP(eff.p, stem)], { type: "application/rdf+xml" }), `${stem}.xmp`);
+    const src = p.raw ? (lim) => linearRGBA(p.raw, lim) : p.bitmap;
+    const px = renderPixels(src, eff, { edge, space, float: fmt === "png16" || fmt === "tif16" });
+    if (fmt === "png16") return save(await encodePNG16(px, space), `${stem}.png`);
+    if (fmt === "tif16") return save(encodeTIFF16(px), `${stem}.tif`);
     const type = fmt === "png" ? "image/png" : "image/jpeg";
-    const blob = await new Promise((res) => canvas.toBlob(res, type, 0.95));
-    release();
+    const blob = await encode8(px, { type, quality: quality / 100, space, exif: metadata ? p.exif : null });
     return save(blob, `${stem}.${fmt === "png" ? "png" : "jpg"}`);
   },
 };
 
 function save(blob, name) {
   return downloadBlob({ headers: new Headers({ "content-disposition": `attachment; filename="${name}"` }), blob: async () => blob }, name);
+}
+
+/** The EXIF (APP1) segment of a JPEG, or null: copied into exported JPEGs. */
+async function readExif(file) {
+  if (!/jpe?g$/i.test(file.type || file.name)) return null;
+  const b = new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer());
+  if (b[0] !== 0xff || b[1] !== 0xd8) return null;
+  for (let i = 2; i + 4 < b.length;) {
+    if (b[i] !== 0xff) return null;
+    const m = b[i + 1], len = (b[i + 2] << 8) | b[i + 3];
+    if (m === 0xe1 && String.fromCharCode(...b.slice(i + 4, i + 8)) === "Exif") return b.slice(i, i + 2 + len);
+    if (m === 0xda) return null;
+    i += 2 + len;
+  }
+  return null;
 }

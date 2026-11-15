@@ -324,3 +324,7 @@ progress { width: 100%; accent-color: var(--accent); }
 .ch-tr { right: -3px; top: -3px; border-left: 0 !important; border-bottom: 0 !important; cursor: nesw-resize; }
 .ch-bl { left: -3px; bottom: -3px; border-right: 0 !important; border-top: 0 !important; cursor: nesw-resize; }
 .ch-br { right: -3px; bottom: -3px; border-left: 0 !important; border-top: 0 !important; cursor: nwse-resize; }
+.form { display: flex; flex-direction: column; gap: 10px; min-width: min(420px, 80vw); margin: 4px 0 8px; }
+.form label { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
+.form label.toggle { display: flex; }
+.form input[type=number] { width: 80px; height: 28px; padding: 0 8px; border-radius: var(--r-s); border: 1px solid var(--line); background: var(--field); color: var(--text); }

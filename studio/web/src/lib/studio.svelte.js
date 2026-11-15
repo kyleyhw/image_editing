@@ -12,6 +12,10 @@ import { draw, makeGL, outputSize, setImage, wbGains, DEFAULTS, SPEC } from "./p
 
 export const ZERO_SCENE = () => ({ haze: 0, clarity_near: 0, clarity_far: 0, sky_exposure: 0, sky_warmth: 0, sky_saturation: 0 });
 const NO_LOOK = "";
+// Starting adjustments for a raw file: a linear decode has none of the S-shaped tone curve that
+// cameras and raw converters apply by default; contrast +20 is a moderate stand-in, shown on the
+// slider so it can be changed.
+const RAW_BASE = { contrast: 20 };
 
 export const S = $state({
   ready: false,
@@ -187,7 +191,8 @@ export async function selectPhoto(id) {
   if (kept) S.style = kept.style;
   const img = await loadImage(photoURL(id, 1600));
   view.img = img;
-  setImage(view.main, img);
+  setImage(view.main, B.source?.(id) ?? img);
+  if (!kept && B.isRaw?.(id)) S.p = { ...RAW_BASE };
   await loadLook();
   if (kept) S.strength = kept.strength;
   S.undo = []; S.redo = []; S.last = snap();
@@ -236,10 +241,14 @@ export function applyScene() {
   }, 250);
 }
 
-export async function exportCurrent(fmt) {
+/** Export with ``opts`` = { fmt, quality (1-100), edge (long side, 0 = full), space ("srgb" | "p3"),
+ * metadata (copy EXIF) }. */
+export async function exportCurrent(opts) {
   if (!S.id) return;
   S.busy = true;
-  try { await B.export(S.id, exportParams(), $state.snapshot(effective()), fmt); } finally { S.busy = false; }
+  try { await B.export(S.id, exportParams(), $state.snapshot(effective()), typeof opts === "string" ? { fmt: opts } : opts); }
+  catch (e) { S.message = String(e); }
+  finally { S.busy = false; }
 }
 
 export async function rememberEdit() {

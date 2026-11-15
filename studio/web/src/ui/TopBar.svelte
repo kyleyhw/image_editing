@@ -1,7 +1,7 @@
 <script>
   import { S, undo, redo, exportCurrent } from "../lib/studio.svelte.js";
   import { I } from "../lib/icons.js";
-  let { exportFmt = $bindable("jpg"), onCreate, onBatch } = $props();
+  let { exportFmt = $bindable("jpg"), exportOpts = {}, onCreate, onBatch, onExportSettings } = $props();
   const REPO = "https://github.com/kyleyhw/image_editing";
   const name = $derived(S.photos.find((p) => p.id === S.id)?.name || "");
 </script>
@@ -21,7 +21,8 @@
     <select id="exportFmt" aria-label="Export format" bind:value={exportFmt}>
       {#each S.formats as [v, label]}<option value={v}>{label}</option>{/each}
     </select>
-    <button id="btnExport" class="btn primary" title="Export (E)" disabled={!S.params || S.busy} onclick={() => exportCurrent(exportFmt)}>Export</button>
+    <button class="icon-btn" title="Export settings" aria-label="Export settings" onclick={onExportSettings}>{@html I.sliders}</button>
+    <button id="btnExport" class="btn primary" title="Export (E)" disabled={!S.id || S.busy} onclick={() => exportCurrent({ fmt: exportFmt, ...exportOpts })}>Export</button>
   {:else}
     <a class="btn" href={REPO} target="_blank" rel="noopener">{@html I.github}<span class="hide-xs">Source</span></a>
   {/if}

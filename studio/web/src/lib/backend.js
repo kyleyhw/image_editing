@@ -26,8 +26,8 @@ const server = {
   },
   photoURL: (id, edge) => `/api/photo/${id}?edge=${edge}`,
   predict: (id, style) => json("/api/predict", { id, style }),
-  async export(id, params, _eff, fmt) {
-    await downloadBlob(await api("/api/export", { id, params, format: fmt }), `export.${fmt}`);
+  async export(id, params, _eff, opts) {
+    await downloadBlob(await api("/api/export", { id, params, format: opts.fmt }), `export.${opts.fmt}`);
   },
 };
 

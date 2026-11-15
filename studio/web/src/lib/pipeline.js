@@ -139,9 +139,9 @@ void main() { uv = vec2(pos.x * 0.5 + 0.5, 0.5 - pos.y * 0.5); gl_Position = vec
 const FS = `#version 300 es
 precision highp float;
 uniform sampler2D img; uniform sampler2D orig;
-uniform int mode; uniform float split; uniform mat3 geo; uniform int clipWarn; uniform float dither;
+uniform int mode; uniform float split; uniform mat3 geo; uniform int clipWarn; uniform float dither; uniform int linIn;
 uniform int lookOn; uniform vec4 lk[13]; uniform int K; uniform mat3 lM; uniform vec3 lBias; uniform float lVig;
-uniform mat3 srgbToW, wToSrgb, wToLms, lmsToW, lmsToLab, labToLms; uniform vec3 luma, srgbY;
+uniform mat3 srgbToW, wToSrgb, wToLms, lmsToW, lmsToLab, labToLms, wToOut; uniform vec3 luma, srgbY, outY;
 uniform vec3 wb; uniform float expo; uniform vec4 tone[8];
 uniform vec4 cp[${4 * CURVE_PTS}]; uniform ivec4 cn;
 uniform int calOn; uniform mat3 calM; uniform float shadowTint;
@@ -192,7 +192,13 @@ void main() {
   vec2 suv = (geo * vec3(uv, 1.0)).xy;
   bool inside = all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)));
   vec3 x = inside ? texture(img, suv).rgb : vec3(0.0);
-  if (mode == 1 || (mode == 0 && uv.x < split)) { o = vec4(inside ? texture(orig, suv).rgb : vec3(0.0), 1.0); return; }
+  if (mode == 1 || (mode == 0 && uv.x < split)) {
+    vec3 b = inside ? texture(orig, suv).rgb : vec3(0.0);
+    if (linIn == 1) b = enc3(clamp(wToSrgb * b, 0.0, 1.0));
+    o = vec4(b, 1.0); return;
+  }
+  vec3 lin0 = x;                                    // linear Rec. 2020 when the source is a raw decode
+  if (linIn == 1) x = enc3(clamp(wToSrgb * x, 0.0, 1.0));
 
   if (lookOn == 1) {                                // the Phase-A5 look, in display space
     vec3 e = vec3(lcurve(0, x.r), lcurve(1, x.g), lcurve(2, x.b));
@@ -201,7 +207,7 @@ void main() {
     e *= clamp(1.0 - lVig * dot(p, p) / 2.0, 0.0, 1.0);
     x = clamp(e, 0.0, 1.0);
   }
-  vec3 c = srgbToW * dec3(clamp(x, 0.0, 1.0));
+  vec3 c = (linIn == 1 && lookOn == 0) ? lin0 : srgbToW * dec3(clamp(x, 0.0, 1.0));
   c *= wb * expo;
 
   // tone: curve on perceptual luminance; colour scaled by the luminance ratio
@@ -250,14 +256,14 @@ void main() {
     c *= pow(2.0, vig.x * kc2.z * smooth01((r - lo) / (hi - lo)));
   }
 
-  vec3 s = wToSrgb * c;
+  vec3 s = wToOut * c;
   bool over = any(greaterThan(s, vec3(1.0 + 1e-4))), under = any(lessThan(s, vec3(-1e-4)));
-  float Ys = clamp(dot(srgbY, s), 0.0, 1.0); vec3 d = s - Ys; float t = 1.0;
+  float Ys = clamp(dot(outY, s), 0.0, 1.0); vec3 d = s - Ys; float t = 1.0;
   for (int i = 0; i < 3; i++) {
     if (d[i] > 1e-9) t = min(t, (1.0 - Ys) / d[i]); else if (d[i] < -1e-9) t = min(t, -Ys / d[i]);
   }
   vec3 outc = enc3(clamp(Ys + max(t, 0.0) * d, 0.0, 1.0));
-  if (clipWarn == 1) { if (dot(srgbY, s) > 1.0) outc = vec3(1.0, 0.15, 0.15); else if (dot(srgbY, s) <= 0.0) outc = vec3(0.15, 0.35, 1.0); }
+  if (clipWarn == 1) { if (dot(outY, s) > 1.0) outc = vec3(1.0, 0.15, 0.15); else if (dot(outY, s) <= 0.0) outc = vec3(0.15, 0.35, 1.0); }
   else if (clipWarn == 2 && (over || under)) outc = vec3(1.0, 0.0, 1.0);
   outc += dither * (rnd(gl_FragCoord.xy) - rnd(gl_FragCoord.yx + 17.0)) / 255.0;
   o = vec4(outc, 1.0);
@@ -297,6 +303,7 @@ export function setImage(R, img, asOriginal = true) {
   upload(R, R.tex, 0, img);
   if (asOriginal) upload(R, R.origTex, 1, img);
   R.src = [img.width ?? img.naturalWidth, img.height ?? img.naturalHeight];
+  R.linear = !!img.linear;
 }
 
 function upload(R, tex, unit, img) {
@@ -323,10 +330,12 @@ function upload(R, tex, unit, img) {
  */
 export function draw(R, e, opts = {}) {
   const { gl, u } = R, p = e.p || {};
-  const { mode = 2, split = 0.5, clipWarn = 0, dither = 1 } = opts;
+  const { mode = 2, split = 0.5, clipWarn = 0, dither = 1, space = "srgb" } = opts;
+  gl.uniformMatrix3fv(u("wToOut"), true, new Float32Array(space === "p3" ? SPEC.m.w_to_p3 : SPEC.m.w_to_srgb));
+  gl.uniform3fv(u("outY"), new Float32Array(space === "p3" ? SPEC.m.p3_y : SPEC.m.srgb_y));
   gl.viewport(0, 0, R.canvas.width, R.canvas.height);
   gl.uniform1i(u("mode"), mode); gl.uniform1f(u("split"), split);
-  gl.uniform1i(u("clipWarn"), clipWarn); gl.uniform1f(u("dither"), dither);
+  gl.uniform1i(u("clipWarn"), clipWarn); gl.uniform1f(u("dither"), dither); gl.uniform1i(u("linIn"), R.linear ? 1 : 0);
   gl.uniformMatrix3fv(u("geo"), true, new Float32Array(geometryMatrix(R.src[0], R.src[1], p.crop).flat()));
   gl.uniform2f(u("frame"), R.canvas.width, R.canvas.height);
 
@@ -420,15 +429,77 @@ export function bakeCube(e, size = 33, title = "Irodori") {
   return lines.join("\n") + "\n";
 }
 
-/** Render an edit at full resolution into a new canvas (export). */
-export function renderFull(src, e, maxEdge = 8192) {
-  const c = document.createElement("canvas"), R = makeGL(c);
-  const lim = Math.min(maxEdge, R.gl.getParameter(R.gl.MAX_TEXTURE_SIZE));
-  const W = src.width ?? src.naturalWidth, H = src.height ?? src.naturalHeight, s = Math.min(1, lim / Math.max(W, H));
-  let img = src;
-  if (s < 1) { img = document.createElement("canvas"); img.width = Math.round(W * s); img.height = Math.round(H * s); img.getContext("2d").drawImage(src, 0, 0, img.width, img.height); }
+/**
+ * Render an edit for export. ``src`` is an image/bitmap/canvas, a float source, or a function
+ * (maxEdge) -> source (so a raw file is expanded only up to the GPU's texture limit). Returns the
+ * pixels: 8-bit RGBA (dithered) or, with ``float``, 32-bit RGBA in display encoding, top row first.
+ */
+export function renderPixels(src, e, { edge = 0, space = "srgb", float = false } = {}) {
+  const c = document.createElement("canvas"), R = makeGL(c), { gl } = R;
+  const lim = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  let img = typeof src === "function" ? src(lim) : src;
+  const W = img.width ?? img.naturalWidth, H = img.height ?? img.naturalHeight;
+  if (!img.data && Math.max(W, H) > lim) {
+    const s = lim / Math.max(W, H), cv = document.createElement("canvas");
+    cv.width = Math.round(W * s); cv.height = Math.round(H * s); cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height); img = cv;
+  }
   setImage(R, img);
-  [c.width, c.height] = outputSize(img.width, img.height, e.p?.crop);
-  draw(R, e, { mode: 2 });
-  return { canvas: c, release: () => R.gl.getExtension("WEBGL_lose_context")?.loseContext() };
+  let [w, h] = outputSize(R.src[0], R.src[1], e.p?.crop);
+  if (edge && Math.max(w, h) > edge) { const s = edge / Math.max(w, h); w = Math.max(1, Math.round(w * s)); h = Math.max(1, Math.round(h * s)); }
+  c.width = w; c.height = h;
+  let fb = null;
+  if (float) {
+    if (!gl.getExtension("EXT_color_buffer_float")) throw new Error("16-bit export needs float rendering, which this browser does not offer.");
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
+    fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  }
+  draw(R, e, { mode: 2, dither: float ? 0 : 1, space });
+  const px = float ? new Float32Array(4 * w * h) : new Uint8Array(4 * w * h);
+  gl.readPixels(0, 0, w, h, gl.RGBA, float ? gl.FLOAT : gl.UNSIGNED_BYTE, px);
+  gl.getExtension("WEBGL_lose_context")?.loseContext();
+  const row = 4 * w, out = float ? new Float32Array(px.length) : new Uint8ClampedArray(px.length);
+  for (let y = 0; y < h; y++) out.set(px.subarray((h - 1 - y) * row, (h - y) * row), y * row);   // bottom-up -> top-down
+  return { data: out, width: w, height: h };
+}
+// ------------------------------------------------------------------ edit layers (as photostyle.slider_looks)
+const SAMPLES = 16;
+const clampTo = (k, v) => { const s = SLIDERS.find((q) => q.name === k); return s ? Math.min(s.max, Math.max(s.min, v)) : v; };
+function evalPts(pts, t) {
+  const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+  if (xs.length === 2) return ys[0] + ((Math.min(xs[1], Math.max(xs[0], t)) - xs[0]) / (xs[1] - xs[0])) * (ys[1] - ys[0]);
+  return Math.min(1, Math.max(0, pchipEval(xs, ys, pchipSlopes(xs, ys), Math.min(xs[xs.length - 1], Math.max(xs[0], t)))));
+}
+/** outer(inner(x)) sampled at 16 points. */
+export function composeCurve(inner, outer) {
+  if (!inner) return outer; if (!outer) return inner;
+  const out = []; let prev = -1;
+  for (let i = 0; i < SAMPLES; i++) { const t = i / (SAMPLES - 1); prev = Math.max(prev, evalPts(outer, evalPts(inner, t))); out.push([t, prev]); }
+  return out;
+}
+/** A slider look at strength ``a``: values scale toward their defaults, curves toward the diagonal. */
+export function scaleLook(p, a) {
+  const out = {};
+  for (const [k, v] of Object.entries(p || {})) {
+    if (k === "curves") out[k] = Object.fromEntries(Object.entries(v).map(([c, pts]) => [c, pts.map(([x, y]) => [x, x + a * (y - x)])]));
+    else if (k === "bw" || (k.startsWith("grade_") && k.endsWith("_hue"))) out[k] = v;
+    else { const d = DEFAULTS[k] ?? 0; out[k] = d + a * (v - d); }
+  }
+  return out;
+}
+/** Sum edit layers in order (auto, look, user), as slider_looks.combine. */
+export function combine(...layers) {
+  const out = {};
+  for (const layer of layers) {
+    if (!layer) continue;
+    for (const [k, v] of Object.entries(layer)) {
+      if (k === "curves") { out.curves ??= {}; for (const [c, pts] of Object.entries(v)) out.curves[c] = composeCurve(out.curves[c], pts); }
+      else if (k === "crop") out.crop = v;
+      else if (k === "bw") out.bw = Math.max(out.bw ?? 0, v);
+      else if (k.startsWith("grade_") && k.endsWith("_hue")) { if (layer[k.replace("_hue", "_sat")]) out[k] = v; }
+      else { const d = DEFAULTS[k] ?? 0; out[k] = clampTo(k, (out[k] ?? d) + (v - d)); }
+    }
+  }
+  return out;
 }

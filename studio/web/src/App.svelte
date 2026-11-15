@@ -8,14 +8,15 @@
   import Welcome from "./ui/Welcome.svelte";
   import CreateStyle from "./dialogs/CreateStyle.svelte";
   import Batch from "./dialogs/Batch.svelte";
+  import ExportDialog from "./dialogs/ExportDialog.svelte";
   import { S, boot, upload, selectPhoto, setStyle, undo, redo, resetAll, exportCurrent, commit } from "./lib/studio.svelte.js";
   import { loadPrefs, savePrefs } from "./lib/prefs.js";
   import { I } from "./lib/icons.js";
 
-  let prefs = $state(loadPrefs({ exportFmt: "jpg" }));
+  let prefs = $state(loadPrefs({ exportFmt: "jpg", exportOpts: { edge: 0, quality: 92, space: "srgb", metadata: true } }));
   $effect(() => savePrefs($state.snapshot(prefs)));
   $effect(() => { if (!S.formats.some(([v]) => v === prefs.exportFmt)) prefs.exportFmt = S.formats[0][0]; });
-  let dialogs = $state({ create: false, batch: false });
+  let dialogs = $state({ create: false, batch: false, export: false });
   let sheetOpen = $state(false), dragging = $state(0), bootError = $state("");
 
   onMount(() => { boot().catch((e) => (bootError = String(e))); });
@@ -30,7 +31,7 @@
     else if (k.toLowerCase() === "z" && !e.ctrlKey && !e.metaKey) { if (S.zoom) { S.zoom = 0; S.pan = [0, 0]; } else S.zoom = 1; }
     else if (k.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey) S.tool = S.tool === "wb" ? null : "wb";
     else if (k.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey) { S.tool = S.tool === "crop" ? null : "crop"; if (!S.tool) commit(); }
-    else if (k.toLowerCase() === "e" && !e.ctrlKey && !e.metaKey) exportCurrent(prefs.exportFmt);
+    else if (k.toLowerCase() === "e" && !e.ctrlKey && !e.metaKey) exportCurrent({ fmt: prefs.exportFmt, ...prefs.exportOpts });
     else if (k.toLowerCase() === "y") { const m = ["split", "after", "before"]; S.mode = m[(m.indexOf(S.mode) + 1) % 3]; }
     else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.shiftKey ? redo() : undo(); e.preventDefault(); }
     else if (/^[1-9]$/.test(k) && S.styles[+k - 1]) setStyle(S.styles[+k - 1].name);
@@ -55,7 +56,7 @@
 
 <Backdrop />
 <div class="app" class:empty={!S.id} class:sheet-open={sheetOpen}>
-  <TopBar bind:exportFmt={prefs.exportFmt} onCreate={() => (dialogs.create = true)} onBatch={() => (dialogs.batch = true)} />
+  <TopBar bind:exportFmt={prefs.exportFmt} exportOpts={prefs.exportOpts} onExportSettings={() => (dialogs.export = true)} onCreate={() => (dialogs.create = true)} onBatch={() => (dialogs.batch = true)} />
   {#if S.id}<Sidebar onCreate={() => (dialogs.create = true)} />{/if}
   <main class="center">
     <Stage />
@@ -81,3 +82,4 @@
 
 {#if S.caps.create}<CreateStyle bind:open={dialogs.create} />{/if}
 {#if S.caps.batch}<Batch bind:open={dialogs.batch} />{/if}
+<ExportDialog bind:open={dialogs.export} bind:opts={prefs.exportOpts} />

@@ -50,6 +50,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--port", type=int, default=8812)
+    ap.add_argument("--raw", type=Path, nargs="*", default=[], help="raw files to open and export (16-bit TIFF)")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
@@ -65,7 +66,7 @@ def main() -> None:
             pg = b.new_page(viewport={"width": vw, "height": vh}, accept_downloads=True)
             errs: list[str] = []
             pg.on("pageerror", lambda e: errs.append(str(e)))
-            pg.on("console", lambda m: m.type == "error" and errs.append(m.text))
+            pg.on("console", lambda m: m.type in ("error", "warning") and errs.append(f"{m.type}: {m.text}"))
             pg.goto(url)
             pg.wait_for_function("window.__studio && window.__studio.S.model.ready", timeout=180_000)
             pg.click(".sample >> nth=0")
@@ -132,16 +133,35 @@ def main() -> None:
                 pg.wait_for_timeout(300)
                 res["wb_picked"] = S("[window.__studio.S.p.temp ?? 0, window.__studio.S.p.tint ?? 0]")
                 # export
-                for fmt in ("jpg", "cube"):
+                for fmt in ("jpg", "cube", "png16", "xmp"):
                     pg.select_option("#exportFmt", fmt)
                     with pg.expect_download() as dl:
                         pg.click("#btnExport")
                     d = dl.value
-                    f = args.out / f"export.{fmt}"
+                    f = args.out / f"export.{fmt.replace('16', '')}"
                     d.save_as(f)
                     res[f"export_{fmt}_bytes"] = f.stat().st_size
+                from PIL import Image
+                with Image.open(args.out / "export.png") as im:
+                    res["png16_mode"] = f"{im.mode} {im.size}"
+                xmp = (args.out / "export.xmp").read_text()
+                res["xmp_has_exposure"] = 'crs:Exposure2012="+0.80"' in xmp and "ToneCurvePV2012" in xmp
                 cube = (args.out / "export.cube").read_text().splitlines()
                 res["cube_rows"] = sum(1 for ln in cube if ln and ln[0].isdigit())
+                for k, rf in enumerate(args.raw):
+                    t1 = time.time()
+                    pg.set_input_files("#upload", str(rf))
+                    pg.wait_for_function(f"window.__studio.S.photos.length >= {2 + k} && window.__studio.S.imgVersion > 0", timeout=240_000)
+                    pg.wait_for_timeout(1500)
+                    res[f"raw_{rf.suffix}_open_s"] = round(time.time() - t1, 1)
+                    res[f"raw_{rf.suffix}_contrast"] = S("window.__studio.S.p.contrast ?? 0")
+                    pg.screenshot(path=str(args.out / f"raw_{k}.png"))
+                    pg.select_option("#exportFmt", "tif16")
+                    with pg.expect_download(timeout=240_000) as dl:
+                        pg.click("#btnExport")
+                    f = args.out / f"raw_{k}.tif"
+                    dl.value.save_as(f)
+                    res[f"raw_{rf.suffix}_tif_bytes"] = f.stat().st_size
             else:
                 pg.click(".quickbar .btn"); pg.wait_for_timeout(600)
                 pg.screenshot(path=str(args.out / "phone_sheet.png"))
