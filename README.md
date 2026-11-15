@@ -199,8 +199,10 @@ is shipped as a documented negative result.
 | [`docs/user_guide.md`](docs/user_guide.md) | How to use Studio, the command line and the new-style pipeline. |
 | [`docs/phone_checklist.md`](docs/phone_checklist.md) | Ten-minute checklist for testing the editor on a real phone. |
 | [`docs/pipeline.md`](docs/pipeline.md) | The image pipeline: working space, white balance, hue-preserving tone, Oklab colour, vignette, geometry, with the mathematics. |
+| [`docs/looks.md`](docs/looks.md) | Every look: the tutorial recipes with their sources, the film stocks and the expert styles. |
+| [`docs/data.md`](docs/data.md) | Datasets (FiveK, film tables) and the slider models: descriptor, loss, oracle, Auto-correct, expert styles, film fits. |
 | [`tests/reports/`](tests/reports/) | One report per phase (learning curve, renderers, regional, conditioning, unpaired, atmosphere, sky, Clean Cool, new-style pipeline; editor phases 19–25 and the FiveK data report). |
-| [`tests/reports/phase19_editor.md`](tests/reports/phase19_editor.md) · [`phase22_25_editor.md`](tests/reports/phase22_25_editor.md) · [`phase20_data.md`](tests/reports/phase20_data.md) | The A6 editor: pipeline agreement and invariants; raw, masks, detail, lens blur and workflow; the FiveK and film data. |
+| [`tests/reports/phase19_editor.md`](tests/reports/phase19_editor.md) · [`phase22_25_editor.md`](tests/reports/phase22_25_editor.md) · [`phase20_data.md`](tests/reports/phase20_data.md) · [`phase21_models.md`](tests/reports/phase21_models.md) · [`phase26_release.md`](tests/reports/phase26_release.md) | The A6 editor: pipeline agreement and invariants; raw, masks, detail, lens blur and workflow; the FiveK and film data; slider models; release verification. |
 | [`CHANGELOG.md`](CHANGELOG.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) | What changed; how to work on the project. |
 | [`legacy/docs/architecture.md`](legacy/docs/architecture.md) | *(legacy)* Mathematics of the feature extractor, every primitive, and the composite loss. Identity-at-init proof. |
 | [`legacy/docs/training_and_inference.md`](legacy/docs/training_and_inference.md) | *(legacy)* Operational guide: data generation, training each architecture, CLI inference, Streamlit UI. |
@@ -278,6 +280,8 @@ HSV-faithful colour identities used by the Fujifilm renderer are in
 ├── tests/                   # unit tests; tests/reports/ holds every phase report
 ├── docs/user_guide.md       # how to use Studio, the CLI and the new-style pipeline
 ├── docs/pipeline.md         # the image pipeline and its mathematics
+├── docs/looks.md · data.md  # every look and its source; datasets and slider models
+├── docs/phone_checklist.md  # test checklist for a real phone
 ├── reports/ · research_notes/   # research report and literature review
 └── legacy/                  # Phases 1–6 (fixed-function styles, Streamlit UI); run from inside legacy/
 ```
