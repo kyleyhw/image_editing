@@ -1,0 +1,178 @@
+{
+ "hidden": 64,
+ "dropout": 0.3,
+ "wd": 0.001,
+ "expert": "b",
+ "sliders": [
+  "temp",
+  "tint",
+  "exposure",
+  "contrast",
+  "highlights",
+  "shadows",
+  "whites",
+  "blacks",
+  "vibrance",
+  "saturation",
+  "hsl_hue_red",
+  "hsl_hue_orange",
+  "hsl_hue_yellow",
+  "hsl_hue_green",
+  "hsl_hue_aqua",
+  "hsl_hue_blue",
+  "hsl_hue_purple",
+  "hsl_hue_magenta",
+  "hsl_sat_red",
+  "hsl_sat_orange",
+  "hsl_sat_yellow",
+  "hsl_sat_green",
+  "hsl_sat_aqua",
+  "hsl_sat_blue",
+  "hsl_sat_purple",
+  "hsl_sat_magenta",
+  "hsl_lum_red",
+  "hsl_lum_orange",
+  "hsl_lum_yellow",
+  "hsl_lum_green",
+  "hsl_lum_aqua",
+  "hsl_lum_blue",
+  "hsl_lum_purple",
+  "hsl_lum_magenta"
+ ],
+ "edge": 128,
+ "n_train": 3499,
+ "n_val": 500,
+ "identity_val": {
+  "psnr": 23.049086297554553,
+  "de00": 8.23263608987383
+ },
+ "lam_0.003": {
+  "psnr": 24.96737029877628,
+  "de00": 6.479646628928749,
+  "dok": 4.871211528778076,
+  "history": [
+   {
+    "epoch": 1,
+    "train_loss": 0.061246727587121255
+   },
+   {
+    "epoch": 2,
+    "train_loss": 0.05580451735754496
+   },
+   {
+    "epoch": 3,
+    "train_loss": 0.056096613610487525
+   },
+   {
+    "epoch": 4,
+    "train_loss": 0.05415679046697329
+   },
+   {
+    "epoch": 5,
+    "train_loss": 0.05278560921025978,
+    "val_dok": 4.91339635848999,
+    "val_psnr": 24.84215694554074
+   },
+   {
+    "epoch": 6,
+    "train_loss": 0.05065737891049002
+   },
+   {
+    "epoch": 7,
+    "train_loss": 0.049774422392006364
+   },
+   {
+    "epoch": 8,
+    "train_loss": 0.048249455866736325
+   },
+   {
+    "epoch": 9,
+    "train_loss": 0.04652118604714341
+   },
+   {
+    "epoch": 10,
+    "train_loss": 0.04511882412766654,
+    "val_dok": 4.859121799468994,
+    "val_psnr": 24.948644106727407
+   },
+   {
+    "epoch": 11,
+    "train_loss": 0.04399031370017964
+   },
+   {
+    "epoch": 12,
+    "train_loss": 0.04342926080783424,
+    "val_dok": 4.871211051940918,
+    "val_psnr": 24.96737029877628
+   }
+  ]
+ },
+ "chosen_lambda": 0.003,
+ "val": {
+  "psnr": 24.96737029877628,
+  "de00": 6.479646628928749,
+  "dok": 4.871211528778076
+ },
+ "identity_test": {
+  "psnr": 22.797193048897405,
+  "de00": 8.47462554232353
+ },
+ "test": {
+  "psnr": 24.69978410274414,
+  "de00": 6.620659215711332,
+  "dok": 5.128529071807861
+ },
+ "slider_stats_val": {
+  "temp": {
+   "median": 13.14,
+   "p05": -28.2,
+   "p95": 34.22
+  },
+  "tint": {
+   "median": 0.04,
+   "p05": -0.36,
+   "p95": 0.52
+  },
+  "exposure": {
+   "median": 0.3,
+   "p05": -0.31,
+   "p95": 1.01
+  },
+  "contrast": {
+   "median": -0.61,
+   "p05": -2.03,
+   "p95": 1.01
+  },
+  "highlights": {
+   "median": -1.24,
+   "p05": -3.35,
+   "p95": 0.63
+  },
+  "shadows": {
+   "median": 6.55,
+   "p05": -8.0,
+   "p95": 34.68
+  },
+  "whites": {
+   "median": -23.12,
+   "p05": -58.07,
+   "p95": 3.02
+  },
+  "blacks": {
+   "median": -0.61,
+   "p05": -3.2,
+   "p95": 3.31
+  },
+  "vibrance": {
+   "median": 0.01,
+   "p05": -0.11,
+   "p95": 0.18
+  },
+  "saturation": {
+   "median": -0.26,
+   "p05": -14.66,
+   "p95": 7.53
+  }
+ },
+ "runtime_s": 1973.1
+}
