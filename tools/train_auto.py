@@ -71,6 +71,9 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--lams", type=float, nargs="+", default=[0.003, 0.01, 0.03])
     ap.add_argument("--colour", action="store_true", help="also predict the 24 HSL sliders")
+    ap.add_argument("--hidden", type=int, default=256)
+    ap.add_argument("--dropout", type=float, default=0.2)
+    ap.add_argument("--wd", type=float, default=1e-4)
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     t0 = time.time()
@@ -115,17 +118,19 @@ def main() -> None:
     xva, yva, fva = load(val_f, "validation")
     print(f"loaded in {time.time() - t0:.0f} s; {xtr.shape[2]}x{xtr.shape[3]} px", flush=True)
 
-    report: dict = {"expert": args.expert, "sliders": names, "edge": args.edge, "n_train": len(xtr), "n_val": len(xva),
+    report: dict = {"hidden": args.hidden, "dropout": args.dropout, "wd": args.wd, "expert": args.expert, "sliders": names, "edge": args.edge, "n_train": len(xtr), "n_val": len(xva),
                     "identity_val": {"psnr": float(np.mean([A.psnr(x, y) for x, y in zip(xva, yva)])), "de00": de00(xva, yva)}}
     print("identity on validation", report["identity_val"], flush=True)
     best = None
     for lam in args.lams:
-        model, hist = A.train(ftr, xtr, ytr, names, lam=lam, epochs=args.epochs, val=(fva, xva, yva))
+        model, hist = A.train(ftr, xtr, ytr, names, lam=lam, epochs=args.epochs, val=(fva, xva, yva),
+                              hidden=args.hidden, dropout=args.dropout, weight_decay=args.wd)
         sc = score(model, fva, xva, yva)
         report[f"lam_{lam}"] = {**sc, "history": hist}
         print(f"lambda {lam}: {sc}", flush=True)
         if best is None or sc["de00"] < best[1]["de00"]:
             best = (lam, sc, model)
+            model.save(out)                       # keep the best so far (runs are long)
     lam, sc, model = best
     report["chosen_lambda"] = lam
     report["val"] = sc
