@@ -137,3 +137,68 @@ def test_crop_matches_slice() -> None:
     x = rand_img(40, 60)
     y = P.render(x, {"crop": {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5}})
     assert (y - x[:, 10:30, 15:45]).abs().max() < 1e-3
+
+
+# ---------------------------------------------------------------- Phases 22-24 operators
+
+def test_detail_sliders_at_zero_are_identity() -> None:
+    """Spatial operators switch off exactly at zero (the local means are not even computed)."""
+    x = rand_img()
+    p = {"texture": 0, "clarity": 0, "dehaze": 0, "sharpen": 0, "nr_luma": 0, "nr_colour": 0, "halation": 0, "grain": 0}
+    assert (P.render(x, p) - x).abs().max() * 255 < 0.01
+
+
+def test_gaussian_blur_preserves_mean_and_constant() -> None:
+    """Normalised kernel: a constant image is unchanged, and the mean is kept (reflect padding)."""
+    c = torch.full((1, 1, 20, 30), 0.37)
+    assert torch.allclose(P.gaussian_blur(c, 3.0), c, atol=1e-6)
+    x = rand_img().unsqueeze(0)
+    assert abs(float(P.gaussian_blur(x, 2.0).mean() - x.mean())) < 2e-3
+
+
+def test_clarity_increases_local_contrast() -> None:
+    """Clarity +80 raises the standard deviation of mid-tone detail; -80 lowers it."""
+    g = torch.Generator().manual_seed(RNG_SEED)
+    x = (0.45 + 0.08 * torch.randn(3, 64, 64, generator=g)).clamp(0, 1)
+    sd = lambda t: float(t.mean(0).std())  # noqa: E731
+    assert sd(P.render(x, {"clarity": 80})) > sd(x) > sd(P.render(x, {"clarity": -80}))
+
+
+def test_grain_is_deterministic_and_zero_mean() -> None:
+    """Same input, same grain (seeded hash); the noise averages out over the image."""
+    x = torch.full((3, 64, 64), 0.5)
+    a, b = P.render(x, {"grain": 80}), P.render(x, {"grain": 80})
+    assert torch.equal(a, b)
+    assert abs(float(a.mean() - 0.5)) < 0.01 and float(a.std()) > 0.005
+
+
+def test_linear_mask_affects_its_side_only() -> None:
+    x = torch.full((3, 40, 60), 0.4)
+    lin = {"type": "linear", "x0": 0.5, "y0": 0.0, "x1": 0.5, "y1": 0.5, "sliders": {"exposure": 1.0}}
+    y = P.render(x, {"masks": [lin]})
+    assert float(y[:, :4].mean()) > 0.5 and abs(float(y[:, -10:].mean()) - 0.4) < 1e-3
+
+
+def test_inverted_mask_is_complement() -> None:
+    """A mask and its inverse with the same exposure add up to the whole-photo edit (in stops)."""
+    x = torch.full((3, 40, 60), 0.3)
+    r = {"type": "radial", "cx": 0.5, "cy": 0.5, "rx": 0.2, "ry": 0.2, "feather": 50, "sliders": {"exposure": 0.5}}
+    both = P.render(x, {"masks": [r, {**r, "invert": True}]})
+    assert torch.allclose(both, P.render(x, {"exposure": 0.5}), atol=2e-3)
+
+
+def test_geometry_defaults_are_identity() -> None:
+    x = rand_img()
+    crop = {"x": 0, "y": 0, "w": 1, "h": 1, "angle": 0, "vertical": 0, "horizontal": 0, "distortion": 0, "scale": 100}
+    assert (P.render(x, {"crop": crop}) - x).abs().max() * 255 < 0.01
+
+
+def test_lens_blur_keeps_focus_plane_sharp() -> None:
+    """Depth ramp left (far) to right (near), focus on the near side: the far side is blurred, the
+    focus plane is not."""
+    x = rand_img(48, 96)
+    d = torch.linspace(0, 1, 96).view(1, 1, 96).expand(1, 48, 96).clone()
+    y = P.render(x, {"lens_amount": 100, "lens_focus": 1.0, "lens_range": 10}, depth=d)
+    far = float((y[..., :20] - x[..., :20]).abs().mean())
+    near = float((y[..., -6:] - x[..., -6:]).abs().mean())
+    assert far > 3 * near and near < 0.05
