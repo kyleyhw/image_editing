@@ -12,6 +12,8 @@ on:
       - "tools/export_web.py"
       - "photostyle/features.py"
       - ".github/workflows/pages.yml"
+      - ".python-version"
+      - "uv.lock"
   workflow_dispatch:
 
 permissions:
