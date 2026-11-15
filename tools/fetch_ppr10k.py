@@ -65,7 +65,7 @@ class RangeFile(io.RawIOBase):
         return self.pos
 
     def _fetch(self, start: int, n: int) -> bytes:
-        for attempt in range(5):
+        for attempt in range(8):             # Drive throttles bursts (it answers 200 with a notice page): back off up to 2 min
             try:
                 r = self.s.get(self.url, headers={"Range": f"bytes={start}-{start + n - 1}"}, timeout=120)
                 if r.status_code == 206:
@@ -73,7 +73,7 @@ class RangeFile(io.RawIOBase):
                 raise OSError(f"HTTP {r.status_code}")
             except (OSError, requests.RequestException) as e:
                 print(f"  retry {attempt + 1} at {start}: {e}", flush=True)
-                time.sleep(2 ** attempt)
+                time.sleep(min(120, 4 ** attempt))
         raise OSError(f"range {start}+{n} failed")
 
     def read(self, n: int = -1) -> bytes:
