@@ -49,11 +49,12 @@ export const S = $state({
   presets: [],               // the user's own presets (localStorage)
   auto: null,                // the base correction for this photo ({slider: value}) when on
   autoOn: false,
+  depth: { loading: false, progress: 0, ready: false, show: false, error: "" },
   clipboard: null,           // copied settings
   snapshots: [],             // named states of this photo
 });
 
-export const view = { img: null, sceneImg: null, main: null, thumb: null, thumbCanvas: null, tween: null, shown: null,
+export const view = { img: null, sceneImg: null, main: null, thumb: null, thumbCanvas: null, tween: null, shown: null, depth: null,
                       brushes: new Map() };   // mask id -> {canvas, version, data} (painted masks, source space)
 const edits = new Map();     // photo id -> {p, style, strength}: each photo keeps its own edit
 
@@ -83,7 +84,7 @@ const lookOf = (params, strength) => (params && params.kind !== "sliders" ? effe
 const layered = (params, strength, p) => (params?.kind === "sliders" || (S.autoOn && S.auto)
   ? combine(S.autoOn ? S.auto : null, params?.kind === "sliders" ? scaleLook(params.sliders, strength) : null, p) : p);
 /** Everything the renderer needs for the current edit. */
-export const effective = () => ({ p: layered(S.params, S.strength, S.p), look: lookOf(S.params, S.strength), K: S.params?.knots ?? 9, brushes: brushList() });
+export const effective = () => ({ p: layered(S.params, S.strength, S.p), look: lookOf(S.params, S.strength), K: S.params?.knots ?? 9, brushes: brushList(), depth: view.depth });
 export const modeCode = () => (S.holdBefore || S.mode === "before" ? 1 : S.mode === "after" ? 2 : 0);
 export const hasLook = () => !!S.style;
 
@@ -97,7 +98,7 @@ export function exportParams() {       // for the server: the look's EditParams 
 /** What is on screen: the hovered look (peek), else the current edit; look changes tween. */
 function target() {
   const pk = S.peek && S.peek !== "__original" && S.byStyle[S.peek];
-  return pk ? { p: layered(pk, pk.strength ?? 1, S.p), look: lookOf(pk, pk.strength ?? 1), K: pk.knots } : effective();
+  return pk ? { p: layered(pk, pk.strength ?? 1, S.p), look: lookOf(pk, pk.strength ?? 1), K: pk.knots, depth: view.depth } : effective();
 }
 
 let raf = 0;
@@ -116,7 +117,7 @@ export function render() {
   const full = B.fullSize?.(S.id), c = view.main.canvas;
   const pxScale = full ? pixelScale(c.width, view.main.src, Math.max(...full), drawnP().crop) : 1;
   draw(view.main, { ...e, brushes: brushList() }, { mode: S.peek === "__original" ? 1 : S.peek ? 2 : modeCode(), split: S.split,
-                       clipWarn: S.clip ? 1 : 0, pxScale, showMask: S.showMask ? S.maskSel : -1 });
+                       clipWarn: S.clip ? 1 : 0, pxScale, showMask: S.showMask ? S.maskSel : -1, showDepth: S.depth.show && !!view.depth });
   untrack(() => S.frame++);          // no dependency: effects that call render() must not loop
 }
 function sizeCanvas() {
@@ -211,7 +212,8 @@ export async function addSample(s) {
 
 export async function selectPhoto(id) {
   remember();
-  S.id = id; view.sceneImg = null; view.tween = null; view.shown = null;
+  S.id = id; view.sceneImg = null; view.tween = null; view.shown = null; view.depth = null;
+  S.depth = { loading: false, progress: 0, ready: false, show: false, error: "" };
   S.scene = ZERO_SCENE(); S.byStyle = {}; S.peek = null; S.zoom = 0; S.pan = [0, 0]; S.tool = null;
   const kept = edits.get(id);
   S.p = kept?.p ?? {}; S.snapshots = kept?.snapshots ?? [];
@@ -513,4 +515,25 @@ export async function setAuto(on) {
   try { localStorage.setItem(AUTO_KEY, on ? "1" : "0"); } catch { /* storage unavailable */ }
   if (on && !S.auto && S.id) await loadAuto(S.id);
   commit();
+}
+
+// ------------------------------------------------------------------ lens blur (Phase 24)
+/** Estimate depth for this photo (downloads the depth model once), then lens blur can be used. */
+export async function estimateDepth() {
+  if (!B.depth || !S.id) return;
+  const id = S.id;
+  S.depth = { ...S.depth, loading: true, error: "" };
+  try {
+    const d = await B.depth(id, (l, t) => (S.depth.progress = t ? l / t : 0));
+    if (S.id !== id) return;
+    view.depth = d; S.depth = { ...S.depth, loading: false, ready: true };
+    if (!S.p.lens_amount) { setSlider("lens_amount", 40); commit(); }
+    render();
+  } catch (e) { S.depth = { ...S.depth, loading: false, error: String(e) }; }
+}
+/** Focus on the depth at output uv (u, v). */
+export function focusAt(su, sv) {
+  const d = view.depth; if (!d) return;
+  const x = Math.min(d.width - 1, Math.max(0, Math.floor(su * d.width))), y = Math.min(d.height - 1, Math.max(0, Math.floor(sv * d.height)));
+  setSlider("lens_focus", Math.round(d.data[y * d.width + x] * 100) / 100); commit();
 }

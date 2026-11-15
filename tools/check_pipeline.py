@@ -89,6 +89,7 @@ def cases() -> list[tuple[str, dict]]:
                  ("nr_luma", 100), ("nr_colour", 100), ("halation", 100), ("grain", 80)]:
         out.append((f"spatial {k} {v:+d}", {k: v}))
     out += mask_cases()
+    out.append(("spatial lens blur", {"lens_amount": 80, "lens_focus": 0.85, "lens_range": 10, "_depth": True}))
     rng = np.random.default_rng(SEED + 1)
     for i in range(12):
         p: dict = {}
@@ -148,7 +149,9 @@ window.renderCase = async (p) => {
     const cv = document.createElement("canvas"); cv.width = b.width; cv.height = b.height; cv.getContext("2d").drawImage(b, 0, 0);
     brushes[j] = { canvas: cv, version: Math.random() };
   }
-  PL.setImage(R, img); PL.draw(R, { p, look: null, brushes }, { mode: 2, dither: 0 });
+  let depth = null;
+  if (p._depth) { const W = 64, H = 48, d = new Float32Array(W * H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) d[y * W + x] = x / (W - 1); depth = { data: d, width: W, height: H }; }
+  PL.setImage(R, img); PL.draw(R, { p, look: null, brushes, depth }, { mode: 2, dither: 0 });
   const px = new Uint8Array(w * h * 4); R.gl.readPixels(0, 0, w, h, R.gl.RGBA, R.gl.UNSIGNED_BYTE, px);
   return { w, h, data: Array.from(px) };
 };
@@ -191,8 +194,9 @@ def main() -> None:
                 continue
             r = page.evaluate("p => window.renderCase(p)", p)
             got = np.array(r["data"], np.uint8).reshape(r["h"], r["w"], 4)[::-1, :, :3].astype(np.float64)
+            depth = torch.linspace(0, 1, 64).view(1, 1, 64).expand(1, 48, 64).clone() if p.get("_depth") else None
             with torch.no_grad():
-                ref = P.render(x.float(), p).double().permute(1, 2, 0).numpy() * 255
+                ref = P.render(x.float(), {k: v for k, v in p.items() if k != "_depth"}, depth=depth).double().permute(1, 2, 0).numpy() * 255
             ref8 = np.clip(np.round(ref), 0, 255)
             d = np.abs(got - ref8)
             if "crop" in p:                      # bilinear sampling differs by half a texel at the cut edges

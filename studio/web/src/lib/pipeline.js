@@ -185,6 +185,7 @@ uniform vec4 kc; uniform vec4 kc2; uniform vec4 kc3;
 uniform int nMasks; uniform vec4 mkA[4]; uniform vec4 mkB[4]; uniform vec4 mkC[4]; uniform vec4 mkR[4]; uniform vec4 mkWB[4];
 uniform vec4 mkT0[4]; uniform vec4 mkT1[4]; uniform vec4 mkS[4]; uniform vec4 mkH; uniform float hiG; uniform int toneLocal; uniform vec2 srcSize; uniform int showMask;
 uniform sampler2D br0; uniform sampler2D br1; uniform sampler2D br2; uniform sampler2D br3;
+uniform int lensOn; uniform int showDepth; uniform sampler2D depthTex; uniform vec4 lens;   // lens: (rmax px, focus, range, span)
 uniform int stage; uniform int spatialOn; uniform sampler2D tPx; uniform sampler2D tMid; uniform sampler2D tBig;
 uniform vec4 det; uniform vec4 det2; uniform vec4 haze; uniform vec3 halTint; uniform vec4 grain; uniform float outH;
 in vec2 uv; out vec4 o;
@@ -257,6 +258,18 @@ float maskAt(int j, vec2 q, float L, float h, float C) {
                     m *= (1.0 - sm1((d - wd) / (0.5 * wd))) * sm1(C / 0.03); }
   return a.y > 0.5 ? 1.0 - m : m;
 }
+vec3 inputAt(vec2 q) {                              // source colour entering the pipeline: look, linear, WB, exposure
+  vec3 x = texture(img, q).rgb;
+  if (linIn == 1 && lookOn == 0) return x * wb * expo;
+  if (linIn == 1) x = enc3(clamp(wToSrgb * x, 0.0, 1.0));
+  if (lookOn == 1) {
+    vec3 e = vec3(lcurve(0, x.r), lcurve(1, x.g), lcurve(2, x.b));
+    e = lM * e + lBias; vec2 pp = q * 2.0 - 1.0;
+    x = clamp(e * clamp(1.0 - lVig * dot(pp, pp) / 2.0, 0.0, 1.0), 0.0, 1.0);
+  }
+  return srgbToW * dec3(clamp(x, 0.0, 1.0)) * wb * expo;
+}
+float cocAt(float d) { return lens.x * clamp((abs(d - lens.y) - lens.z) / lens.w, 0.0, 1.0); }
 float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
 void main() {
@@ -285,6 +298,18 @@ void main() {
   }
   vec3 c = (linIn == 1 && lookOn == 0) ? lin0 : srgbToW * dec3(clamp(x, 0.0, 1.0));
   c *= wb * expo;
+  if (lensOn == 1 && inside) {                      // depth of field (pipeline.lens_blur): occlusion-aware disc gather
+    float dp = texture(depthTex, suv).r, cp = cocAt(dp), wsum = 1.0;
+    vec3 acc = c;
+    for (int k = 0; k < ${SPEC.lens.taps.length}; k++) {
+      float r = sqrt((float(k) + 0.5) / ${SPEC.lens.taps.length}.0), a = float(k) * 2.39996322972865;
+      vec2 o = vec2(r * cos(a), r * sin(a)) * lens.x, q = suv + o / srcSize;
+      float ds = texture(depthTex, q).r, rs = cocAt(ds), dist = length(o);
+      float reach = ds < dp ? min(rs, cp) : rs, w = clamp(reach - dist + 0.5, 0.0, 1.0);
+      if (w > 0.0) { acc += w * inputAt(clamp(q, 0.0, 1.0)); wsum += w; }
+    }
+    c = acc / wsum;
+  }
   float mk[4] = float[4](0.0, 0.0, 0.0, 0.0);
   if (nMasks > 0) {
     float Lm = enc(dot(luma, c)); vec3 lb = toLab(c); float hm = atan(lb.z, lb.y), Cm = length(lb.yz);
@@ -397,6 +422,7 @@ void main() {
     outc = enc3(clamp(kg * lin + (Yn - kg * Yg), 0.0, 1.0));
   }
   if (showMask >= 0) outc = mix(outc, vec3(1.0, 0.2, 0.25), 0.55 * mk[showMask]);
+  if (showDepth == 1) { float dd = texture(depthTex, suv).r; outc = vec3(dd); if (lensOn == 1 && cocAt(dd) < 0.5) outc = mix(outc, vec3(0.3, 1.0, 0.4), 0.45); }
   outc += dither * (rnd(gl_FragCoord.xy) - rnd(gl_FragCoord.yx + 17.0)) / 255.0;
   o = vec4(outc, 1.0);
 }`;
@@ -705,6 +731,20 @@ export function draw(R, e, opts = {}) {
   const pxs = opts.pxScale ?? 1;
   gl.uniform4f(u("grain"), g100("grain"), (1 + 3 * g100("grain_size")) * pxs, g100("grain_roughness"), D.grain);
   gl.uniform1f(u("outH"), R.canvas.height);
+  const lensOn = get(p, "lens_amount") > 0 && !!e.depth;
+  gl.uniform1i(u("lensOn"), lensOn ? 1 : 0); gl.uniform1i(u("showDepth"), opts.showDepth ? 1 : 0);
+  if (lensOn) {
+    if (R.depthSrc !== e.depth) {                   // depth map: {data: Float32Array, width, height}, nearest = 1
+      R.depthTex ??= gl.createTexture();
+      gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, R.depthTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, e.depth.width, e.depth.height, 0, gl.RED, gl.FLOAT, e.depth.data);
+      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      R.depthSrc = e.depth;
+    }
+    gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, R.depthTex); gl.uniform1i(u("depthTex"), 12);
+    gl.uniform4f(u("lens"), SPEC.lens.r * (get(p, "lens_amount") / 100) * Math.max(R.src[0], R.src[1]), get(p, "lens_focus"),
+                 (get(p, "lens_range") / 100) * 0.3, SPEC.lens.span);
+  } else { gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, R.depthTex ?? null); gl.uniform1i(u("depthTex"), 12); }
   if (on) spatial(R, { ...e, pxScale: pxs });
   gl.bindFramebuffer(gl.FRAMEBUFFER, opts.fb ?? null);
   gl.viewport(0, 0, R.canvas.width, R.canvas.height);

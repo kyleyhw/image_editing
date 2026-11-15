@@ -14,6 +14,7 @@
   import VignettePanel from "../panels/VignettePanel.svelte";
   import DetailPanel from "../panels/DetailPanel.svelte";
   import EffectsPanel from "../panels/EffectsPanel.svelte";
+  import LensPanel from "../panels/LensPanel.svelte";
   import GeometryPanel from "../panels/GeometryPanel.svelte";
   import MasksPanel from "../panels/MasksPanel.svelte";
   import ScenePanel from "../panels/ScenePanel.svelte";
@@ -87,6 +88,7 @@
   <Section title="Black & white" open={false} edited={edited(G.bw)} onreset={() => resetGroup(G.bw)}><BWPanel /></Section>
   <Section title="Crop & straighten" open={false} edited={!!S.p.crop} onreset={() => resetGroup(["crop"])}><GeometryPanel /></Section>
   <Section title="Vignette" open={false} edited={edited(G.vig)} onreset={() => resetGroup(G.vig)}><VignettePanel /></Section>
+  <Section title="Lens blur" open={false} edited={!!S.p.lens_amount} onreset={() => resetGroup(["lens_amount", "lens_focus", "lens_range"])}><LensPanel /></Section>
   <Section title="Effects" open={false} edited={edited(G.fx)} onreset={() => resetGroup(G.fx)}><EffectsPanel /></Section>
   <Section title="Calibration" open={false} edited={edited(G.cal)} onreset={() => resetGroup(G.cal)}><CalibrationPanel /></Section>
   {#if S.caps.scene}<Section title="Scene" open={false}><ScenePanel /></Section>{/if}

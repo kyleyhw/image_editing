@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { S, view, initGL, render, pretty, drawnP, neutralise, setCrop, commit, effective, updateMask, paint, endStroke } from "./lib/studio.svelte.js";
+  import { S, view, initGL, render, pretty, drawnP, neutralise, setCrop, commit, effective, updateMask, paint, endStroke, focusAt } from "./lib/studio.svelte.js";
   import { geometryMap, geometryInverse, SPEC } from "./lib/pipeline.js";
   import { applyLook } from "./lib/render.js";
 
@@ -10,7 +10,7 @@
 
   // Re-render on any change that affects the picture.
   $effect(() => {
-    S.params; S.strength; S.mode; S.split; S.holdBefore; S.peek; S.clip; S.tool; S.showMask; S.maskSel;
+    S.params; S.strength; S.mode; S.split; S.holdBefore; S.peek; S.clip; S.tool; S.showMask; S.maskSel; S.depth.show; S.depth.ready; S.autoOn; S.auto;
     JSON.stringify(S.p);
     render();
     requestAnimationFrame(place);
@@ -125,6 +125,7 @@
     const [u, v] = uvOf(e);
     if (S.tool === "wb") { neutralise(sourceColour(u, v)); S.tool = null; return; }
     if (S.tool === "pickhue" && sel) { pickHue(u, v); return; }
+    if (S.tool === "focus") { const [su, sv] = toSrc(u, v); focusAt(su, sv); S.tool = null; return; }
     if (S.tool === "mask" && sel?.type === "brush") { painting = true; const [su, sv] = fromScreen(e); paint(S.maskSel, su, sv); canvas.setPointerCapture(e.pointerId); return; }
     start = [e.clientX, e.clientY]; pan0 = S.pan.slice();
     dragging = S.zoom ? "pan" : null;
@@ -201,7 +202,7 @@
 <svelte:window onresize={place} />
 
 <div class="stage" class:has-photo={!!S.id}>
-  <div id="canvasWrap" bind:this={wrap} onwheel={wheel} class:picking={S.tool === "wb" || S.tool === "pickhue"} class:zoomed={!!S.zoom}>
+  <div id="canvasWrap" bind:this={wrap} onwheel={wheel} class:picking={S.tool === "wb" || S.tool === "pickhue" || S.tool === "focus"} class:zoomed={!!S.zoom}>
     <div class="zoomer" bind:this={zoomer}>
       <canvas id="view" bind:this={canvas} aria-label="Photo preview" class:ready={!!S.id && S.imgVersion > 0}
               onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}
@@ -245,6 +246,7 @@
     {#if showing}<div class="peek-tag">{showing}</div>{/if}
     {#if S.tool === "wb"}<div class="peek-tag">Click something that should be neutral grey</div>{/if}
     {#if S.tool === "pickhue"}<div class="peek-tag">Click the colour this mask should select</div>{/if}
+    {#if S.tool === "focus"}<div class="peek-tag">Click what should be in focus</div>{/if}
     {#if S.readout}<div class="readout">R {S.readout.rgb[0]} · G {S.readout.rgb[1]} · B {S.readout.rgb[2]}</div>{/if}
     {#if S.id && S.style && !S.params}<div class="thinking"><span></span>Reading the photo…</div>{/if}
     {#if S.sceneBusy}<div class="thinking small"><span></span>Updating scene…</div>{/if}

@@ -36,7 +36,9 @@ const f32 = (b64) => {
   return out;
 };
 
-let session = null, modelReady = null, styles = [], models = {};
+let session = null, modelReady = null, styles = [], models = {}, depthSession = null;
+const DEPTH_URL = "https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model_quantized.onnx";
+const DEPTH_EDGE = 518;                          // the model's native input (37 x 14 px patches)
 const HEAD_KEYS = ["mu", "sigma", "w1", "b1", "ln_w", "ln_b", "w2", "b2", "theta_mean"];
 const decodeHead = (h) => ({ ...h, ...Object.fromEntries(HEAD_KEYS.map((k) => [k, f32(h[k])])) });
 const photos = new Map();
@@ -134,7 +136,7 @@ function head(st, f, withOod = true) {
 
 export const browser = {
   kind: "browser",
-  caps: { scene: false, batch: false, create: false, remember: false, persist: true },
+  caps: { scene: false, batch: false, create: false, remember: false, persist: true, depth: true },
   formats: [["jpg", "JPEG"], ["png", "PNG"], ["png16", "PNG 16-bit"], ["tif16", "TIFF 16-bit"], ["cube", ".cube LUT"],
             ["xmp", "Lightroom preset"], ["json", "Settings (JSON)"]],
   accept: "image/*",
@@ -198,6 +200,27 @@ export const browser = {
     const { theta, ood } = head(st, await features(p));
     return { style, renderer: st.card.renderer, knots: st.card.knots, theta,
              strength: st.card.default_strength ?? 1, ood_score: ood, version: 1 };
+  },
+  /** Relative depth of a photo (1 = nearest), from Depth Anything V2 Small (Apache-2.0, 27 MB
+   * quantised ONNX, downloaded once on first use and cached by the browser). */
+  async depth(id, onProgress) {
+    const p = photos.get(id);
+    if (p.depth) return p.depth;
+    depthSession ??= (async () => {
+      const bytes = await fetchProgress(DEPTH_URL, (l, t) => onProgress?.(l, t));
+      return ort.InferenceSession.create(bytes, { executionProviders: ["wasm"] });
+    })();
+    const sess = await depthSession, N = DEPTH_EDGE;
+    const c = canvasOf(p.bitmap, N, N), d = c.getContext("2d").getImageData(0, 0, N, N).data, x = new Float32Array(3 * N * N);
+    const mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
+    for (let i = 0; i < N * N; i++) for (let k = 0; k < 3; k++) x[k * N * N + i] = (d[4 * i + k] / 255 - mean[k]) / std[k];
+    const out = await sess.run({ [sess.inputNames[0]]: new ort.Tensor("float32", x, [1, 3, N, N]) });
+    const y = out[sess.outputNames[0]].data;
+    let lo = Infinity, hi = -Infinity;
+    for (const v of y) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    const data = Float32Array.from(y, (v) => (v - lo) / Math.max(hi - lo, 1e-6));
+    p.depth = { data, width: N, height: N };
+    return p.depth;
   },
   /** A slider model's prediction for a photo: {slider: value} (the base correction is "auto_c"). */
   async sliders(id, model = "auto_c") {

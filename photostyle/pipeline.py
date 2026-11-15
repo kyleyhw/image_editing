@@ -153,6 +153,8 @@ SLIDERS: list[dict] = [
     _s("grain", "Amount", "effects", 0, 100), _s("grain_size", "Size", "effects", 0, 100, 25),
     _s("grain_roughness", "Roughness", "effects", 0, 100, 50),
     _s("halation", "Halation", "effects", 0, 100),
+    _s("lens_amount", "Blur amount", "lens", 0, 100), _s("lens_focus", "Focus depth", "lens", 0, 1, 0.5, 0.01),
+    _s("lens_range", "Focal range", "lens", 0, 100, 20),
 ]
 DEFAULTS: dict[str, float] = {s["name"]: s["default"] for s in SLIDERS}
 NAMES = [s["name"] for s in SLIDERS]
@@ -192,6 +194,64 @@ def wb_gains(temp: torch.Tensor, tint: torch.Tensor) -> torch.Tensor:
     g = _white_w(torch.full_like(temp, WB_REF_K)) / _white_w(1e6 / mired)
     g = g * torch.stack([torch.ones_like(tint), 2 ** (-TINT_STOPS * tint / 100), torch.ones_like(tint)], -1)
     return g / (g @ torch.as_tensor(LUMA, dtype=g.dtype)).unsqueeze(-1)
+
+
+# --------------------------------------------------------------------------- 2a lens blur (Phase 24)
+# Depth of field from a depth map (relative inverse depth in [0, 1], 1 = nearest; in the browser from
+# Depth Anything V2 Small). Circle of confusion, in pixels:
+#   CoC = R * clamp((|d - d_focus| - range) / 0.5, 0, 1),   R = 2 % of the long edge at amount 100,
+# so blur grows with distance in depth from the focus plane, beyond an in-focus range. The blur is a
+# disc gathered from LENS_TAPS points (a Vogel spiral, evenly covering the disc), averaged in linear
+# light so bright points bloom into bokeh discs. A sample counts if its own disc reaches the pixel;
+# a sample behind the pixel counts only within the pixel's own disc, so a blurred background does
+# not spill over a sharp foreground (scatter-as-gather with occlusion).
+LENS_TAPS = 48
+LENS_R = 0.02
+LENS_SPAN = 0.5
+
+
+def vogel(n: int = LENS_TAPS) -> torch.Tensor:
+    """(n, 2) points evenly covering the unit disc (golden-angle spiral)."""
+    k = torch.arange(n, dtype=torch.float64)
+    r = torch.sqrt((k + 0.5) / n)
+    a = k * math.pi * (3 - math.sqrt(5))
+    return torch.stack([r * torch.cos(a), r * torch.sin(a)], 1)
+
+
+def coc(depth: torch.Tensor, p: Params, rmax: float) -> torch.Tensor:
+    B = depth.shape[0]
+    f = _get(p, "lens_focus", B).to(depth).view(B, 1, 1, 1)
+    rng = _get(p, "lens_range", B).to(depth).view(B, 1, 1, 1) / 100 * 0.3
+    return rmax * ((((depth - f).abs() - rng) / LENS_SPAN).clamp(0, 1))
+
+
+def lens_blur(c: torch.Tensor, depth: torch.Tensor, p: Params, src_edge: int) -> torch.Tensor:
+    """Depth-of-field blur of linear colour c (B, 3, H, W) with depth (B, 1, H, W). The disc radius is
+    relative to the source photo's long edge ``src_edge`` (unchanged by cropping)."""
+    B, _, H, W = c.shape
+    amt = float(_get(p, "lens_amount", 1)[0]) / 100
+    if amt <= 0:
+        return c
+    rmax = LENS_R * amt * src_edge
+    cp = coc(depth, p, rmax)
+    yy, xx = torch.meshgrid(torch.arange(H, dtype=torch.float64) + 0.5, torch.arange(W, dtype=torch.float64) + 0.5, indexing="ij")
+    acc = c.clone()
+    wsum = torch.ones_like(cp)
+    for o in vogel():
+        dx, dy = float(o[0]) * rmax, float(o[1]) * rmax
+        dist = math.hypot(dx, dy)
+        gx = ((xx + dx) / W * 2 - 1).float()
+        gy = ((yy + dy) / H * 2 - 1).float()
+        grid = torch.stack([gx, gy], -1).unsqueeze(0).expand(B, -1, -1, -1).to(c)
+        cs = torch.nn.functional.grid_sample(c, grid, mode="bilinear", padding_mode="border", align_corners=False)
+        ds = torch.nn.functional.grid_sample(depth, grid, mode="bilinear", padding_mode="border", align_corners=False)
+        rs = coc(ds, p, rmax)
+        behind = (ds < depth).to(c)                 # farther than the pixel (smaller inverse depth)
+        reach = behind * torch.minimum(rs, cp) + (1 - behind) * rs
+        w = (reach - dist + 0.5).clamp(0, 1)
+        acc = acc + w * cs
+        wsum = wsum + w
+    return acc / wsum
 
 
 # --------------------------------------------------------------------------- 3 tone
@@ -822,12 +882,13 @@ def gamut_clip(c: torch.Tensor, y_row: NDArray[np.float64] = SRGB_TO_XYZ[1]) -> 
 
 
 def render(img: torch.Tensor, params: Params | None = None, legacy: Any = None, output: str = "srgb",
-           px_scale: float = 1.0) -> torch.Tensor:
+           px_scale: float = 1.0, depth: torch.Tensor | None = None) -> torch.Tensor:
     """Apply the pipeline. ``img`` is display-encoded sRGB in [0, 1], (3, H, W) or (B, 3, H, W).
     ``legacy`` is an optional callable applied first to the display-encoded image (the Phase-A5
     looks, until Phase 21 replaces them). ``output`` is "srgb" or "p3" (Display P3: same transfer
     curve, wider primaries). ``px_scale`` is this image's long edge over the full-resolution long
-    edge (pixel-sized detail and grain keep their size in previews)."""
+    edge (pixel-sized detail and grain keep their size in previews). ``depth`` (B, 1, H, W) or
+    (1, H, W) in the source frame enables lens blur."""
     p = dict(params or {})
     single = img.dim() == 3
     x = img.unsqueeze(0) if single else img
@@ -839,6 +900,11 @@ def render(img: torch.Tensor, params: Params | None = None, legacy: Any = None, 
     c = _mat(SRGB_TO_W, srgb_decode(x.clamp(0, 1)))
     c = c * wb_gains(_get(p, "temp", B), _get(p, "tint", B)).to(c).view(B, 3, 1, 1)
     c = c * (2 ** _get(p, "exposure", B).to(c)).view(B, 1, 1, 1)
+    if depth is not None and float(_get(p, "lens_amount", 1)[0]) > 0:
+        d = depth if depth.dim() == 4 else depth.unsqueeze(0)
+        d = torch.nn.functional.interpolate(d.float(), size=src_hw, mode="bilinear", align_corners=False)
+        d = apply_geometry(d.expand(B, 1, -1, -1).repeat(1, 3, 1, 1), p.get("crop"))[:, :1] if p.get("crop") else d.expand(B, 1, -1, -1)
+        c = lens_blur(c, d.to(c), p, max(src_hw))
     maps = mask_maps(p["masks"], src_hw, p.get("crop"), c) if p.get("masks") else None
     for mk, mm in zip(p.get("masks") or [], maps or []):
         sl = mk.get("sliders") or {}
@@ -890,6 +956,7 @@ def spec() -> dict:
               "grade_c": GRADE_C, "grade_l": GRADE_L, "bw_mix": BW_MIX, "vig_stops": VIG_STOPS},
         "masks": {"max": MAX_MASKS, "local": LOCAL_SLIDERS},
         "geometry": {"perspective_k": PERSPECTIVE_K, "distortion_k": DISTORTION_K},
+        "lens": {"taps": vogel().tolist(), "r": LENS_R, "span": LENS_SPAN},
         "detail": {"sigma_px": SIGMA_PX, "sigma_mid": SIGMA_MID, "sigma_big": SIGMA_BIG, "clarity": CLARITY_K,
                    "texture": TEXTURE_K, "sharpen": SHARPEN_K, "sharpen_tau": SHARPEN_TAU, "nr_sigma": NR_SIGMA,
                    "dehaze_w": DEHAZE_W, "dehaze_t0": DEHAZE_T0, "dehaze_veil": DEHAZE_VEIL, "veil_max": VEIL_MAX, "halation_thr": HALATION_THR,
