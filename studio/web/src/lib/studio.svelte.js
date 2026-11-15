@@ -62,7 +62,7 @@ export function initGL(canvas) {
   view.main = makeGL(canvas);
   view.thumbCanvas = document.createElement("canvas");
   view.thumb = makeGL(view.thumbCanvas);
-  /** @type {any} */ (window).__studio = { S, effective, exportParams, setSlider, get main() { return view.main; } };   // automated tests
+  /** @type {any} */ (window).__studio = { S, effective, exportParams, setSlider, setStyle, get main() { return view.main; } };   // automated tests
 }
 
 export async function boot() {

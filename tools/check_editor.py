@@ -112,6 +112,14 @@ def main() -> None:
                 pg.keyboard.press("Control+z")
                 pg.wait_for_timeout(800)
                 res["undo_restores_look"] = S("window.__studio.S.style") == style0
+                # expert style: the model predicts the look's sliders for this photo
+                if S("window.__studio.S.styles.some(s => s.kind === 'model')"):
+                    pg.evaluate("() => window.__studio.setStyle('expert_c')")
+                    pg.wait_for_function("window.__studio.S.style === 'expert_c' && window.__studio.S.params !== null", timeout=60_000)
+                    res["expert_kind"] = S("window.__studio.S.params.kind")
+                    res["expert_sliders"] = S("Object.keys(window.__studio.S.params.sliders || {}).length")
+                    pg.keyboard.press("Control+z")
+                    pg.wait_for_timeout(800)
                 # curves: click on the canvas adds a point
                 cv = pg.locator("#curves")
                 cv.scroll_into_view_if_needed()
