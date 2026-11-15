@@ -13,7 +13,8 @@ with the reference to within 1 code value in 129 of 130 test cases
 ```
 display sRGB ──► geometry ──► [look, Phase A5] ──► linear Rec. 2020
    │                                                    │
-   │    1 white balance ─► 2 exposure ─► 3 tone ─► 4 point curves ─► 5 colour (Oklab) ─► 6 vignette
+   │    1 white balance ─► 2 exposure ─► 3a detail, dehaze, colour NR ─► 3 tone ─► 4 point curves
+   │                         ─► 5 colour (Oklab) ─► 5a halation ─► 6 vignette ─► grain
    │                                                                                       │
    └──────────── output: linear sRGB, luminance-preserving gamut clip, sRGB encode, dither ◄┘
 ```
@@ -123,6 +124,57 @@ hence hue (`test_tone_preserves_hue`: under 2° of Oklab hue). Below the floor, 
 luminance is added as grey, so a lifted black becomes grey rather than dividing by zero. The floor
 $10^{-5}$ is 0.03 of a code value in sRGB, below visibility.
 
+## 3a. Detail, dehaze and noise (spatial)
+
+These operators need neighbourhoods, so they are computed from **local means**: Gaussian blurs of
+the photo after white balance and exposure, at three scales.
+
+| scale | σ | blurred quantities | used by |
+|---|---|---|---|
+| PX | 1 px at full resolution | perceptual $L$ | sharpening, luminance noise |
+| MID | 0.4 % of the long edge | linear RGB, $L$ | texture, colour noise |
+| BIG | 1.5 % of the long edge | $L$, dark channel $\min_c c$, highlight excess | clarity, dehaze, halation |
+
+PX is defined in full-resolution pixels and scaled by the preview's size, so sharpening looks the
+same in a preview as in the export (at 100 %). MID and BIG are fractions of the frame, so they do
+not depend on resolution.
+
+**Detail** is a change $\Delta L$ of perceptual luminance, added before the tone curve and
+therefore applied through the hue-preserving luminance ratio:
+
+$$
+\Delta L = 0.6\,k_{\text{cla}}\,(L - \bar L_{\text{big}})\,4L(1-L)
+ + 0.8\,k_{\text{tex}}\,(L - \bar L_{\text{mid}})
+ + k_{\text{sh}}\,(L - \bar L_{\text{px}})\,m
+ - k_{\text{nr}}\,e^{-((L - \bar L_{\text{px}})/0.03)^2}(L - \bar L_{\text{px}}) .
+$$
+
+- **Clarity** is a large-radius unsharp mask weighted by $4L(1-L)$, so it works on mid-tones and
+  leaves highlights and shadows unhaloed.
+- **Texture** is the same at the fine scale.
+- **Sharpening** is a 1 px unsharp mask. Its mask
+  $m = \operatorname{clamp}((|L - \bar L_{\text{mid}}| - \tau + 0.01)/0.02)$ restricts it to
+  edges as Masking raises $\tau$ up to 0.04.
+- **Luminance noise reduction** removes small deviations from the 1 px mean, those within about
+  0.03 of perceptual luminance. That is the amplitude of noise, not of edges, which the Gaussian
+  weight spares.
+
+**Dehaze** uses the dark-channel prior of He, Sun and Tang [[6]](#ref-he): haze-free regions have
+some channel near zero, so the local minimum over channels estimates the haze. With the
+atmospheric light $A$ (the 99th percentile of linear luminance) and the dark channel averaged at
+the BIG scale,
+
+$$
+t = 1 - 0.9\,k\,\frac{\overline{\min_c c}}{A}, \qquad c' = \frac{c - A(1 - t)}{\max(t, 0.15)} .
+$$
+
+The floor 0.15 keeps dense haze from amplifying noise. Negative dehaze blends up to 35 % toward
+$\min(A, 0.35)$. There is no depth map, so the veil is uniform rather than graded with distance,
+and the cap keeps a night scene's lamps from setting a white veil.
+
+**Colour noise** pulls each pixel's Oklab $(a, b)$ toward the MID-scale mean, leaving lightness
+(and so detail) untouched.
+
 ## 4. Point curves
 
 These are Lightroom's point curves: **RGB** (the same curve on each channel), then **R**, **G**,
@@ -165,6 +217,13 @@ $C = \sqrt{a^2+b^2}$ and $h = \operatorname{atan2}(b, a)$:
   conventional (HSV) degrees and is mapped through the band anchors, so "30° orange" means sRGB
   orange.
 
+## 5a. Halation
+
+Film halation is light that passes through the emulsion, reflects off the base and re-exposes the
+red layer around bright sources. It is modelled as $c \leftarrow c + 1.5\,k\,\bar h\,(1, 0.35,
+0.12)$. Here $h = \operatorname{clamp}((L - 0.75)/0.25)^2$ is each pixel's highlight excess,
+blurred at the BIG scale, so the glow spreads from each light rather than from bright regions only.
+
 ## 6. Vignette
 
 $c \leftarrow c \cdot 2^{2\,(a/100)\,m(r)}$, an exposure-like change of up to ±2 stops in the
@@ -184,6 +243,16 @@ $$
 
 which keeps hue and luminance and gives up chroma, instead of clipping channels, which shifts hue.
 The result is then sRGB-encoded.
+
+## Grain
+
+Grain is added last, to the display-encoded output, as monochrome value noise:
+
+- **Size** sets cells of 1 to 4 full-resolution pixels.
+- **Roughness** mixes in an octave at half that size.
+- The amplitude follows $1 - (2L - 1)^2$, strongest in the mid-tones, as with silver grain.
+- The noise comes from an integer PCG hash [[7]](#ref-pcg), so Python and the shader produce the
+  same grain exactly.
 
 ## Geometry
 
@@ -228,3 +297,7 @@ approximate and unverified (A6.6).
 <span id="ref-fc">[4]</span> Fritsch, F. N., & Carlson, R. E. (1980). *Monotone piecewise cubic interpolation.* SIAM Journal on Numerical Analysis, 17(2), 238–246. [Link](https://doi.org/10.1137/0717021)
 
 <span id="ref-oklab">[5]</span> Ottosson, B. (2020). *A perceptual color space for image processing.* [Link](https://bottosson.github.io/posts/oklab/)
+
+<span id="ref-he">[6]</span> He, K., Sun, J., & Tang, X. (2011). *Single image haze removal using dark channel prior.* IEEE TPAMI, 33(12), 2341–2353. [Link](https://doi.org/10.1109/TPAMI.2010.168)
+
+<span id="ref-pcg">[7]</span> O'Neill, M. E. (2014). *PCG: A family of simple fast space-efficient statistically good algorithms for random number generation.* Harvey Mudd College, HMC-CS-2014-0905. [Link](https://www.pcg-random.org/paper.html)

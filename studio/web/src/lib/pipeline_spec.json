@@ -612,6 +612,105 @@
    "max": 100,
    "default": 0.0,
    "step": 1.0
+  },
+  {
+   "name": "texture",
+   "label": "Texture",
+   "group": "detail",
+   "min": -100,
+   "max": 100,
+   "default": 0.0,
+   "step": 1.0
+  },
+  {
+   "name": "clarity",
+   "label": "Clarity",
+   "group": "detail",
+   "min": -100,
+   "max": 100,
+   "default": 0.0,
+   "step": 1.0
+  },
+  {
+   "name": "dehaze",
+   "label": "Dehaze",
+   "group": "detail",
+   "min": -100,
+   "max": 100,
+   "default": 0.0,
+   "step": 1.0
+  },
+  {
+   "name": "sharpen",
+   "label": "Sharpening",
+   "group": "detail",
+   "min": 0,
+   "max": 150,
+   "default": 0.0,
+   "step": 1.0
+  },
+  {
+   "name": "sharpen_masking",
+   "label": "Masking",
+   "group": "detail",
+   "min": 0,
+   "max": 100,
+   "default": 0.0,
+   "step": 1.0
+  },
+  {
+   "name": "nr_luma",
+   "label": "Noise reduction",
+   "group": "detail",
+   "min": 0,
+   "max": 100,
+   "default": 0.0,
+   "step": 1.0
+  },
+  {
+   "name": "nr_colour",
+   "label": "Colour noise",
+   "group": "detail",
+   "min": 0,
+   "max": 100,
+   "default": 0.0,
+   "step": 1.0
+  },
+  {
+   "name": "grain",
+   "label": "Amount",
+   "group": "effects",
+   "min": 0,
+   "max": 100,
+   "default": 0.0,
+   "step": 1.0
+  },
+  {
+   "name": "grain_size",
+   "label": "Size",
+   "group": "effects",
+   "min": 0,
+   "max": 100,
+   "default": 25,
+   "step": 1.0
+  },
+  {
+   "name": "grain_roughness",
+   "label": "Roughness",
+   "group": "effects",
+   "min": 0,
+   "max": 100,
+   "default": 50,
+   "step": 1.0
+  },
+  {
+   "name": "halation",
+   "label": "Halation",
+   "group": "effects",
+   "min": 0,
+   "max": 100,
+   "default": 0.0,
+   "step": 1.0
   }
  ],
  "bands": [
@@ -2285,5 +2384,44 @@
   "grade_l": 0.1,
   "bw_mix": 0.4,
   "vig_stops": 2.0
+ },
+ "masks": {
+  "max": 4,
+  "local": [
+   "temp",
+   "tint",
+   "exposure",
+   "contrast",
+   "highlights",
+   "shadows",
+   "whites",
+   "blacks",
+   "saturation",
+   "clarity",
+   "texture",
+   "dehaze"
+  ]
+ },
+ "detail": {
+  "sigma_px": 1.0,
+  "sigma_mid": 0.004,
+  "sigma_big": 0.015,
+  "clarity": 0.6,
+  "texture": 0.8,
+  "sharpen": 1.0,
+  "sharpen_tau": 0.04,
+  "nr_sigma": 0.03,
+  "dehaze_w": 0.9,
+  "dehaze_t0": 0.15,
+  "dehaze_veil": 0.35,
+  "veil_max": 0.35,
+  "halation_thr": 0.75,
+  "halation_k": 1.5,
+  "halation_tint": [
+   1.0,
+   0.35,
+   0.12
+  ],
+  "grain": 0.1
  }
 }

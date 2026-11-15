@@ -8,7 +8,7 @@ import { untrack } from "svelte";
 import { api, loadImage, pollJob, json } from "./api.js";
 import { B, initBackend } from "./backend.js";
 import { effectiveFrom, mixEffective } from "./render.js";
-import { draw, makeGL, outputSize, setImage, wbGains, DEFAULTS, SPEC } from "./pipeline.js";
+import { draw, makeGL, outputSize, pixelScale, setImage, wbGains, DEFAULTS, SPEC } from "./pipeline.js";
 
 export const ZERO_SCENE = () => ({ haze: 0, clarity_near: 0, clarity_far: 0, sky_exposure: 0, sky_warmth: 0, sky_saturation: 0 });
 const NO_LOOK = "";
@@ -95,8 +95,10 @@ export function render() {
   view.shown = e;
   e = { ...e, p: drawnP() };
   sizeCanvas();
+  const full = B.fullSize?.(S.id), c = view.main.canvas;
+  const pxScale = full ? pixelScale(c.width, view.main.src, Math.max(...full), drawnP().crop) : 1;
   draw(view.main, e, { mode: S.peek === "__original" ? 1 : S.peek ? 2 : modeCode(), split: S.split,
-                       clipWarn: S.clip ? 1 : 0 });
+                       clipWarn: S.clip ? 1 : 0, pxScale });
   untrack(() => S.frame++);          // no dependency: effects that call render() must not loop
 }
 function sizeCanvas() {

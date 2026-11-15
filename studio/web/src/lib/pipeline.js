@@ -149,6 +149,8 @@ uniform float sat, vib; uniform vec4 band[8]; uniform vec4 hsl[8]; uniform int b
 uniform vec4 grade[4]; uniform vec2 gradeBal; uniform int colourOn;
 uniform vec4 vig; uniform float vigRound; uniform vec2 frame;
 uniform vec4 kc; uniform vec4 kc2; uniform vec4 kc3;
+uniform int stage; uniform int spatialOn; uniform sampler2D tPx; uniform sampler2D tMid; uniform sampler2D tBig;
+uniform vec4 det; uniform vec4 det2; uniform vec4 haze; uniform vec3 halTint; uniform vec4 grain; uniform float outH;
 in vec2 uv; out vec4 o;
 
 float knot(int i) { return lk[i / 4][i % 4]; }
@@ -186,10 +188,22 @@ float bandW(int k, float h) {
   float t = d < 0.0 ? -d / b.y : d / b.z;
   return t < 1.0 ? pow(cos(clamp(t, 0.0, 1.0) * 1.5707963267949), 2.0) : 0.0;
 }
+uint pcg(uint v) { uint st = v * 747796405u + 2891336453u; uint w = ((st >> ((st >> 28u) + 4u)) ^ st) * 277803737u; return (w >> 22u) ^ w; }
+float hv(float a, float b, uint seed) {
+  uint k = (uint(int(a)) & 0xFFFFu) | ((uint(int(b)) & 0xFFFFu) << 16u);
+  return float(pcg(k ^ seed)) / 4294967295.0 * 2.0 - 1.0;
+}
+float vnoise(vec2 q, float cell, uint seed) {
+  vec2 u = q / cell, i = floor(u), f = u - i; f = f * f * (3.0 - 2.0 * f);
+  return hv(i.x, i.y, seed) * (1.0 - f.x) * (1.0 - f.y) + hv(i.x + 1.0, i.y, seed) * f.x * (1.0 - f.y)
+       + hv(i.x, i.y + 1.0, seed) * (1.0 - f.x) * f.y + hv(i.x + 1.0, i.y + 1.0, seed) * f.x * f.y;
+}
+vec3 toLab(vec3 c) { return lmsToLab * cbrt3(wToLms * c); }
+vec3 fromLab(vec3 l) { vec3 m = labToLms * l; return lmsToW * (m * m * m); }
 float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
 void main() {
-  vec2 suv = (geo * vec3(uv, 1.0)).xy;
+  vec2 suv = stage == 1 ? uv : (geo * vec3(uv, 1.0)).xy;
   bool inside = all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)));
   vec3 x = inside ? texture(img, suv).rgb : vec3(0.0);
   if (mode == 1 || (mode == 0 && uv.x < split)) {
@@ -209,9 +223,25 @@ void main() {
   }
   vec3 c = (linIn == 1 && lookOn == 0) ? lin0 : srgbToW * dec3(clamp(x, 0.0, 1.0));
   c *= wb * expo;
+  if (stage == 1) { o = vec4(c, enc(dot(luma, c))); return; }
+
+  float dL = 0.0;
+  if (spatialOn == 1) {                             // detail and dehaze from the local means (pipeline.py 3a)
+    vec2 fuv = vec2(suv.x, 1.0 - suv.y);             // render targets store the image top at t = 1
+    float Lpx = texture(tPx, fuv).r; vec4 mid = texture(tMid, fuv); vec4 big = texture(tBig, fuv);
+    float A = haze.x, amt = haze.y;
+    if (amt > 0.0) { float t = 1.0 - haze.z * amt * clamp(big.g / A, 0.0, 1.0); c = (c - A * (1.0 - t)) / max(t, haze.w); }
+    else if (amt < 0.0) { float v = -amt * kc3.x; c = c * (1.0 - v) + min(A, kc3.y) * v; }
+    if (det2.z > 0.0) { vec3 l = toLab(c), lm = toLab(mid.rgb); c = fromLab(vec3(l.x, mix(l.yz, lm.yz, det2.z))); }
+    float L0 = enc(dot(luma, c)), L0c = clamp(L0, 0.0, 1.0);
+    dL = det.x * (L0 - big.r) * 4.0 * L0c * (1.0 - L0c) + det.y * (L0 - mid.a);
+    float tau = det.w, e = abs(L0 - mid.a), msk = clamp((e - tau + 0.01) / 0.02, 0.0, 1.0);
+    dL += det.z * (L0 - Lpx) * msk;
+    float nd = (L0 - Lpx) / kc2.w; dL -= det2.x * exp(-nd * nd) * (L0 - Lpx);
+  }
 
   // tone: curve on perceptual luminance; colour scaled by the luminance ratio
-  float Y = dot(luma, c), Lp = toneEval(enc(Y)), Yp = dec(max(Lp, 0.0));
+  float Y = dot(luma, c), Lp = toneEval(max(enc(Y) + dL, 0.0)), Yp = dec(max(Lp, 0.0));
   float kr = Yp / max(Y, kc.x);
   c = kr * c + (Yp - kr * Y);
 
@@ -247,6 +277,8 @@ void main() {
     c = lmsToW * (lms * lms * lms);
   }
 
+  if (spatialOn == 1 && det2.y > 0.0) c += kc3.z * det2.y * texture(tBig, vec2(suv.x, 1.0 - suv.y)).b * halTint;     // halation
+
   if (vig.x != 0.0) {                               // exposure-like vignette, as pipeline.vignette_mask
     vec2 q = uv * 2.0 - 1.0; float asp = frame.x / frame.y, rn = vigRound;
     float sx = 1.0 + max(rn, 0.0) * (asp - 1.0), pw = 2.0 * pow(2.0, -min(rn, 0.0) * 1.5);
@@ -265,9 +297,126 @@ void main() {
   vec3 outc = enc3(clamp(Ys + max(t, 0.0) * d, 0.0, 1.0));
   if (clipWarn == 1) { if (dot(outY, s) > 1.0) outc = vec3(1.0, 0.15, 0.15); else if (dot(outY, s) <= 0.0) outc = vec3(0.15, 0.35, 1.0); }
   else if (clipWarn == 2 && (over || under)) outc = vec3(1.0, 0.0, 1.0);
+  if (grain.x > 0.0) {                              // film grain, as pipeline.apply_grain
+    vec2 q = vec2(gl_FragCoord.x, outH - gl_FragCoord.y);
+    float n = (1.0 - 0.5 * grain.z) * vnoise(q, grain.y, 17u) + 0.5 * grain.z * vnoise(q, grain.y * 0.5, 91u);
+    vec3 lin = dec3(outc); float Yg = dot(outY, lin), Lg = enc(Yg), wmid = clamp(1.0 - (2.0 * Lg - 1.0) * (2.0 * Lg - 1.0), 0.0, 1.0);
+    float Yn = dec(clamp(Lg + grain.w * grain.x * wmid * n, 0.0, 1.0)), kg = Yn / max(Yg, kc.x);
+    outc = enc3(clamp(kg * lin + (Yn - kg * Yg), 0.0, 1.0));
+  }
   outc += dither * (rnd(gl_FragCoord.xy) - rnd(gl_FragCoord.yx + 17.0)) / 255.0;
   o = vec4(outc, 1.0);
 }`;
+
+const BVS = VS;
+const BFS = `#version 300 es
+precision highp float;
+uniform sampler2D src; uniform int mode; uniform vec2 dir; uniform float w[25]; uniform int n; uniform vec4 thr;
+in vec2 uv; out vec4 o;
+vec4 pick(vec2 p) {
+  vec4 b = texture(src, p);
+  if (mode == 1) return vec4(b.a, 0.0, 0.0, 0.0);                                     // px: L
+  if (mode == 2) { float h = clamp((b.a - thr.x) / (1.0 - thr.x), 0.0, 1.0); return vec4(b.a, min(b.r, min(b.g, b.b)), h * h, 0.0); }   // big: L, dark, highlight
+  return b;
+}
+void main() {
+  vec2 q = vec2(uv.x, 1.0 - uv.y);
+  if (n == 0) { o = pick(q); return; }                                              // copy / downsample
+  vec4 acc = w[0] * texture(src, q);
+  for (int i = 1; i < 25; i++) { if (i >= n) break; vec2 d = dir * float(i); acc += w[i] * (texture(src, q + d) + texture(src, q - d)); }
+  o = acc;
+}`;
+
+function target(gl, w, h, fmt) {
+  const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, fmt.internal, w, h, 0, gl.RGBA, fmt.type, null);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+  const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { t, fb, w, h };
+}
+
+/** The local means (pipeline.local_means) on the GPU: a prep pass (linear colour + L in source
+ * space), then Gaussian blurs; mid at 1/2 and big at 1/8 resolution after 2x box downsamples. */
+function spatial(R, e) {
+  const { gl } = R, [W, H] = R.src;
+  const key = `${W}x${H}`;
+  if (!R.sp || R.sp.key !== key) {
+    const half = gl.getExtension("EXT_color_buffer_float") || gl.getExtension("EXT_color_buffer_half_float");
+    const fmt = half ? { internal: gl.RGBA16F, type: gl.HALF_FLOAT } : { internal: gl.RGBA8, type: gl.UNSIGNED_BYTE };
+    const d = (k) => [Math.max(1, Math.round(W / k)), Math.max(1, Math.round(H / k))];
+    R.sp = { key, base: target(gl, W, H, fmt), px: [target(gl, W, H, fmt), target(gl, W, H, fmt)],
+             mid: [target(gl, ...d(2), fmt), target(gl, ...d(2), fmt)],
+             d4: target(gl, ...d(4), fmt), big: [target(gl, ...d(8), fmt), target(gl, ...d(8), fmt)] };
+  }
+  const sp = R.sp, B = R.blur;
+  // prep: the main program at stage 1, in source space
+  gl.useProgram(R.prog);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, sp.base.fb); gl.viewport(0, 0, W, H);
+  gl.uniform1i(R.u("stage"), 1);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.uniform1i(R.u("stage"), 0);
+  gl.useProgram(B.prog);
+  const run = (src, dst, mode, sigma, dirx, diry) => {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb); gl.viewport(0, 0, dst.w, dst.h);
+    gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, src.t); gl.uniform1i(B.u("src"), 6);
+    gl.uniform1i(B.u("mode"), mode);
+    if (sigma > 0.3) {
+      const r = Math.min(24, Math.ceil(3 * sigma)), w = [];
+      for (let i = 0; i <= r; i++) w.push(Math.exp(-0.5 * (i / sigma) ** 2));
+      const sum = w[0] + 2 * w.slice(1).reduce((a, b) => a + b, 0);
+      const wf = new Float32Array(25); w.forEach((v, i) => (wf[i] = v / sum));
+      gl.uniform1fv(B.u("w"), wf); gl.uniform1i(B.u("n"), r + 1);
+      gl.uniform2f(B.u("dir"), dirx / src.w, diry / src.h);
+    } else gl.uniform1i(B.u("n"), 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  };
+  gl.uniform4f(B.u("thr"), SPEC.detail.halation_thr, 0, 0, 0);
+  const D = SPEC.detail, edge = Math.max(W, H), pxs = e.pxScale ?? 1;
+  // px: L at sigma_px (in this image's pixels)
+  run(sp.base, sp.px[1], 1, 0, 0, 0);
+  run(sp.px[1], sp.px[0], 0, D.sigma_px * pxs, 1, 0); run(sp.px[0], sp.px[1], 0, D.sigma_px * pxs, 0, 1);
+  // mid: [rgb, L] at 1/2 resolution
+  run(sp.base, sp.mid[1], 0, 0, 0, 0);
+  // the 2x and 8x box downsamples already blur by sqrt((k^2 - 1) / 12) full-resolution pixels; the
+  // Gaussian adds the rest, so the total matches the reference's single full-resolution Gaussian
+  const rest = (sigma, k) => Math.sqrt(Math.max(0, sigma * sigma - (k * k - 1) / 12)) / k;
+  const sm = rest(D.sigma_mid * edge, 2);
+  run(sp.mid[1], sp.mid[0], 0, sm, 1, 0); run(sp.mid[0], sp.mid[1], 0, sm, 0, 1);
+  // big: [L, dark, highlight] at 1/8 resolution (2x box steps)
+  run(sp.base, sp.mid[0], 2, 0, 0, 0); run(sp.mid[0], sp.d4, 0, 0, 0, 0); run(sp.d4, sp.big[1], 0, 0, 0, 0);
+  const sb = rest(D.sigma_big * edge, 8);
+  run(sp.big[1], sp.big[0], 0, sb, 1, 0); run(sp.big[0], sp.big[1], 0, sb, 0, 1);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.useProgram(R.prog);
+  for (const [unit, name, tex] of [[2, "tPx", sp.px[1]], [3, "tMid", sp.mid[1]], [4, "tBig", sp.big[1]]]) {
+    gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex.t); gl.uniform1i(R.u(name), unit);
+  }
+}
+
+/** 99th percentile of linear luminance of the source after exposure (dehaze's atmospheric light),
+ * from every k-th pixel at full preview resolution (no averaging, which would pull in the extremes). */
+function hazeLight(R, expo) {
+  if (R.q99 == null) {
+    const img = R.srcImg, Y = [];
+    if (img?.data instanceof Float32Array) {
+      const n = img.data.length / 4, step = Math.max(1, Math.floor(n / 65536));
+      for (let i = 0; i < n; i += step) Y.push(M.luma[0] * img.data[4 * i] + M.luma[1] * img.data[4 * i + 1] + M.luma[2] * img.data[4 * i + 2]);
+    } else if (img) {
+      const W = img.width ?? img.naturalWidth, H = img.height ?? img.naturalHeight, c = document.createElement("canvas");
+      c.width = W; c.height = H; const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, W, H).data, n = W * H, step = Math.max(1, Math.floor(n / 65536));
+      const dl = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4), sy = SPEC.m.srgb_y;
+      for (let i = 0; i < n; i += step) Y.push(sy[0] * dl(d[4 * i] / 255) + sy[1] * dl(d[4 * i + 1] / 255) + sy[2] * dl(d[4 * i + 2] / 255));
+    }
+    Y.sort((a, b) => a - b);
+    R.q99 = Y.length ? Y[Math.floor(0.99 * (Y.length - 1))] : 1;
+  }
+  return Math.max(1e-3, R.q99 * expo);
+}
+
+const SPATIAL_KEYS = ["texture", "clarity", "dehaze", "sharpen", "nr_luma", "nr_colour", "halation"];
 
 export function makeGL(canvas) {
   const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true, premultipliedAlpha: false });
@@ -294,6 +443,14 @@ export function makeGL(canvas) {
   }
   gl.uniform3fv(u("luma"), new Float32Array(SPEC.m.luma)); gl.uniform3fv(u("srgbY"), new Float32Array(SPEC.m.srgb_y));
   gl.uniform4fv(u("band"), new Float32Array(BAND_GEO.flatMap((g) => [...g, 0])));
+  R.prog = pr;
+  const bp = gl.createProgram();
+  gl.attachShader(bp, sh(gl.VERTEX_SHADER, BVS)); gl.attachShader(bp, sh(gl.FRAGMENT_SHADER, BFS)); gl.linkProgram(bp);
+  if (!gl.getProgramParameter(bp, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(bp));
+  const bl = gl.getAttribLocation(bp, "pos"); gl.enableVertexAttribArray(bl); gl.vertexAttribPointer(bl, 2, gl.FLOAT, false, 0, 0);
+  const bc = {};
+  R.blur = { prog: bp, u: (n) => (n in bc ? bc[n] : (bc[n] = gl.getUniformLocation(bp, n))) };
+  gl.useProgram(pr);
   return R;
 }
 
@@ -304,6 +461,7 @@ export function setImage(R, img, asOriginal = true) {
   if (asOriginal) upload(R, R.origTex, 1, img);
   R.src = [img.width ?? img.naturalWidth, img.height ?? img.naturalHeight];
   R.linear = !!img.linear;
+  if (asOriginal) { R.srcImg = img; R.q99 = null; }
 }
 
 function upload(R, tex, unit, img) {
@@ -330,7 +488,8 @@ function upload(R, tex, unit, img) {
  */
 export function draw(R, e, opts = {}) {
   const { gl, u } = R, p = e.p || {};
-  const { mode = 2, split = 0.5, clipWarn = 0, dither = 1, space = "srgb" } = opts;
+  gl.useProgram(R.prog);
+  const { mode = 2, split = 0.5, clipWarn = 0, dither = 1, space = "srgb" } = opts;   // also: pxScale, fb
   gl.uniformMatrix3fv(u("wToOut"), true, new Float32Array(space === "p3" ? SPEC.m.w_to_p3 : SPEC.m.w_to_srgb));
   gl.uniform3fv(u("outY"), new Float32Array(space === "p3" ? SPEC.m.p3_y : SPEC.m.srgb_y));
   gl.viewport(0, 0, R.canvas.width, R.canvas.height);
@@ -384,8 +543,29 @@ export function draw(R, e, opts = {}) {
   gl.uniform4f(u("vig"), get(p, "vig_amount") / 100, get(p, "vig_midpoint") / 100, get(p, "vig_feather") / 100, 0);
   gl.uniform1f(u("vigRound"), get(p, "vig_roundness") / 100);
   gl.uniform4f(u("kc"), K.eps_y, K.chroma_full, K.vib_c0, K.hsl_hue_deg);
-  gl.uniform4f(u("kc2"), K.hsl_lum, K.bw_mix, K.vig_stops, 0);
+  const D = SPEC.detail;
+  gl.uniform4f(u("kc2"), K.hsl_lum, K.bw_mix, K.vig_stops, D.nr_sigma);
+  gl.uniform4f(u("kc3"), D.dehaze_veil, D.veil_max, D.halation_k, 0);
+  const on = SPATIAL_KEYS.some((k) => get(p, k) !== 0);
+  gl.uniform1i(u("spatialOn"), on ? 1 : 0); gl.uniform1i(u("stage"), 0);
+  const g100 = (k) => get(p, k) / 100;
+  gl.uniform4f(u("det"), D.clarity * g100("clarity"), D.texture * g100("texture"), D.sharpen * g100("sharpen"), D.sharpen_tau * g100("sharpen_masking"));
+  gl.uniform4f(u("det2"), g100("nr_luma"), g100("halation"), g100("nr_colour"), 0);
+  gl.uniform3fv(u("halTint"), new Float32Array(D.halation_tint));
+  gl.uniform4f(u("haze"), on ? hazeLight(R, 2 ** get(p, "exposure")) : 1, g100("dehaze"), D.dehaze_w, D.dehaze_t0);
+  const pxs = opts.pxScale ?? 1;
+  gl.uniform4f(u("grain"), g100("grain"), (1 + 3 * g100("grain_size")) * pxs, g100("grain_roughness"), D.grain);
+  gl.uniform1f(u("outH"), R.canvas.height);
+  if (on) spatial(R, { ...e, pxScale: pxs });
+  gl.bindFramebuffer(gl.FRAMEBUFFER, opts.fb ?? null);
+  gl.viewport(0, 0, R.canvas.width, R.canvas.height);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+/** Output pixels per full-resolution source pixel (pixel-sized effects keep their size). */
+export function pixelScale(outW, src, fullEdge, crop) {
+  const fullW = fullEdge ? (fullEdge * src[0]) / Math.max(src[0], src[1]) : src[0];
+  return Math.min(1, outW / ((crop?.w ?? 1) * fullW));
 }
 
 /** Does this slider dict change anything? (The default edit is the identity.) */
@@ -404,17 +584,19 @@ export function bakeCube(e, size = 33, title = "Irodori") {
     data[i] = r / (size - 1); data[i + 1] = g / (size - 1); data[i + 2] = b / (size - 1); data[i + 3] = 1;
   }
   setImage(R, { data, width: size * size, height: size });
-  const { crop: _c, vig_amount: _v, ...p } = e.p || {};
-  let out, float = !!gl.getExtension("EXT_color_buffer_float");
+  const p = Object.fromEntries(Object.entries(e.p || {}).filter(([k]) => k !== "crop" && k !== "vig_amount"
+    && k !== "grain" && !SPATIAL_KEYS.includes(k)));            // a LUT holds the per-pixel colour part only
+  let out, fb = null, float = !!gl.getExtension("EXT_color_buffer_float");
   if (float) {
-    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, t);
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, c.width, c.height, 0, gl.RGBA, gl.FLOAT, null);
-    const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
     float = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
-    if (!float) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!float) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); fb = null; }
   }
-  draw(R, { ...e, p }, { mode: 2, dither: 0 });
+  draw(R, { ...e, p }, { mode: 2, dither: 0, fb });
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   if (float) { out = new Float32Array(4 * n); gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.FLOAT, out); }
   else { const u8 = new Uint8Array(4 * n); gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.UNSIGNED_BYTE, u8); out = Float32Array.from(u8, (v) => v / 255); }
   gl.getExtension("WEBGL_lose_context")?.loseContext();
@@ -434,7 +616,7 @@ export function bakeCube(e, size = 33, title = "Irodori") {
  * (maxEdge) -> source (so a raw file is expanded only up to the GPU's texture limit). Returns the
  * pixels: 8-bit RGBA (dithered) or, with ``float``, 32-bit RGBA in display encoding, top row first.
  */
-export function renderPixels(src, e, { edge = 0, space = "srgb", float = false } = {}) {
+export function renderPixels(src, e, { edge = 0, space = "srgb", float = false, fullEdge = 0 } = {}) {
   const c = document.createElement("canvas"), R = makeGL(c), { gl } = R;
   const lim = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   let img = typeof src === "function" ? src(lim) : src;
@@ -450,12 +632,13 @@ export function renderPixels(src, e, { edge = 0, space = "srgb", float = false }
   let fb = null;
   if (float) {
     if (!gl.getExtension("EXT_color_buffer_float")) throw new Error("16-bit export needs float rendering, which this browser does not offer.");
-    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, t);
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
     fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
   }
-  draw(R, e, { mode: 2, dither: float ? 0 : 1, space });
+  draw(R, e, { mode: 2, dither: float ? 0 : 1, space, fb, pxScale: pixelScale(w, R.src, fullEdge, e.p?.crop) });
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   const px = float ? new Float32Array(4 * w * h) : new Uint8Array(4 * w * h);
   gl.readPixels(0, 0, w, h, gl.RGBA, float ? gl.FLOAT : gl.UNSIGNED_BYTE, px);
   gl.getExtension("WEBGL_lose_context")?.loseContext();

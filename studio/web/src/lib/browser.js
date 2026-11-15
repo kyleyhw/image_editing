@@ -179,6 +179,8 @@ export const browser = {
   /** The texture source for editing: linear float data for raw files, else null (use the preview). */
   source: (id) => photos.get(id)?.lin ?? null,
   isRaw: (id) => !!photos.get(id)?.raw,
+  /** Full-resolution size, for pixel-sized effects in the preview. */
+  fullSize: (id) => { const p = photos.get(id); return p?.raw ? [p.raw.width, p.raw.height] : [p?.bitmap.width, p?.bitmap.height]; },
   async predict(id, style) {
     const p = photos.get(id), st = styles.find((s) => s.card.name === style);
     const { theta, ood } = head(st, await features(p));
@@ -192,7 +194,8 @@ export const browser = {
     if (fmt === "json") return save(new Blob([JSON.stringify(params, null, 1)], { type: "application/json" }), `${stem}.json`);
     if (fmt === "xmp") return save(new Blob([lightroomXMP(eff.p, stem)], { type: "application/rdf+xml" }), `${stem}.xmp`);
     const src = p.raw ? (lim) => linearRGBA(p.raw, lim) : p.bitmap;
-    const px = renderPixels(src, eff, { edge, space, float: fmt === "png16" || fmt === "tif16" });
+    const full = Math.max(...this.fullSize(id));
+    const px = renderPixels(src, eff, { edge, space, float: fmt === "png16" || fmt === "tif16", fullEdge: full });
     if (fmt === "png16") return save(await encodePNG16(px, space), `${stem}.png`);
     if (fmt === "tif16") return save(encodeTIFF16(px), `${stem}.tif`);
     const type = fmt === "png" ? "image/png" : "image/jpeg";

@@ -63,6 +63,8 @@ def cases() -> list[tuple[str, dict]]:
     """Each control alone at a strong setting, then random combinations of everything."""
     out: list[tuple[str, dict]] = [("identity", {})]
     for s in P.SLIDERS:
+        if s["group"] in ("detail", "effects"):
+            continue
         if s["name"] in ("vig_midpoint", "vig_feather", "vig_roundness", "grade_blending", "grade_balance") \
                 or s["name"].endswith("_hue") and s["name"].startswith("grade_"):
             continue
@@ -81,10 +83,15 @@ def cases() -> list[tuple[str, dict]]:
     out.append(("curves", {"curves": {"rgb": [[0, 0.08], [0.3, 0.25], [0.7, 0.78], [1, 0.95]],
                                       "r": [[0, 0], [0.5, 0.55], [1, 1]], "b": [[0, 0.1], [1, 0.9]]}}))
     out.append(("crop + straighten", {"crop": {"x": 0.1, "y": 0.05, "w": 0.7, "h": 0.8, "angle": 4.0}}))
+    for k, v in [("clarity", 80), ("clarity", -80), ("texture", 80), ("dehaze", 60), ("dehaze", -60), ("sharpen", 120),
+                 ("nr_luma", 100), ("nr_colour", 100), ("halation", 100), ("grain", 80)]:
+        out.append((f"spatial {k} {v:+d}", {k: v}))
     rng = np.random.default_rng(SEED + 1)
     for i in range(12):
         p: dict = {}
         for s in P.SLIDERS:
+            if s["group"] in ("detail", "effects"):
+                continue
             if s["name"] == "bw":
                 p["bw"] = float(rng.random() < 0.15)
             elif rng.random() < 0.35:
@@ -121,11 +128,18 @@ window.ready = true;
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, default=ROOT / "tests/reports")
+    ap.add_argument("--image", type=Path, help="test on this photo instead of the synthetic image")
+    ap.add_argument("--only", help="only cases whose name starts with this")
     args = ap.parse_args()
     t0 = time.time()
     from playwright.sync_api import sync_playwright
 
-    img = test_image()
+    if args.image:
+        im = Image.open(args.image).convert("RGB")
+        im.thumbnail((640, 640))
+        img = np.asarray(im).copy()
+    else:
+        img = test_image()
     buf = io.BytesIO()
     Image.fromarray(img).save(buf, "PNG")
     page_html = PAGE % (base64.b64encode(browser_module().encode()).decode(), base64.b64encode(buf.getvalue()).decode())
@@ -142,6 +156,8 @@ def main() -> None:
         page.set_content(page_html)
         page.wait_for_function("window.ready === true", timeout=60_000)
         for name, p in cases():
+            if args.only and not name.startswith(args.only):
+                continue
             r = page.evaluate("p => window.renderCase(p)", p)
             got = np.array(r["data"], np.uint8).reshape(r["h"], r["w"], 4)[::-1, :, :3].astype(np.float64)
             with torch.no_grad():
@@ -152,15 +168,21 @@ def main() -> None:
                 d = d[2:-2, 2:-2]
                 got, ref8 = got[2:-2, 2:-2], ref8[2:-2, 2:-2]
             de = ciede2000(srgb_to_lab(ref8 / 255), srgb_to_lab(got / 255))
+            spatial = name.startswith("spatial")
+            # spatial operators blur differently on the GPU (downsampled pyramid) than the reference
+            # (one full-resolution Gaussian); their target is on the mean only: mean dE00 <= 0.5
+            ok = de.mean() <= 0.5 if spatial else (d.max() <= 1 and de.mean() <= 0.5)
             rows.append({"case": name, "max": float(d.max()), "mean": float(d.mean()),
-                         "de_mean": float(de.mean()), "de_p99": float(np.percentile(de, 99)),
-                         "ok": bool(d.max() <= 1 and de.mean() <= 0.5)})
+                         "de_mean": float(de.mean()), "de_p99": float(np.percentile(de, 99)), "ok": bool(ok)})
             print(f"{name:28s} max {d.max():4.0f}  mean {d.mean():.3f}  dE00 mean {de.mean():.3f} p99 "
                   f"{np.percentile(de, 99):.3f}  {'ok' if rows[-1]['ok'] else 'FAIL'}", flush=True)
         b.close()
     runtime = time.time() - t0
     args.out.mkdir(parents=True, exist_ok=True)
     Image.fromarray(img).save(args.out / "assets" / "pipeline_test_image.png") if (args.out / "assets").exists() else None
+    if args.image or args.only:
+        print(f"{sum(r['ok'] for r in rows)}/{len(rows)} cases within target (not saved: partial run)")
+        return
     (args.out / "pipeline_agreement.json").write_text(json.dumps({"rows": rows, "errors": errors, "runtime_s": runtime}, indent=1))
     n_ok = sum(r["ok"] for r in rows)
     print(f"{n_ok}/{len(rows)} cases within target; page errors: {errors or 'none'}; {runtime:.0f} s")

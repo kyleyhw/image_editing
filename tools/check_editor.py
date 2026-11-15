@@ -110,6 +110,17 @@ def main() -> None:
                 pg.wait_for_timeout(300)
                 pg.screenshot(path=str(args.out / "editor_colour.png"), full_page=False)
                 pg.locator(".inspector").screenshot(path=str(args.out / "inspector.png"))
+                # detail and effects (multi-pass GPU path)
+                pg.click("summary:has-text('Detail')")
+                before = sig()
+                pg.fill(".slider:has(#s_clarity) .num", "60")
+                pg.keyboard.press("Enter")
+                pg.click("summary:has-text('Effects')")
+                pg.fill(".slider:has(#s_grain) .num", "40")
+                pg.keyboard.press("Enter")
+                pg.wait_for_timeout(500)
+                res["detail_changes_picture"] = sig() != before
+                pg.screenshot(path=str(args.out / "editor_detail.png"))
                 # crop
                 w0 = S("document.getElementById('view').width")
                 pg.click("summary:has-text('Crop & straighten')")

@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Any, Mapping, Union
+from typing import Any, Mapping, Sequence, Union
 
 import numpy as np
 import torch
@@ -146,6 +146,13 @@ SLIDERS: list[dict] = [
     _s("cal_shadow_tint", "Shadows tint", "calibration", -100, 100),
     _s("vig_amount", "Amount", "vignette", -100, 100), _s("vig_midpoint", "Midpoint", "vignette", 0, 100, 50),
     _s("vig_feather", "Feather", "vignette", 0, 100, 50), _s("vig_roundness", "Roundness", "vignette", -100, 100),
+    _s("texture", "Texture", "detail", -100, 100), _s("clarity", "Clarity", "detail", -100, 100),
+    _s("dehaze", "Dehaze", "detail", -100, 100),
+    _s("sharpen", "Sharpening", "detail", 0, 150), _s("sharpen_masking", "Masking", "detail", 0, 100),
+    _s("nr_luma", "Noise reduction", "detail", 0, 100), _s("nr_colour", "Colour noise", "detail", 0, 100),
+    _s("grain", "Amount", "effects", 0, 100), _s("grain_size", "Size", "effects", 0, 100, 25),
+    _s("grain_roughness", "Roughness", "effects", 0, 100, 50),
+    _s("halation", "Halation", "effects", 0, 100),
 ]
 DEFAULTS: dict[str, float] = {s["name"]: s["default"] for s in SLIDERS}
 NAMES = [s["name"] for s in SLIDERS]
@@ -253,18 +260,297 @@ def pchip(xs: torch.Tensor, ys: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
     return torch.where(inside, cubic, lin)
 
 
-def apply_tone(c: torch.Tensor, p: Params) -> torch.Tensor:
-    """Hue-preserving tone: the curve acts on perceptual luminance, colour is scaled by Y'/Y."""
+TONE_KEYS = ("contrast", "highlights", "shadows", "whites", "blacks")
+
+
+def apply_tone(c: torch.Tensor, p: Params, detail: torch.Tensor | None = None,
+               maps: Sequence[torch.Tensor] | None = None) -> torch.Tensor:
+    """Hue-preserving tone: the curve acts on perceptual luminance, colour is scaled by Y'/Y.
+    ``detail`` is an optional change of perceptual luminance (texture, clarity, sharpening, NR)
+    added before the curve."""
     B = c.shape[0]
     Y = _mat(LUMA[None, :], c)[:, :1]                                     # (B, 1, H, W)
     L = srgb_encode(Y)
+    if detail is not None:
+        L = (L + detail).clamp_min(0)
     xs = torch.tensor(TONE_X, dtype=c.dtype, device=c.device)
-    Lp = pchip(xs, tone_points(p, B).to(c), L.flatten(1)).view_as(L)
+    local = [(mk, m) for mk, m in zip(p.get("masks") or [], maps or [])
+             if any((mk.get("sliders") or {}).get(k) for k in TONE_KEYS)]
+    if local:
+        # per-pixel ordinates: the slider fields enter linearly, then monotone, then PCHIP
+        y = torch.tensor(TONE_X, dtype=c.dtype).view(1, -1, 1, 1).expand(B, -1, *L.shape[2:]).clone()
+        for k, row in TONE_ROWS.items():
+            y = y + local_field(p, k, B, maps, c) / 100 * torch.tensor(row, dtype=c.dtype).view(1, -1, 1, 1)
+        h = local_field(p, "highlights", B, maps, c) / 100
+        y[:, -1:] = y[:, -1:] - TONE_RECOVERY * torch.relu(-h)
+        ym = [y[:, :1]]
+        for i in range(1, y.shape[1]):
+            ym.append(torch.maximum(y[:, i:i + 1], ym[-1] + MONO_EPS))
+        Lp = pchip_px(xs, torch.cat(ym, 1), L)
+    else:
+        Lp = pchip(xs, tone_points(p, B).to(c), L.flatten(1)).view_as(L)
     Yp = srgb_decode(Lp.clamp_min(0))
     # c' = k c + (Y' - k Y): a pure luminance ratio k = Y'/Y wherever Y >= EPS_Y; below it the ratio is
     # capped and the rest of the new luminance is added as grey, so a lifted black becomes grey.
     k = Yp / Y.clamp_min(EPS_Y)
     return k * c + (Yp - k * Y)
+
+
+# --------------------------------------------------------------------------- 3a detail (spatial)
+# Local means at three scales of the photo after white balance and exposure (A6, Phase 24):
+#   PX   1 px at full resolution: sharpening and luminance noise (pixel-level detail)
+#   MID  0.4 % of the long edge (6 px at 1600 px): texture and colour noise (fine structure)
+#   BIG  1.5 % of the long edge (24 px at 1600 px): clarity, dehaze and halation (local contrast,
+#        the scale at which haze and glow vary)
+# ``px_scale`` = this image's long edge / the full-resolution long edge, so pixel-sized operators
+# (sharpening, noise, grain) keep their size between the preview and the export.
+SIGMA_PX = 1.0
+SIGMA_MID = 0.004
+SIGMA_BIG = 0.015
+CLARITY_K = 0.6         # clarity +100 adds 0.6 x (L - local mean), weighted to the mid-tones
+TEXTURE_K = 0.8         # texture +100 adds 0.8 x (L - fine mean)
+SHARPEN_K = 1.0         # sharpening 100 adds 1.0 x (L - 1 px mean) (Lightroom's range is 0-150)
+SHARPEN_TAU = 0.04      # masking 100 restricts sharpening to edges with local contrast above 0.04
+NR_SIGMA = 0.03         # luminance NR smooths differences below ~0.03 of perceptual L (noise, not edges)
+DEHAZE_W = 0.9          # dehaze +100 removes 90 % of the estimated haze (dark-channel prior)
+DEHAZE_T0 = 0.15        # transmission floor: prevents noise blow-up in dense haze
+DEHAZE_VEIL = 0.35      # dehaze -100 blends 35 % toward the atmospheric light
+VEIL_MAX = 0.35         # ...capped at linear 0.35 (perceptual 0.63), so a night scene's lamps do not set a white veil
+HALATION_THR = 0.75     # glow comes from perceptual luminance above 0.75 (highlights)
+HALATION_K = 1.5        # halation 100 adds 1.5 x the blurred highlight excess (linear light)
+HALATION_TINT = (1.0, 0.35, 0.12)   # red-orange, the colour of film halation (red layer exposed by backscatter)
+GRAIN_K = 0.10          # grain 100: +-0.10 of perceptual L in the mid-tones
+
+
+def gaussian_blur(x: torch.Tensor, sigma: float) -> torch.Tensor:
+    """Separable Gaussian blur (reflect padding), kernel radius 3 sigma."""
+    if sigma < 0.3:
+        return x
+    r = int(math.ceil(3 * sigma))
+    t = torch.arange(-r, r + 1, dtype=x.dtype, device=x.device)
+    k = torch.exp(-0.5 * (t / sigma) ** 2)
+    k = k / k.sum()
+    C = x.shape[1]
+    pad_x = min(r, x.shape[3] - 1)
+    pad_y = min(r, x.shape[2] - 1)
+    y = torch.nn.functional.pad(x, (pad_x, pad_x, 0, 0), mode="reflect")
+    y = torch.nn.functional.conv2d(y, k[r - pad_x: r + pad_x + 1].view(1, 1, 1, -1).expand(C, 1, 1, -1), groups=C)
+    y = torch.nn.functional.pad(y, (0, 0, pad_y, pad_y), mode="reflect")
+    return torch.nn.functional.conv2d(y, k[r - pad_y: r + pad_y + 1].view(1, 1, -1, 1).expand(C, 1, -1, 1), groups=C)
+
+
+SPATIAL = ("texture", "clarity", "dehaze", "sharpen", "nr_luma", "nr_colour", "halation")
+
+
+def needs_spatial(p: Params) -> bool:
+    return any(float(torch.as_tensor(p.get(k, 0)).abs().max()) > 0 for k in SPATIAL) or any(
+        (mk.get("sliders") or {}).get(k) for mk in p.get("masks") or [] for k in ("clarity", "texture", "dehaze"))
+
+
+def local_means(c: torch.Tensor, px_scale: float) -> dict[str, torch.Tensor]:
+    """Local means. px: perceptual L at 1 px; mid: [linear RGB, L] at 0.4 %; big: [L, dark
+    channel min_c(c), highlight excess] at 1.5 %. The dark channel and the highlight excess are
+    taken per pixel before blurring (the dark-channel prior; glow spreads from each light)."""
+    L = srgb_encode(_mat(LUMA[None, :], c))
+    edge = max(c.shape[2], c.shape[3])
+    dark = c.amin(1, keepdim=True)
+    hi = ((L - HALATION_THR) / (1 - HALATION_THR)).clamp(0, 1) ** 2
+    return {"px": gaussian_blur(L, SIGMA_PX * px_scale), "mid": gaussian_blur(torch.cat([c, L], 1), SIGMA_MID * edge),
+            "big": gaussian_blur(torch.cat([L, dark, hi], 1), SIGMA_BIG * edge)}
+
+
+def haze_light(c: torch.Tensor) -> torch.Tensor:
+    """Atmospheric light: the 99th percentile of linear luminance, per image (B,)."""
+    Y = _mat(LUMA[None, :], c).flatten(1)
+    return torch.quantile(Y.float(), 0.99, dim=1).to(c).clamp_min(1e-3)
+
+
+def apply_dehaze(c: torch.Tensor, p: Params, m: dict[str, torch.Tensor],
+                 maps: Sequence[torch.Tensor] | None = None) -> torch.Tensor:
+    """Dark-channel dehaze (He, Sun & Tang 2011), with the dark channel averaged at the BIG scale:
+    t = 1 - w * dark / A,  c' = (c - A (1 - t)) / max(t, t0). Negative amounts add a uniform veil
+    toward A instead (there is no depth, so the haze is not graded with distance)."""
+    B = c.shape[0]
+    amt = local_field(p, "dehaze", B, maps, c) / 100
+    A = haze_light(c).view(B, 1, 1, 1)
+    dark = (m["big"][:, 1:2] / A).clamp(0, 1)
+    t = 1 - DEHAZE_W * amt.clamp_min(0) * dark
+    out = (c - A * (1 - t)) / t.clamp_min(DEHAZE_T0)
+    veil = (-amt).clamp_min(0) * DEHAZE_VEIL
+    return torch.where(amt >= 0, out, c * (1 - veil) + A.clamp_max(VEIL_MAX) * veil)
+
+
+def detail_delta(L0: torch.Tensor, p: Params, m: dict[str, torch.Tensor],
+                 maps: Sequence[torch.Tensor] | None = None) -> torch.Tensor:
+    """Change of perceptual luminance from texture, clarity, sharpening and luminance NR."""
+    B = L0.shape[0]
+    g = lambda k: local_field(p, k, B, maps, L0) / 100      # noqa: E731
+    Lpx, Lmid, Lbig = m["px"], m["mid"][:, 3:], m["big"][:, :1]
+    d = CLARITY_K * g("clarity") * (L0 - Lbig) * (4 * L0.clamp(0, 1) * (1 - L0.clamp(0, 1)))
+    d = d + TEXTURE_K * g("texture") * (L0 - Lmid)
+    tau = SHARPEN_TAU * g("sharpen_masking")
+    e = (L0 - Lmid).abs()
+    mask = ((e - tau + 0.01) / 0.02).clamp(0, 1)
+    d = d + SHARPEN_K * g("sharpen") * (L0 - Lpx) * mask
+    w = torch.exp(-(((L0 - Lpx) / NR_SIGMA) ** 2))
+    return d - g("nr_luma") * w * (L0 - Lpx)
+
+
+def apply_colour_nr(c: torch.Tensor, p: Params, m: dict[str, torch.Tensor]) -> torch.Tensor:
+    """Colour noise: pull each pixel's Oklab (a, b) toward the MID-scale local mean."""
+    B = c.shape[0]
+    k = (_get(p, "nr_colour", B).to(c) / 100).view(B, 1, 1)
+    lab, lab_m = to_oklab(c), to_oklab(m["mid"][:, :3])
+    ab = lab[:, 1:] * (1 - k.unsqueeze(1)) + lab_m[:, 1:] * k.unsqueeze(1)
+    return from_oklab(torch.cat([lab[:, :1], ab], 1))
+
+
+def apply_halation(c: torch.Tensor, p: Params, m: dict[str, torch.Tensor]) -> torch.Tensor:
+    B = c.shape[0]
+    k = (_get(p, "halation", B).to(c) / 100).view(B, 1, 1, 1)
+    h = m["big"][:, 2:3]
+    return c + HALATION_K * k * h * torch.tensor(HALATION_TINT, dtype=c.dtype).view(1, 3, 1, 1)
+
+
+def _pcg(v: torch.Tensor) -> torch.Tensor:
+    """PCG hash on uint32 (O'Neill 2014), in int64 arithmetic; the shader computes the same."""
+    M = 0xFFFFFFFF
+    s = (v * 747796405 + 2891336453) & M
+    w = (((s >> ((s >> 28) + 4)) ^ s) * 277803737) & M
+    return ((w >> 22) ^ w) & M
+
+
+def value_noise(h: int, w: int, cell: float, seed: int, offset: tuple[float, float] = (0.0, 0.0)) -> torch.Tensor:
+    """Smooth value noise in [-1, 1] on a grid of ``cell`` pixels (pixel centres, as the shader)."""
+    yy, xx = torch.meshgrid(torch.arange(h, dtype=torch.float64) + 0.5 + offset[1],
+                            torch.arange(w, dtype=torch.float64) + 0.5 + offset[0], indexing="ij")
+    u, v = xx / cell, yy / cell
+    iu, iv = torch.floor(u), torch.floor(v)
+    fu, fv = u - iu, v - iv
+    fu, fv = fu * fu * (3 - 2 * fu), fv * fv * (3 - 2 * fv)
+
+    def hv(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+        k = _pcg(((a.long() & 0xFFFF) | ((b.long() & 0xFFFF) << 16)) ^ seed)
+        return k.double() / 0xFFFFFFFF * 2 - 1
+
+    n = (hv(iu, iv) * (1 - fu) * (1 - fv) + hv(iu + 1, iv) * fu * (1 - fv)
+         + hv(iu, iv + 1) * (1 - fu) * fv + hv(iu + 1, iv + 1) * fu * fv)
+    return n.float()
+
+
+def apply_grain(out: torch.Tensor, p: Params, px_scale: float) -> torch.Tensor:
+    """Monochrome film grain on the display-encoded output: value noise of 1-4 px cells (size),
+    with a finer octave mixed in by roughness, strongest in the mid-tones."""
+    B, _, H, W = out.shape
+    amt = _get(p, "grain", B).to(out)
+    if not bool((amt > 0).any()):
+        return out
+    size = float(_get(p, "grain_size", 1)[0]) / 100
+    rough = float(_get(p, "grain_roughness", 1)[0]) / 100
+    cell = (1 + 3 * size) * px_scale
+    n = (1 - 0.5 * rough) * value_noise(H, W, cell, 17) + 0.5 * rough * value_noise(H, W, cell / 2, 91)
+    Y = _mat(SRGB_TO_XYZ[1:2], srgb_decode(out))
+    L = srgb_encode(Y)
+    wmid = (1 - (2 * L - 1) ** 2).clamp(0, 1)
+    dL = GRAIN_K * (amt / 100).view(B, 1, 1, 1) * wmid * n.to(out)
+    Yn = srgb_decode((L + dL).clamp(0, 1))
+    k = Yn / Y.clamp_min(EPS_Y)
+    return srgb_encode((k * srgb_decode(out) + (Yn - k * Y)).clamp(0, 1))
+
+
+# --------------------------------------------------------------------------- local adjustments (Phase 23)
+# A mask is {"type": "linear" | "radial" | "brush" | "all", "invert": bool, shape parameters in source
+# coordinates (fractions of the frame, before crop), optional "range": {"lum": [lo, hi], "feather": f,
+# "hue": deg, "hue_width": deg}, "sliders": {name: value}}. Its sliders are added where the mask is
+# on: s(p) = s + sum_j m_j(p) s_j (A6.3). Up to MAX_MASKS masks.
+MAX_MASKS = 4
+LOCAL_SLIDERS = ["temp", "tint", "exposure", "contrast", "highlights", "shadows", "whites", "blacks",
+                 "saturation", "clarity", "texture", "dehaze"]
+
+
+def _smooth(t: torch.Tensor) -> torch.Tensor:
+    t = t.clamp(0, 1)
+    return t * t * (3 - 2 * t)
+
+
+def mask_shape(mk: Mapping[str, Any], h: int, w: int) -> torch.Tensor:
+    """(H, W) shape mask in source space, before range and invert."""
+    yy, xx = torch.meshgrid((torch.arange(h) + 0.5) / h, (torch.arange(w) + 0.5) / w, indexing="ij")
+    kind = mk.get("type", "all")
+    if kind == "linear":
+        # full effect on the start side, fading to none at the end (Lightroom's linear gradient)
+        x0, y0, x1, y1 = (float(mk[k]) for k in ("x0", "y0", "x1", "y1"))
+        dx, dy = (x1 - x0) * w, (y1 - y0) * h
+        t = ((xx - x0) * w * dx + (yy - y0) * h * dy) / max(dx * dx + dy * dy, 1e-9)
+        return 1 - _smooth(t)
+    if kind == "radial":
+        cx, cy, rx, ry = (float(mk[k]) for k in ("cx", "cy", "rx", "ry"))
+        a = math.radians(float(mk.get("angle", 0)))
+        px, py = (xx - cx) * w, (yy - cy) * h
+        u = (px * math.cos(a) + py * math.sin(a)) / max(rx * w, 1e-6)
+        v = (-px * math.sin(a) + py * math.cos(a)) / max(ry * h, 1e-6)
+        r = torch.sqrt(u * u + v * v)
+        f = max(float(mk.get("feather", 50)) / 100, 0.01)
+        return 1 - _smooth((r - (1 - f)) / f)
+    if kind == "brush":
+        import base64
+        import io
+
+        from PIL import Image
+        im = Image.open(io.BytesIO(base64.b64decode(mk["data"]))).convert("L")
+        t = torch.from_numpy(np.asarray(im).copy()).float()[None, None] / 255
+        return torch.nn.functional.interpolate(t, size=(h, w), mode="bilinear", align_corners=False)[0, 0]
+    return torch.ones(h, w)
+
+
+def mask_range(mk: Mapping[str, Any], L: torch.Tensor, hue: torch.Tensor, chroma: torch.Tensor) -> torch.Tensor:
+    """Range refinement from the pixel's own perceptual luminance and Oklab hue (1 where no range)."""
+    rg = mk.get("range") or {}
+    out = torch.ones_like(L)
+    if "lum" in rg:
+        lo, hi = (float(v) for v in rg["lum"])
+        fe = max(float(rg.get("feather", 10)) / 100, 1e-3)
+        out = out * _smooth((L - lo + fe) / fe) * _smooth((hi + fe - L) / fe)
+    if "hue" in rg:
+        c = math.radians(float(rg["hue"]))
+        wdt = math.radians(float(rg.get("hue_width", 30)))
+        d = (torch.remainder(hue - c + math.pi, 2 * math.pi) - math.pi).abs()
+        out = out * (1 - _smooth((d - wdt) / (0.5 * wdt))) * _smooth(chroma / 0.03)
+    return out
+
+
+def mask_maps(masks: Sequence[Mapping[str, Any]], src_hw: tuple[int, int], crop: Mapping[str, float] | None,
+              c0: torch.Tensor) -> list[torch.Tensor]:
+    """(B, 1, H, W) mask for each mask, in output space (after crop), from the global-edit colour c0."""
+    B, _, H, W = c0.shape
+    L = srgb_encode(_mat(LUMA[None, :], c0))
+    lab = to_oklab(c0)
+    hue, chroma = torch.atan2(lab[:, 2:3], lab[:, 1:2]), torch.sqrt(lab[:, 1:2] ** 2 + lab[:, 2:3] ** 2)
+    out = []
+    for mk in list(masks)[:MAX_MASKS]:
+        shp = mask_shape(mk, *src_hw)[None, None].expand(B, 1, -1, -1).to(c0)
+        shp = apply_geometry(shp.expand(B, 3, -1, -1), crop)[:, :1] if crop else shp
+        m = shp * mask_range(mk, L, hue, chroma)
+        out.append(1 - m if mk.get("invert") else m)
+    return out
+
+
+def local_field(p: Params, k: str, B: int, maps: Sequence[torch.Tensor] | None, like: torch.Tensor) -> torch.Tensor:
+    """A slider as a field: the global value plus each mask's value where that mask is on.
+    (B, 1, 1, 1) without masks, else (B, 1, H, W)."""
+    v = _get(p, k, B).to(like).view(B, 1, 1, 1)
+    for mk, m in zip(p.get("masks") or [], maps or []):
+        dv = float((mk.get("sliders") or {}).get(k, 0))
+        if dv:
+            v = v + m * dv
+    return v
+
+
+def pchip_px(xs: torch.Tensor, ys: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+    """PCHIP with per-pixel ordinates: ys (B, n, H, W), t (B, 1, H, W)."""
+    B, n, H, W = ys.shape
+    flat_y = ys.permute(0, 2, 3, 1).reshape(B * H * W, n)
+    return pchip(xs, flat_y, t.reshape(B * H * W, 1)).view(B, 1, H, W)
 
 
 # --------------------------------------------------------------------------- 4 point curves
@@ -356,7 +642,7 @@ def _grade_dir(hue_deg: torch.Tensor) -> torch.Tensor:
     return torch.stack([torch.cos(ang), torch.sin(ang)], -1)
 
 
-def apply_colour(c: torch.Tensor, p: Params) -> torch.Tensor:
+def apply_colour(c: torch.Tensor, p: Params, maps: Sequence[torch.Tensor] | None = None) -> torch.Tensor:
     B = c.shape[0]
     g = lambda k: _get(p, k, B).to(c).view(B, 1, 1)          # noqa: E731
 
@@ -391,6 +677,10 @@ def apply_colour(c: torch.Tensor, p: Params) -> torch.Tensor:
     vw = 1 - (C / VIB_C0).clamp(0, 1)
     C = C * (1 + SAT_GAIN * g("saturation") / 100).clamp_min(0) * (1 + vib * vw * vw).clamp_min(0)
     C = C * (1 + sat).clamp_min(0)
+    for mk, m in zip(p.get("masks") or [], maps or []):
+        ds = float((mk.get("sliders") or {}).get("saturation", 0))
+        if ds:
+            C = C * (1 + SAT_GAIN * m[:, 0] * ds / 100).clamp_min(0)
     h = h + torch.deg2rad(hue * HSL_HUE_DEG) * cw
     L = L * (1 + lum * HSL_LUM * cw)
 
@@ -498,29 +788,49 @@ def gamut_clip(c: torch.Tensor, y_row: NDArray[np.float64] = SRGB_TO_XYZ[1]) -> 
     return (Y + t * d).clamp(0, 1)
 
 
-def render(img: torch.Tensor, params: Params | None = None, legacy: Any = None, output: str = "srgb") -> torch.Tensor:
+def render(img: torch.Tensor, params: Params | None = None, legacy: Any = None, output: str = "srgb",
+           px_scale: float = 1.0) -> torch.Tensor:
     """Apply the pipeline. ``img`` is display-encoded sRGB in [0, 1], (3, H, W) or (B, 3, H, W).
     ``legacy`` is an optional callable applied first to the display-encoded image (the Phase-A5
     looks, until Phase 21 replaces them). ``output`` is "srgb" or "p3" (Display P3: same transfer
-    curve, wider primaries)."""
+    curve, wider primaries). ``px_scale`` is this image's long edge over the full-resolution long
+    edge (pixel-sized detail and grain keep their size in previews)."""
     p = dict(params or {})
     single = img.dim() == 3
     x = img.unsqueeze(0) if single else img
     if legacy is not None:
         x = legacy(x)
+    src_hw = (x.shape[2], x.shape[3])
     x = apply_geometry(x, p.get("crop"))
     B = x.shape[0]
     c = _mat(SRGB_TO_W, srgb_decode(x.clamp(0, 1)))
     c = c * wb_gains(_get(p, "temp", B), _get(p, "tint", B)).to(c).view(B, 3, 1, 1)
     c = c * (2 ** _get(p, "exposure", B).to(c)).view(B, 1, 1, 1)
-    c = apply_tone(c, p)
+    maps = mask_maps(p["masks"], src_hw, p.get("crop"), c) if p.get("masks") else None
+    for mk, mm in zip(p.get("masks") or [], maps or []):
+        sl = mk.get("sliders") or {}
+        if sl.get("temp") or sl.get("tint"):
+            g = wb_gains(torch.tensor([float(sl.get("temp", 0))]), torch.tensor([float(sl.get("tint", 0))]))[0].to(c)
+            c = c * torch.exp(mm * torch.log(g).view(1, 3, 1, 1))
+        if sl.get("exposure"):
+            c = c * 2 ** (mm * float(sl["exposure"]))
+    detail, m = None, None
+    if needs_spatial(p):
+        m = local_means(c, px_scale)
+        c = apply_dehaze(c, p, m, maps)
+        c = apply_colour_nr(c, p, m)
+        detail = detail_delta(srgb_encode(_mat(LUMA[None, :], c)), p, m, maps)
+    c = apply_tone(c, p, detail, maps)
     c = apply_curves(c, p.get("curves"))
-    c = apply_colour(c, p)
+    c = apply_colour(c, p, maps)
+    if m is not None:
+        c = apply_halation(c, p, m)
     c = apply_vignette(c, p)
     if output == "p3":
         out = srgb_encode(gamut_clip(_mat(W_TO_P3, c), P3_TO_XYZ[1]))
     else:
         out = srgb_encode(gamut_clip(_mat(W_TO_SRGB, c)))
+    out = apply_grain(out, p, px_scale)
     return out[0] if single else out
 
 
@@ -545,6 +855,11 @@ def spec() -> dict:
         "k": {"eps_y": EPS_Y, "cal_shift": CAL_SHIFT, "cal_shadow": CAL_SHADOW, "sat_gain": SAT_GAIN,
               "vib_c0": VIB_C0, "hsl_hue_deg": HSL_HUE_DEG, "hsl_lum": HSL_LUM, "chroma_full": CHROMA_FULL,
               "grade_c": GRADE_C, "grade_l": GRADE_L, "bw_mix": BW_MIX, "vig_stops": VIG_STOPS},
+        "masks": {"max": MAX_MASKS, "local": LOCAL_SLIDERS},
+        "detail": {"sigma_px": SIGMA_PX, "sigma_mid": SIGMA_MID, "sigma_big": SIGMA_BIG, "clarity": CLARITY_K,
+                   "texture": TEXTURE_K, "sharpen": SHARPEN_K, "sharpen_tau": SHARPEN_TAU, "nr_sigma": NR_SIGMA,
+                   "dehaze_w": DEHAZE_W, "dehaze_t0": DEHAZE_T0, "dehaze_veil": DEHAZE_VEIL, "veil_max": VEIL_MAX, "halation_thr": HALATION_THR,
+                   "halation_k": HALATION_K, "halation_tint": list(HALATION_TINT), "grain": GRAIN_K},
     }
 
 

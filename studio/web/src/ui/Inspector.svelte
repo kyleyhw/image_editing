@@ -11,6 +11,8 @@
   import BWPanel from "../panels/BWPanel.svelte";
   import CalibrationPanel from "../panels/CalibrationPanel.svelte";
   import VignettePanel from "../panels/VignettePanel.svelte";
+  import DetailPanel from "../panels/DetailPanel.svelte";
+  import EffectsPanel from "../panels/EffectsPanel.svelte";
   import GeometryPanel from "../panels/GeometryPanel.svelte";
   import ScenePanel from "../panels/ScenePanel.svelte";
   import HistogramPanel from "../panels/HistogramPanel.svelte";
@@ -25,6 +27,7 @@
   const G = {
     basic: group(/^(temp|tint|exposure|contrast|highlights|shadows|whites|blacks|vibrance|saturation)$/),
     mixer: group(/^hsl_/), grading: group(/^grade_/), bw: group(/^bw/), cal: group(/^cal_/), vig: group(/^vig_/),
+    detail: group(/^(texture|clarity|dehaze|sharpen|sharpen_masking|nr_luma|nr_colour)$/), fx: group(/^(grain|grain_size|grain_roughness|halation)$/),
   };
 </script>
 
@@ -62,9 +65,11 @@
   <Section title="Curves" edited={!!S.p.curves} onreset={() => resetGroup(["curves"])}><CurvesPanel /></Section>
   <Section title="Colour mixer" open={false} edited={edited(G.mixer)} onreset={() => resetGroup(G.mixer)}><MixerPanel /></Section>
   <Section title="Colour grading" open={false} edited={edited(G.grading)} onreset={() => resetGroup(G.grading)}><GradingPanel /></Section>
+  <Section title="Detail" open={false} edited={edited(G.detail)} onreset={() => resetGroup(G.detail)}><DetailPanel /></Section>
   <Section title="Black & white" open={false} edited={edited(G.bw)} onreset={() => resetGroup(G.bw)}><BWPanel /></Section>
   <Section title="Crop & straighten" open={false} edited={!!S.p.crop} onreset={() => resetGroup(["crop"])}><GeometryPanel /></Section>
   <Section title="Vignette" open={false} edited={edited(G.vig)} onreset={() => resetGroup(G.vig)}><VignettePanel /></Section>
+  <Section title="Effects" open={false} edited={edited(G.fx)} onreset={() => resetGroup(G.fx)}><EffectsPanel /></Section>
   <Section title="Calibration" open={false} edited={edited(G.cal)} onreset={() => resetGroup(G.cal)}><CalibrationPanel /></Section>
   {#if S.caps.scene}<Section title="Scene" open={false}><ScenePanel /></Section>{/if}
 
