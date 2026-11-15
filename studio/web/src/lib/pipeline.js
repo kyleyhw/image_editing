@@ -867,7 +867,7 @@ export function combine(...layers) {
     if (!layer) continue;
     for (const [k, v] of Object.entries(layer)) {
       if (k === "curves") { out.curves ??= {}; for (const [c, pts] of Object.entries(v)) out.curves[c] = composeCurve(out.curves[c], pts); }
-      else if (k === "crop") out.crop = v;
+      else if (k === "crop" || k === "masks") out[k] = v;              // belong to the photo: the last layer's
       else if (k === "bw") out.bw = Math.max(out.bw ?? 0, v);
       else if (k.startsWith("grade_") && k.endsWith("_hue")) { if (layer[k.replace("_hue", "_sat")]) out[k] = v; }
       else { const d = DEFAULTS[k] ?? 0; out[k] = clampTo(k, (out[k] ?? d) + (v - d)); }

@@ -24,7 +24,12 @@
   let { open = $bindable(false) } = $props();
 
   const card = $derived(S.styles.find((s) => s.name === S.style));
-  const changes = $derived(S.params ? describe(effectiveFrom(S.params, S.strength), S.params.knots) : []);
+  // what the look does: for a slider look its main settings, for a learned look measured through its renderer
+  const changes = $derived(!S.params ? [] : S.params.kind === "sliders"
+    ? Object.entries(S.params.sliders).filter(([k, v]) => typeof v === "number" && !k.endsWith("_hue") && Math.abs(v) >= (k === "exposure" ? 0.05 : 5))
+        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 8)
+        .map(([k, v]) => ({ label: SLIDERS.find((s) => s.name === k)?.label ?? k, value: (v > 0 ? "+" : "") + (k === "exposure" ? (v * S.strength).toFixed(2) : Math.round(v * S.strength)) }))
+    : describe(effectiveFrom(S.params, S.strength), S.params.knots));
   const group = (re) => SLIDERS.filter((s) => re.test(s.name)).map((s) => s.name);
   const edited = (names) => names.some((n) => n in S.p);
   const G = {

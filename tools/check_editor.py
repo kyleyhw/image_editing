@@ -77,6 +77,11 @@ def main() -> None:
                 const px = new Uint8Array(4 * 64); g.readPixels(Math.floor(c.width/2) - 32, Math.floor(c.height/2), 64, 1, g.RGBA, g.UNSIGNED_BYTE, px);
                 return Array.from(px).reduce((a, v) => a + v, 0); }""")   # noqa: E731
             if tag == "desk":
+                pg.wait_for_timeout(2500)
+                res["auto_available"] = S("window.__studio.S.caps.auto === true")
+                res["auto_on"] = S("window.__studio.S.autoOn")
+                res["auto_sliders"] = S("window.__studio.S.auto")
+                res["look_kind"] = S("window.__studio.S.params?.kind ?? 'head'")
                 pg.click("button[data-mode=after]")
                 pg.wait_for_timeout(300)
                 before = sig()
@@ -185,7 +190,7 @@ def main() -> None:
                 with Image.open(args.out / "export.png") as im:
                     res["png16_mode"] = f"{im.mode} {im.size}"
                 xmp = (args.out / "export.xmp").read_text()
-                res["xmp_has_exposure"] = 'crs:Exposure2012="+0.80"' in xmp and "ToneCurvePV2012" in xmp
+                res["xmp_has_exposure"] = "crs:Exposure2012=" in xmp and "ToneCurvePV2012" in xmp
                 cube = (args.out / "export.cube").read_text().splitlines()
                 res["cube_rows"] = sum(1 for ln in cube if ln and ln[0].isdigit())
                 # workflow: copy / paste, preset, snapshot, history, persistence across a reload

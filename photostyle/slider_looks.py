@@ -201,8 +201,8 @@ def combine(*layers: dict) -> dict:
                 cur = out.setdefault("curves", {})
                 for ch, pts in v.items():
                     cur[ch] = compose_curve(cur.get(ch), pts)
-            elif k == "crop":
-                out["crop"] = v
+            elif k in ("crop", "masks"):
+                out[k] = v
             elif k == "bw":
                 out["bw"] = max(out.get("bw", 0.0), v)
             elif k.startswith("grade_") and k.endswith("_hue"):
