@@ -102,9 +102,11 @@ def main() -> None:
                 res["curve_points"] = S("(window.__studio.S.p.curves?.rgb || []).length")
                 # mixer and grading
                 pg.click("summary:has-text('Colour mixer')")
-                pg.fill(".slider:has(#s_hsl_hue_orange) .num", "-40"); pg.keyboard.press("Enter")
+                pg.fill(".slider:has(#s_hsl_hue_orange) .num", "-40")
+                pg.keyboard.press("Enter")
                 pg.click("summary:has-text('Colour grading')")
-                pg.fill(".slider:has(#s_grade_shadows_sat) .num", "40"); pg.keyboard.press("Enter")
+                pg.fill(".slider:has(#s_grade_shadows_sat) .num", "40")
+                pg.keyboard.press("Enter")
                 pg.wait_for_timeout(300)
                 pg.screenshot(path=str(args.out / "editor_colour.png"), full_page=False)
                 pg.locator(".inspector").screenshot(path=str(args.out / "inspector.png"))
@@ -120,9 +122,12 @@ def main() -> None:
                 pg.screenshot(path=str(args.out / "editor_crop_tool.png"))
                 pg.click("button:has-text('Done')")
                 # clipping, zoom
-                pg.keyboard.press("j"); pg.wait_for_timeout(300)
+                pg.keyboard.press("j")
+                pg.wait_for_timeout(300)
                 pg.screenshot(path=str(args.out / "editor_clipping.png"))
-                pg.keyboard.press("j"); pg.keyboard.press("z"); pg.wait_for_timeout(300)
+                pg.keyboard.press("j")
+                pg.keyboard.press("z")
+                pg.wait_for_timeout(300)
                 res["zoom"] = S("window.__studio.S.zoom")
                 pg.screenshot(path=str(args.out / "editor_zoom100.png"))
                 pg.keyboard.press("z")
@@ -163,7 +168,8 @@ def main() -> None:
                     dl.value.save_as(f)
                     res[f"raw_{rf.suffix}_tif_bytes"] = f.stat().st_size
             else:
-                pg.click(".quickbar .btn"); pg.wait_for_timeout(600)
+                pg.click(".quickbar .btn")
+                pg.wait_for_timeout(600)
                 pg.screenshot(path=str(args.out / "phone_sheet.png"))
             res[f"{tag}_errors"] = errs
             pg.close()
