@@ -45,7 +45,12 @@ def psnr(a: NDArray[np.float32], b: NDArray[np.float32]) -> float:
 
 
 def du(path: Path) -> int:
-    return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
+    # hidden folders (.tmp: sparse in-flight shards; .state: bookkeeping) excluded
+    return sum(
+        p.stat().st_size
+        for p in path.rglob("*")
+        if p.is_file() and not any(q.startswith(".") for q in p.relative_to(path).parts)
+    )
 
 
 def quantiles(x: list[float]) -> dict[str, float]:

@@ -8,13 +8,18 @@ and 15 are not covered here).*
 | Task | Item | Result | Decision |
 |---|---|---|---|
 | 9 | Disk, memory and network budget | 29 GB free disk, 15 GB RAM shared with other work, 4 CPUs, 10–125 MB/s download | 512 px lossless proxies; peak FiveK footprint ≈ 9 GB final + ≤ 6.3 GB transient |
-| 10 | MIT-Adobe FiveK, all splits, experts C, A, B, D, E | FIVEK_STATE | **Go**; see the deviation on raw files below |
+| 10 | MIT-Adobe FiveK, all splits, experts C, A, B, D, E | Expert C and all 5,000 originals complete (train 3,500, test 1,000, validation 500); experts A, B, D, E downloading in the background | **Go**; see the deviation on raw files below |
 | 11 | PPR10K | Official Google Drive files refuse download ("quota exceeded", 2 attempts); no other complete mirror | **Blocked**; retry later; one partial alternative recorded |
 | 12 | Film colour tables | 294 HaldCLUTs (RawTherapee Film Simulation Collection, CC BY-SA 4.0) and a tested loader | **Go** |
 | 13 | Camera looks from raw files with embedded JPEGs | Leica previews q 18–54 or 160 px; Fujifilm previews usable, but one sample per look | **No-go** with raw.pixls.us; **conditional go** with the owner's own Fujifilm files |
 | 16 | darktable as a headless reference editor | `darktable-cli` 4.6.1 installs from apt and exports a DNG in 3.3 s | **Go** for rendering; slider calibration needs generated module parameters |
 
-FIVEK_RUNNING_NOTE
+**State at the time of writing (08:06 UTC).** The expert C phase finished at 08:02 UTC with no
+failed shards. Experts A, B, D and E (20,000 images, about 1.5 GB each) are still downloading in
+the background (`data/logs/fetch_fivek_ae.log`) at about 3,600 rows/h, so they should finish
+in 4–6 h. The machine's 4 CPUs are shared with other work (load average 11 at 08:10 UTC). Re-running the
+fetch command resumes and finishes them. After they finish, `tools/fivek_stats.py` updates the
+counts below.
 
 ## 1. Budget (task 9)
 
@@ -130,9 +135,40 @@ saves about 260 GB of transfer.
 
 ### Counts, disk use and statistics
 
-FIVEK_COUNTS
+| Split | Originals | Expert C | Disk (originals + expert C + XMP) |
+|---|---|---|---|
+| train | 3,500 | 3,500 | 2.06 GB |
+| test | 1,000 | 1,000 | 0.58 GB |
+| validation | 500 | 500 | 0.29 GB |
+| **total** | **5,000** | **5,000** | **2.93 GB** |
 
-FIVEK_STATS
+Per image: original PNG 282 KB, expert PNG 284 KB, XMP 10.7 KB (means). Each further expert adds
+about 1.5 GB, so the five experts will occupy about 8.9 GB. Transient disk use: up to three
+shard files of at most 2.1 GB in `data/fivek/.tmp/`, deleted after each shard.
+
+Taken from the per-row records (`data/fivek/{split}/expert_c/img_NNNN.json`). The baseline uses
+200 seeded rows per split (`tests/reports/phase20_fivek_stats.json`):
+
+| Quantity | train | test | validation |
+|---|---|---|---|
+| Rotation applied to the original: none / 90° / 180° / 270° (`np.rot90` k = 0, 1, 2, 3) | 2279 / 620 / 9 / 592 | 700 / 155 / 2 / 143 | 329 / 92 / 3 / 76 |
+| Originals smaller than the export (scaled) | 29 | 8 | 5 |
+| Alignment correlation r: p5 / median / min | 0.910 / 0.980 / 0.190 | 0.903 / 0.980 / 0.703 | 0.909 / 0.980 / 0.718 |
+| Expert C pixels outside sRGB: median / p95 | 4.6 % / 34 % | 5.1 % / 35 % | 5.1 % / 37 % |
+| Expert C crops (`crs:HasCrop`) | 1 | 0 | 0 |
+| Identity baseline, original vs expert C: mean ΔE₀₀ / PSNR | 10.4 / 19.8 dB | 10.3 / 19.8 dB | 10.2 / 20.1 dB |
+
+34 % of the originals needed a rotation: portrait photos turned by 90° either way, plus 14
+photos turned by 180°. The 180° cases were inspected and are correct. Seventeen rows have
+r < 0.8. Those inspected (train 108, 155, 540) are correctly registered: the expert brightened a
+night or indoor scene, or darkened a sky, so the luminance patterns differ. **One pair is
+broken.** Train 2152 (`a4949`) has the only cropped expert export (3687 × 2950 of 5634 × 3752),
+its original is visibly distorted, and r = 0.19. Excluding `align_r < 0.6` in
+`data/manifests/fivek.csv` removes exactly this row.
+
+The identity baseline is not comparable with published FiveK figures. Those use Adobe's
+"as shot" rendering as the input, whereas these originals are LibRaw renders with
+auto-brightening.
 
 ![FiveK sample: twelve pairs of the original (left of each pair) and expert C's edit (right)](assets/phase20_fivek_sheet.jpg)
 
@@ -149,8 +185,8 @@ Lightroom's default tone curve, so they look flatter than a camera JPEG would.*
 - **The previous tool `tools/download_fivek_subset.py` (and `download_fivek_landscapes.py`, which
   shares its approach) produced wrong pairs.** It saved the ProPhoto experts as JPEG without the
   profile, so every reader treats them as sRGB and sees them desaturated. It also resized the
-  unrotated original and the upright expert independently, so about 35 % of pairs (portrait photos;
-  254 of the first 720 rows needed a rotation) are misregistered by 90°. Any model trained on those
+  unrotated original and the upright expert independently, so 34 % of pairs (1,692 of 5,000 rows
+  needed a rotation, almost all by 90°) are misregistered. Any model trained on those
   pairs (A5, `tests/reports/mit5k_expert_c_report.md`) learned from both errors. The tool was not
   changed, because it is outside this task; `tools/fetch_fivek.py` replaces it.
 - **Deviation from task 10.** The plan asks for FiveK raw files decoded through our own raw path.
@@ -322,7 +358,17 @@ uv run pytest -q tests/test_haldclut.py
 
 ## Runtime
 
-RUNTIME
+| Step | Wall time |
+|---|---|
+| Whole session (probing, tools, downloads, report) | 05:36–08:10 UTC, 2 h 34 min |
+| FiveK index of all five configurations (376 shards, metadata only) | ≈ 5 min |
+| FiveK expert C and originals (5,000 rows, 3 workers, including two restarts) | 06:07–08:02 UTC, 1 h 55 min; last uninterrupted run 5,190 s; ≈ 3,300 rows/h |
+| FiveK experts A, B, D, E | running since 08:04 UTC; ≈ 3,600 rows/h, 4–6 h expected with shared CPUs |
+| HaldCLUT download (421 MB) and extraction | ≈ 1 min |
+| `tests/test_haldclut.py` (5 tests) | 0.24 s |
+| Camera-look probe (10 files) | 72 s, plus ≈ 1 min download |
+| darktable install / one export | < 2 min / 3.3 s |
+| `tools/fivek_stats.py` (600 baseline pairs) | 82 s |
 
 ## References
 

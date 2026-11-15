@@ -19,6 +19,7 @@ which bound what any model of this class can reach, and the evaluation metrics.
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
@@ -184,13 +185,28 @@ def _render_with(xs: torch.Tensor, p: dict, cy: torch.Tensor | None, knots: torc
     return P.pchip(xs_k, ys_k, flat).view_as(out)
 
 
+def _read_linear(path: Path) -> torch.Tensor:
+    """(3, H, W) linear sRGB of an image file, colour-managed: FiveK's expert edits are 8-bit
+    ProPhoto RGB with an embedded profile, so reading them as sRGB would desaturate them
+    (tools/fetch_fivek.py, Phase 20 report). Out-of-sRGB colours are clipped."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("fetch_fivek", Path(__file__).resolve().parent.parent / "tools" / "fetch_fivek.py")
+    mod = sys.modules.get("fetch_fivek")
+    if mod is None:
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["fetch_fivek"] = mod
+        spec.loader.exec_module(mod)
+    lin = mod.decode_linear_srgb(path.read_bytes(), clip=True)
+    return torch.from_numpy(np.ascontiguousarray(lin, dtype=np.float32)).permute(2, 0, 1)
+
+
 def load_pairs(root: Path, split: str, expert: str, edge: int, limit: int | None = None
                ) -> tuple[torch.Tensor, torch.Tensor, list[str]]:
-    """Inputs and expert targets from ``root/{split}/{original,expert_X}``, resized so the long edge
-    is ``edge`` and centre-padded to a common (edge x edge * 3/4) frame for batching. Returns
-    (xs, ys, file stems)."""
-    from PIL import Image
-
+    """Inputs and expert targets from ``root/{split}/{original,expert_X}`` as display-encoded sRGB,
+    resized in linear light so the long edge is ``edge``, portrait frames turned to landscape and
+    stretched to one (edge * 3/4 x edge) frame for batching. Returns (xs, ys, file stems)."""
     IMG = (".png", ".jpg", ".jpeg", ".tif", ".tiff")
     src = sorted(f for f in (root / split / "original").iterdir() if f.suffix.lower() in IMG)
     tdir = root / split / f"expert_{expert}"
@@ -201,11 +217,11 @@ def load_pairs(root: Path, split: str, expert: str, edge: int, limit: int | None
     ys = torch.zeros(len(pairs), 3, H, W)
     for i, (a, b) in enumerate(pairs):
         for t, f in ((xs, a), (ys, b)):
-            im = Image.open(f).convert("RGB")
-            if im.height > im.width:
-                im = im.rotate(90, expand=True)          # portrait frames turned to landscape: one batch shape
-            im = im.resize((W, H), Image.BILINEAR)
-            t[i] = torch.from_numpy(np.asarray(im).copy()).permute(2, 0, 1).float() / 255
+            lin = _read_linear(f)
+            if lin.shape[1] > lin.shape[2]:
+                lin = lin.rot90(1, (1, 2))           # portrait frames turned to landscape: one batch shape
+            lin = torch.nn.functional.interpolate(lin[None], size=(H, W), mode="bilinear", antialias=True, align_corners=False)[0]
+            t[i] = P.srgb_encode(lin.clamp(0, 1)).clamp(0, 1)
     return xs, ys, [a.stem for a, _ in pairs]
 
 

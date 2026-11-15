@@ -780,6 +780,12 @@ def write_manifest(
                     "original": f"{split}/original/img_{idx:04d}.png" if c else "",
                     "orig_w": c.get("orig_w", ""),
                     "orig_h": c.get("orig_h", ""),
+                    # orientation fix applied to the original, its luminance
+                    # correlation with expert C, and whether the frames matched;
+                    # exclude rows with a low align_r or a cropped expert
+                    "rot90": c.get("rot90", ""),
+                    "align_r": c.get("align_r", ""),
+                    "aligned": int(c["aligned"]) if "aligned" in c else "",
                 }
                 for col in LABEL_COLUMNS:
                     row[col] = names[col][s.labels[col][j]]

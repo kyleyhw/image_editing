@@ -33,10 +33,20 @@ DATA = ROOT / "data/fivek"
 IMG = (".png", ".jpg", ".jpeg")
 
 
+def misaligned() -> set[tuple[str, str]]:
+    """Pairs whose original and expert frames do not register (Phase 20 report: align_r < 0.6)."""
+    import csv
+    man = ROOT / "data/manifests/fivek.csv"
+    if not man.exists():
+        return set()
+    return {(r["split"], f"img_{int(r['idx']):04d}") for r in csv.DictReader(man.open()) if float(r["align_r"] or 1) < 0.6}
+
+
 def split_files(split: str, expert: str, limit: int | None) -> list[Path]:
+    bad = misaligned()
     src = sorted(f for f in (DATA / split / "original").iterdir() if f.suffix.lower() in IMG) if (DATA / split / "original").exists() else []
     tdir = DATA / split / f"expert_{expert}"
-    return [f for f in src if any((tdir / (f.stem + e)).exists() for e in IMG)][:limit]
+    return [f for f in src if (split, f.stem) not in bad and any((tdir / (f.stem + e)).exists() for e in IMG)][:limit]
 
 
 def de00(a: torch.Tensor, b: torch.Tensor) -> float:
