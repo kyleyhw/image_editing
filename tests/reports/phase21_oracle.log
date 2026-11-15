@@ -1,0 +1,3 @@
+64 pairs at 96x128
+identity {'dok': 8.21943473815918, 'psnr': 20.410198185733325, 'de00': 10.192375590889306}
+correction {'dok': 2.4344184398651123, 'psnr': 28.79150399932482, 'de00': 3.6558040561547522, 'at_limit': {'temp': 0.156, 'tint': 0.047, 'contrast': 0.062, 'highlights': 0.469, 'shadows': 0.234, 'whites': 0.969, 'blacks': 0.797, 'vibrance': 0.109, 'saturation': 0.016}}

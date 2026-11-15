@@ -1,0 +1,11 @@
+dok 1.713494062423706
+temp        median    -4.3  p10   -54.9  p90    43.5  |v|>100: 0.06
+tint        median   -10.6  p10   -28.9  p90     7.3  |v|>100: 0.03
+exposure    median     0.6  p10    -0.0  p90     1.2  |v|>100: 0.00
+contrast    median     1.9  p10   -45.0  p90    34.6  |v|>100: 0.00
+highlights  median   -55.7  p10   -95.7  p90    -3.2  |v|>100: 0.12
+shadows     median   -51.5  p10   -95.5  p90    27.1  |v|>100: 0.12
+whites      median  -229.1  p10  -306.3  p90  -172.2  |v|>100: 0.97
+blacks      median  -202.1  p10  -279.4  p90   -21.4  |v|>100: 0.66
+vibrance    median    27.3  p10    -3.6  p90   107.1  |v|>100: 0.22
+saturation  median    -0.2  p10   -29.8  p90    56.6  |v|>100: 0.00
