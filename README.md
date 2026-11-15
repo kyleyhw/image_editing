@@ -55,6 +55,25 @@ open decision is in **amendment A4**. Highlights, on FiveK landscapes:
   code: fitted on 20 before/after pairs, or read instantly from example
   photos.
 
+**Professional editor (plan amendment A6, Phases 19–26).** Studio is now a full editor on
+one image pipeline ([docs/pipeline.md](docs/pipeline.md)):
+
+- **Pipeline:** linear Rec. 2020 at 32-bit float, white balance as channel gains, hue-preserving
+  tone, colour in Oklab.
+- **Controls:** Lightroom-style basic, curves, colour mixer, colour grading, black & white and
+  calibration panels; local masks; detail (texture, clarity, dehaze, sharpening, noise reduction);
+  lens blur from an estimated depth map; grain, halation, perspective and lens corrections.
+- **Files:** raw files decoded in the browser, 16-bit and Display P3 export, Lightroom presets.
+- **Workflow:** presets, snapshots, history, copy and paste, work kept between visits, offline
+  use.
+- **Agreement:** the browser and the Python reference agree to within 1 code value on every
+  per-pixel control. The spatial operators agree to a mean ΔE00 of at most 0.32 on photographs;
+  on the deliberately harsh synthetic test image three of them miss that target (mean ΔE00 up to
+  about 1.2).
+
+A per-photo correction model, trained on the MIT-Adobe FiveK expert edits, is in progress (Phase
+21).
+
 Phase reports are in [`tests/reports/`](tests/reports/). The research
 direction is summarised in
 [`reports/project_direction/project_direction.pdf`](reports/project_direction/project_direction.pdf).
@@ -180,12 +199,13 @@ is shipped as a documented negative result.
 | [`docs/user_guide.md`](docs/user_guide.md) | How to use Studio, the command line and the new-style pipeline. |
 | [`docs/phone_checklist.md`](docs/phone_checklist.md) | Ten-minute checklist for testing the editor on a real phone. |
 | [`docs/pipeline.md`](docs/pipeline.md) | The image pipeline: working space, white balance, hue-preserving tone, Oklab colour, vignette, geometry, with the mathematics. |
-| [`tests/reports/`](tests/reports/) | One report per phase (learning curve, renderers, regional, conditioning, unpaired, atmosphere, sky, Clean Cool, new-style pipeline). |
+| [`tests/reports/`](tests/reports/) | One report per phase (learning curve, renderers, regional, conditioning, unpaired, atmosphere, sky, Clean Cool, new-style pipeline; editor phases 19–25 and the FiveK data report). |
+| [`tests/reports/phase19_editor.md`](tests/reports/phase19_editor.md) · [`phase22_25_editor.md`](tests/reports/phase22_25_editor.md) · [`phase20_data.md`](tests/reports/phase20_data.md) | The A6 editor: pipeline agreement and invariants; raw, masks, detail, lens blur and workflow; the FiveK and film data. |
 | [`CHANGELOG.md`](CHANGELOG.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) | What changed; how to work on the project. |
 | [`legacy/docs/architecture.md`](legacy/docs/architecture.md) | *(legacy)* Mathematics of the feature extractor, every primitive, and the composite loss. Identity-at-init proof. |
 | [`legacy/docs/training_and_inference.md`](legacy/docs/training_and_inference.md) | *(legacy)* Operational guide: data generation, training each architecture, CLI inference, Streamlit UI. |
 | [`legacy/docs/roadmap.md`](legacy/docs/roadmap.md) | *(legacy)* Phase-1 design rationale and historical context that motivated the architecture choices. |
-| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | Purpose, users, success metrics, target architecture, Phase 7 – 17 roadmap, UI/UX spec, data and evaluation plans, risks, and amendments A1–A5 (results and decisions). |
+| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | Purpose, users, success metrics, target architecture, Phase 7 – 17 roadmap, UI/UX spec, data and evaluation plans, risks, and amendments A1–A6 (results and decisions; A6 is the professional editor). |
 | [`reports/project_direction/project_direction.pdf`](reports/project_direction/project_direction.pdf) | One-page research report (PDF, Typst source alongside) on the revised purpose and recommended architecture. |
 | [`reports/Content adaptive photo edit models.md`](reports/Content%20adaptive%20photo%20edit%20models.md) | Full literature comparison: Zeng et al. 3D LUTs and 17 alternatives. |
 | [`tests/reports/phase3_to_phase6_report.md`](tests/reports/phase3_to_phase6_report.md) | End-to-end verification, including MCP-driven UI test. |
@@ -236,7 +256,7 @@ HSV-faithful colour identities used by the Fujifilm renderer are in
 
 ```
 .
-├── PROJECT_PLAN.md          # purpose, architecture, roadmap, UI/UX spec, amendments A1–A5
+├── PROJECT_PLAN.md          # purpose, architecture, roadmap, UI/UX spec, amendments A1–A6
 ├── README.md · CHANGELOG.md · CONTRIBUTING.md · LICENSE (MIT)
 ├── pyproject.toml · uv.lock # uv-managed deps (CPU-only PyTorch on Linux/Windows)
 │
@@ -248,6 +268,9 @@ HSV-faithful colour identities used by the Fujifilm renderer are in
 │   ├── regional.py · sky.py · atmosphere.py   # regional tools, learned sky mask, depth-aware scene tools
 │   ├── engine.py · export.py · io.py          # EditParams, style packs, .cube / XMP export, RAW/ICC I/O
 │   ├── newstyle.py · openverse.py             # idea → references → style pipeline
+│   ├── pipeline.py          # the image pipeline (reference for the browser's WebGL2 port)
+│   ├── slider_looks.py · auto.py              # looks as slider settings; slider models trained on FiveK
+│   ├── colour_diff.py · haldclut.py           # CIEDE2000; film colour tables
 │   └── cli.py               # `photostyle` command
 ├── studio/                  # the app: FastAPI server, Svelte source (web/), built UI (dist/), v1 page (static/)
 ├── bench/                   # benchmarks and phase experiments (results in bench/results/)
