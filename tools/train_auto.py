@@ -74,6 +74,7 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     t0 = time.time()
+    torch.set_num_threads(3)     # the FiveK download shares the CPU
     names = A.CORRECTION + (A.COLOUR if args.colour else [])
     tag = f"{'style' if args.colour else 'auto'}_{args.expert}"
     out = args.out or ROOT / "photostyle/models" / f"{tag}.pt"
@@ -89,6 +90,15 @@ def main() -> None:
     print(f"train {len(train_f)}, validation {len(val_f)}, test {len(test_f)}", flush=True)
 
     def load(files: list[Path], split_hint: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        key = cache / f"pairs_{split_hint}_{args.expert}_{args.edge}_{len(files)}.pt"
+        if key.exists():
+            d = torch.load(key)
+            return d["x"], d["y"], d["f"]
+        out = _load(files)
+        torch.save({"x": out[0], "y": out[1], "f": out[2]}, key)
+        return out
+
+    def _load(files: list[Path]) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         by_split: dict[str, list[Path]] = {}
         for f in files:
             by_split.setdefault(f.parent.parent.name, []).append(f)

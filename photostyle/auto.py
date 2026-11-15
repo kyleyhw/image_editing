@@ -216,6 +216,8 @@ def load_pairs(root: Path, split: str, expert: str, edge: int, limit: int | None
     xs = torch.zeros(len(pairs), 3, H, W)
     ys = torch.zeros(len(pairs), 3, H, W)
     for i, (a, b) in enumerate(pairs):
+        if i % 500 == 0:
+            print(f"  load_pairs {split}/{expert}: {i}/{len(pairs)}", flush=True)
         for t, f in ((xs, a), (ys, b)):
             lin = _read_linear(f)
             if lin.shape[1] > lin.shape[2]:
@@ -236,7 +238,9 @@ def descriptors(xs_full: Sequence[Path], cache: Path) -> torch.Tensor:
             return d["feats"]
     fx = FeatureExtractor()
     out = []
-    for f in xs_full:
+    for i, f in enumerate(xs_full):
+        if i % 250 == 0:
+            print(f"  descriptors: {i}/{len(xs_full)}", flush=True)
         im = Image.open(f).convert("RGB")
         im.thumbnail((512, 512))
         out.append(fx(torch.from_numpy(np.asarray(im).copy()).permute(2, 0, 1).float() / 255))
