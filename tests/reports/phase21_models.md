@@ -102,16 +102,45 @@ calibrated against Lightroom. In a side-by-side review the slider versions look 
 natural (Moody Forest keeps its greens; Autumn and Bright Food are less overcooked). Bright & Airy,
 Bright Food and CineStill are milder.
 
-### Film looks
+### Film looks <a id="film-fit"></a>
 
-See the [film fit](#film-fit) section below.
+Twelve stocks from the RawTherapee Film Simulation Collection (CC BY-SA 4.0) were fitted as slider
+settings: tone, white balance, vibrance, saturation, 8-band HSL, colour grading, calibration and
+R, G, B point curves; the two black-and-white stocks use the B&W mix in place of colour.
+
+The fit was gradient descent on the Oklab distance to the table's output, over 32 FiveK photos
+as edited by expert C (well exposed, close to neutral). The error is measured on 16 other photos.
+
+| Stock | Table against the unedited photo (ΔE00) | Fitted sliders against the table (ΔE00) |
+|---|---|---|
+| Kodak Portra 400 | 6.18 | 1.44 |
+| Kodak Portra 160 | 5.77 | 1.07 |
+| Kodak Ektar 100 | 3.04 | 1.14 |
+| Kodak Kodachrome 64 | 6.57 | 1.46 |
+| Kodak Ektachrome 100 VS | 7.31 | 1.59 |
+| Fuji Velvia 50 | 5.63 | 1.69 |
+| Fuji Provia 100F | 3.82 | 1.72 |
+| Fuji Pro 400H | 5.44 | 1.25 |
+| Fuji Superia 400 | 7.24 | 1.56 |
+| Agfa Vista 200 | 5.11 | 1.30 |
+| Kodak Tri-X 400 | 11.74 | 0.68 |
+| Ilford HP5 Plus 400 | 11.88 | 0.79 |
+
+![Film tables against fitted sliders](assets/phase21_film.jpg)
+
+*Left: the film table applied to a photo. Right: the fitted slider look. They are hard to tell
+apart.*
+
+Every stock is below the residual-table threshold of ΔE00 2 (A6.4), so no residual colour table
+is needed. The twelve are in the editor as the **Film stocks** group: ordinary slider looks that
+can be edited like any other. Each is credited to the collection in its card.
 
 ## Not done
 
 - **Expert styles A–E.** Their data is still downloading, about 4–6 h at the time of writing.
 - **The colour and curve oracle configurations.** Stopped at the time limit.
-- **Residual colour tables.** Not built; the film-fit errors below decide whether any look needs
-  one.
+- **Residual colour tables.** Not built: every fitted look is below the threshold, so none is
+  needed.
 
 ## Runtime
 

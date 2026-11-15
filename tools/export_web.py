@@ -112,6 +112,17 @@ def export_v3(src: Path, out: Path, auto: list[Path]) -> None:
         else:
             out_styles.append({**st, "card": {**st["card"], "kind": st["card"].get("kind", "head")}})
             print(f"head    {name}")
+    film = Path("photostyle/film_looks.json")
+    if film.exists():                       # film stocks: sliders fitted to film colour tables (Phase 21)
+        base = 100 + len(out_styles)
+        for k, (name, fl) in enumerate(json.loads(film.read_text()).items()):
+            card = {"name": name, "title": fl["title"], "category": "Film stocks", "kind": "sliders", "default_strength": 1.0,
+                    "order": base + k,
+                    "description": f"{fl['title']}, as slider settings fitted to its film-simulation colour table "
+                                   f"(held-out error dE00 {fl['heldout_de00']}). Editable like any other look.",
+                    "source": "RawTherapee Film Simulation Collection (Pat David, Pavlov Dmitry, Michael Ezra), CC BY-SA 4.0"}
+            out_styles.append({"card": card, "attribution": [card["source"]], "sliders": fl["sliders"]})
+            print(f"film    {name}")
     models = {}
     for path in auto:
         m = SliderModel.load(path)

@@ -1,0 +1,65 @@
+{
+ "rows": [
+  {
+   "stock": "Kodak Portra 400",
+   "identity_de00": 6.18,
+   "fit_de00": 1.44
+  },
+  {
+   "stock": "Kodak Portra 160",
+   "identity_de00": 5.77,
+   "fit_de00": 1.07
+  },
+  {
+   "stock": "Kodak Ektar 100",
+   "identity_de00": 3.04,
+   "fit_de00": 1.14
+  },
+  {
+   "stock": "Kodak Kodachrome 64",
+   "identity_de00": 6.57,
+   "fit_de00": 1.46
+  },
+  {
+   "stock": "Kodak Ektachrome 100 VS",
+   "identity_de00": 7.31,
+   "fit_de00": 1.59
+  },
+  {
+   "stock": "Fuji Velvia 50",
+   "identity_de00": 5.63,
+   "fit_de00": 1.69
+  },
+  {
+   "stock": "Fuji Provia 100F",
+   "identity_de00": 3.82,
+   "fit_de00": 1.72
+  },
+  {
+   "stock": "Fuji Pro 400H",
+   "identity_de00": 5.44,
+   "fit_de00": 1.25
+  },
+  {
+   "stock": "Fuji Superia 400",
+   "identity_de00": 7.24,
+   "fit_de00": 1.56
+  },
+  {
+   "stock": "Agfa Vista 200",
+   "identity_de00": 5.11,
+   "fit_de00": 1.3
+  },
+  {
+   "stock": "Kodak Tri-X 400",
+   "identity_de00": 11.74,
+   "fit_de00": 0.68
+  },
+  {
+   "stock": "Ilford HP5 Plus 400",
+   "identity_de00": 11.88,
+   "fit_de00": 0.79
+  }
+ ],
+ "runtime_s": 774.4
+}
