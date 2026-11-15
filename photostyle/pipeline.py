@@ -752,9 +752,9 @@ def apply_colour(c: torch.Tensor, p: Params, maps: Sequence[torch.Tensor] | None
     cw = cw * cw * (3 - 2 * cw)                                     # smoothstep: greys are not affected
 
     W = band_weights(h)                                             # (8, B, H, W)
-    hue = sum(W[k] * g(f"hsl_hue_{n}") for k, n in enumerate(BAND_NAMES)) / 100
-    sat = sum(W[k] * g(f"hsl_sat_{n}") for k, n in enumerate(BAND_NAMES)) / 100
-    lum = sum(W[k] * g(f"hsl_lum_{n}") for k, n in enumerate(BAND_NAMES)) / 100
+    hue = torch.stack([W[k] * g(f"hsl_hue_{n}") for k, n in enumerate(BAND_NAMES)]).sum(0) / 100
+    sat = torch.stack([W[k] * g(f"hsl_sat_{n}") for k, n in enumerate(BAND_NAMES)]).sum(0) / 100
+    lum = torch.stack([W[k] * g(f"hsl_lum_{n}") for k, n in enumerate(BAND_NAMES)]).sum(0) / 100
 
     vib = g("vibrance") / 100
     vw = 1 - (C / VIB_C0).clamp(0, 1)
@@ -768,7 +768,7 @@ def apply_colour(c: torch.Tensor, p: Params, maps: Sequence[torch.Tensor] | None
     L = L * (1 + lum * HSL_LUM * cw)
 
     if bool((g("bw") > 0.5).any()):
-        mix = sum(W[k] * g(f"bw_{n}") for k, n in enumerate(BAND_NAMES)) / 100
+        mix = torch.stack([W[k] * g(f"bw_{n}") for k, n in enumerate(BAND_NAMES)]).sum(0) / 100
         Lbw = L * (1 + mix * BW_MIX * cw)
         on = (g("bw") > 0.5).to(c)
         L = on * Lbw + (1 - on) * L
