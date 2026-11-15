@@ -12,7 +12,7 @@
   });
   function paint() {
     last = performance.now();
-    if (!cv || !view.main || !S.params) return;
+    if (!cv || !view.main || !S.id) return;
     const W = (cv.width = cv.clientWidth * (window.devicePixelRatio || 1) || 560), H = (cv.height = Math.round(W * 0.3));
     const src = view.main.canvas, t = document.createElement("canvas"), tw = 256, th = Math.max(1, Math.round((256 * src.height) / src.width));
     t.width = tw; t.height = th;

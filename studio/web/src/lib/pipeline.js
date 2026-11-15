@@ -382,3 +382,53 @@ export function draw(R, e, opts = {}) {
 /** Does this slider dict change anything? (The default edit is the identity.) */
 export const isDefault = (p) => SLIDERS.every((s) => get(p, s.name) === s.default)
   && !["rgb", "r", "g", "b"].some((k) => curvePoints(p?.curves, k)) && !p?.crop;
+
+/** A 3D LUT (.cube, red fastest, as photostyle.export.write_cube) of the colour part of an edit:
+ * the lattice is drawn through the same shader (no crop, no vignette), read back as float where the
+ * browser can render to float (EXT_color_buffer_float), else 8-bit. */
+export function bakeCube(e, size = 33, title = "Irodori") {
+  const c = document.createElement("canvas");
+  c.width = size * size; c.height = size;
+  const R = makeGL(c), { gl } = R, n = size * size * size, data = new Float32Array(4 * n);
+  for (let b = 0; b < size; b++) for (let g = 0; g < size; g++) for (let r = 0; r < size; r++) {
+    const i = 4 * (b * size * size + g * size + r);
+    data[i] = r / (size - 1); data[i + 1] = g / (size - 1); data[i + 2] = b / (size - 1); data[i + 3] = 1;
+  }
+  setImage(R, { data, width: size * size, height: size });
+  const { crop: _c, vig_amount: _v, ...p } = e.p || {};
+  let out, float = !!gl.getExtension("EXT_color_buffer_float");
+  if (float) {
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, c.width, c.height, 0, gl.RGBA, gl.FLOAT, null);
+    const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    float = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    if (!float) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+  draw(R, { ...e, p }, { mode: 2, dither: 0 });
+  if (float) { out = new Float32Array(4 * n); gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.FLOAT, out); }
+  else { const u8 = new Uint8Array(4 * n); gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.UNSIGNED_BYTE, u8); out = Float32Array.from(u8, (v) => v / 255); }
+  gl.getExtension("WEBGL_lose_context")?.loseContext();
+  const lines = [`TITLE "${title}"`, `LUT_3D_SIZE ${size}`, "DOMAIN_MIN 0.0 0.0 0.0", "DOMAIN_MAX 1.0 1.0 1.0"];
+  for (let b = 0; b < size; b++) {
+    const row = size - 1 - b;                    // framebuffer rows run bottom-up
+    for (let g = 0; g < size; g++) for (let r = 0; r < size; r++) {
+      const i = 4 * (row * size * size + g * size + r);
+      lines.push(`${out[i].toFixed(6)} ${out[i + 1].toFixed(6)} ${out[i + 2].toFixed(6)}`);
+    }
+  }
+  return lines.join("\n") + "\n";
+}
+
+/** Render an edit at full resolution into a new canvas (export). */
+export function renderFull(src, e, maxEdge = 8192) {
+  const c = document.createElement("canvas"), R = makeGL(c);
+  const lim = Math.min(maxEdge, R.gl.getParameter(R.gl.MAX_TEXTURE_SIZE));
+  const W = src.width ?? src.naturalWidth, H = src.height ?? src.naturalHeight, s = Math.min(1, lim / Math.max(W, H));
+  let img = src;
+  if (s < 1) { img = document.createElement("canvas"); img.width = Math.round(W * s); img.height = Math.round(H * s); img.getContext("2d").drawImage(src, 0, 0, img.width, img.height); }
+  setImage(R, img);
+  [c.width, c.height] = outputSize(img.width, img.height, e.p?.crop);
+  draw(R, e, { mode: 2 });
+  return { canvas: c, release: () => R.gl.getExtension("WEBGL_lose_context")?.loseContext() };
+}

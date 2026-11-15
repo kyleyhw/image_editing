@@ -1,6 +1,11 @@
 // Inline SVG icons (24 px grid, stroke = currentColor).
 const svg = (d, extra = "") => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${d}</svg>`;
 export const I = {
+  dropper: svg('<path d="m14.5 6.5 3 3"/><path d="M17 4a2.1 2.1 0 0 1 3 3l-2 2-3-3 2-2Z"/><path d="m15 9-8.5 8.5L4 20l2.5-2.5"/>'),
+  crop: svg('<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>'),
+  clip: svg('<path d="M3 17 9 11l4 4 8-8"/><path d="M3 21h18"/><path d="M3 3h18"/>'),
+  zoom: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M11 8v6M8 11h6"/>'),
+  copy: svg('<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   undo: svg('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
   redo: svg('<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>'),

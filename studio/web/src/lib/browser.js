@@ -6,7 +6,7 @@
 // Models come from tools/export_web.py. Photos stay in memory on this device.
 import * as ort from "onnxruntime-web/wasm";
 import { downloadBlob } from "./api.js";
-import { bakeCube, draw, makeGL, setImage } from "./render.js";
+import { bakeCube, renderFull } from "./pipeline.js";
 
 const BASE = import.meta.env.BASE_URL;
 ort.env.wasm.numThreads = 1;              // GitHub Pages is not cross-origin isolated
@@ -174,21 +174,13 @@ export const browser = {
              strength: st.card.default_strength ?? 1, ood_score: ood, version: 1 };
   },
   async export(id, params, eff, fmt) {
-    const p = photos.get(id), stem = `${p.name.replace(/\.[^.]+$/, "")}_${params.style}`;
-    if (fmt === "cube") {
-      const blob = new Blob([bakeCube(eff, params.knots, 33, `photostyle ${params.style}`)], { type: "text/plain" });
-      return save(blob, `${stem}.cube`);
-    }
+    const p = photos.get(id), stem = `${p.name.replace(/\.[^.]+$/, "")}${params.style ? "_" + params.style : "_edit"}`;
+    if (fmt === "cube") return save(new Blob([bakeCube(eff, 33, `Irodori ${params.style ?? "edit"}`)], { type: "text/plain" }), `${stem}.cube`);
     if (fmt === "json") return save(new Blob([JSON.stringify(params, null, 1)], { type: "application/json" }), `${stem}.json`);
-    const c = document.createElement("canvas"), R = makeGL(c);
-    const max = Math.min(8192, R.gl.getParameter(R.gl.MAX_TEXTURE_SIZE));
-    const [w, h] = fit(p.bitmap.width, p.bitmap.height, max);
-    c.width = w; c.height = h;
-    setImage(R, w === p.bitmap.width ? p.bitmap : canvasOf(p.bitmap, w, h));
-    draw(R, eff, params.knots, 2);
+    const { canvas, release } = renderFull(p.bitmap, eff);
     const type = fmt === "png" ? "image/png" : "image/jpeg";
-    const blob = await new Promise((res) => c.toBlob(res, type, 0.95));
-    R.gl.getExtension("WEBGL_lose_context")?.loseContext();
+    const blob = await new Promise((res) => canvas.toBlob(res, type, 0.95));
+    release();
     return save(blob, `${stem}.${fmt === "png" ? "png" : "jpg"}`);
   },
 };

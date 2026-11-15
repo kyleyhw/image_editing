@@ -1,12 +1,17 @@
 // Studio state and actions (Svelte 5 runes). Heavy objects (images, WebGL) live in `view`,
 // outside the reactive proxy. All model calls go through the backend (server or browser).
+//
+// An edit has three layers (A6.3): the look (a predicted Phase-A5 look, applied first, scaled by
+// Strength), then the photo's own adjustments `S.p` (every slider, curve and crop), which belong to
+// the photo and survive a change of look. Undo covers all three.
 import { untrack } from "svelte";
 import { api, loadImage, pollJob, json } from "./api.js";
 import { B, initBackend } from "./backend.js";
-import { curveFromKnots, draw, effectiveFrom, makeGL, mixEffective, setImage } from "./render.js";
+import { effectiveFrom, mixEffective } from "./render.js";
+import { draw, makeGL, outputSize, setImage, wbGains, DEFAULTS, SPEC } from "./pipeline.js";
 
-const ZERO_D = () => ({ warmth: 0, tint: 0, sat: 0, vig: 0 });
 export const ZERO_SCENE = () => ({ haze: 0, clarity_near: 0, clarity_far: 0, sky_exposure: 0, sky_warmth: 0, sky_saturation: 0 });
+const NO_LOOK = "";
 
 export const S = $state({
   ready: false,
@@ -16,29 +21,33 @@ export const S = $state({
   accept: "image/*",
   model: { loaded: 0, total: 0, ready: true, error: "" },   // browser backend: backbone download
   photos: [], styles: [], id: null, style: null,
-  params: null,              // EditParams payload for the current style
+  params: null,              // the look's predicted params for this photo (null: no look)
   byStyle: {},               // style name -> params for the current photo (thumbnails, peek)
   peek: null,                // style name previewed while hovering the style list
   strength: 1,
-  d: ZERO_D(),               // user deltas (colour, vignette)
-  knots: null,               // user curve override: [3][K] or null
+  p: {},                     // the photo's adjustments: sliders by name, curves {rgb,r,g,b}, crop
   scene: ZERO_SCENE(),       // scene tools (server-rendered, applied before the grade)
   sceneBusy: false, busy: false,
-  mode: "split", split: 0.5, holdBefore: false, ch: 0,
+  mode: "split", split: 0.5, holdBefore: false, ch: "rgb",
+  tool: null,                // null | "crop" | "wb" (eyedropper)
+  clip: 0,                   // clipping warning: 0 off, 1 shadows/highlights
+  zoom: 0,                   // 0 = fit, else scale (1 = 100 %)
+  pan: [0, 0],
+  readout: null,             // {x, y, rgb} under the pointer
   message: "",
   imgVersion: 0,             // bumps when a new photo is on the GPU
-  frame: 0,                  // bumps after every draw (ambient light, histogram)
+  frame: 0,                  // bumps after every draw (histogram)
   undo: [], redo: [], last: "",
 });
 
-export const view = { img: null, sceneImg: null, main: null, thumb: null, thumbCanvas: null, srcPx: null,
-                      tween: null, shown: null };
+export const view = { img: null, sceneImg: null, main: null, thumb: null, thumbCanvas: null, tween: null, shown: null };
+const edits = new Map();     // photo id -> {p, style, strength}: each photo keeps its own edit
 
 export function initGL(canvas) {
   view.main = makeGL(canvas);
   view.thumbCanvas = document.createElement("canvas");
   view.thumb = makeGL(view.thumbCanvas);
-  /** @type {any} */ (window).__studio = { S, effective, exportParams, draw, get main() { return view.main; } };   // automated tests
+  /** @type {any} */ (window).__studio = { S, effective, exportParams, setSlider, get main() { return view.main; } };   // automated tests
 }
 
 export async function boot() {
@@ -50,61 +59,107 @@ export async function boot() {
   if (S.photos.length) await selectPhoto(S.photos[0].id);
 }
 
-export const effective = () => effectiveFrom(S.params, S.strength, S.d, S.knots);
+const lookOf = (params, strength) => (params ? effectiveFrom(params, strength) : null);
+/** Everything the renderer needs for the current edit. */
+export const effective = () => ({ p: S.p, look: lookOf(S.params, S.strength), K: S.params?.knots ?? 9 });
 export const modeCode = () => (S.holdBefore || S.mode === "before" ? 1 : S.mode === "after" ? 2 : 0);
+export const hasLook = () => !!S.style;
 
-export function exportParams() {       // EditParams for the server (overrides are absolute)
-  const p = S.params, e = effective(), ov = { dM: e.dM, bias: e.bias, vignette: [e.vig] };
-  if (S.knots && p.renderer !== "shared") ov.curve = curveFromKnots(p, S.knots);
+export function exportParams() {       // for the server: the look's EditParams plus the adjustments
+  const p = S.params;
   const scene = Object.fromEntries(Object.entries(S.scene).filter(([, v]) => v));
-  return { style: p.style, renderer: p.renderer, knots: p.knots, theta: p.theta, strength: S.strength,
-           overrides: ov, ood_score: p.ood_score, version: 1, scene };
+  return { style: p?.style ?? null, renderer: p?.renderer, knots: p?.knots, theta: p?.theta, strength: S.strength,
+           overrides: {}, ood_score: p?.ood_score, version: 1, scene, edit: $state.snapshot(S.p) };
 }
 
-/** What is on screen: the hovered style (peek), else the current edit; style changes tween. */
+/** What is on screen: the hovered look (peek), else the current edit; look changes tween. */
 function target() {
-  const pk = S.peek && S.byStyle[S.peek];
-  return pk ? effectiveFrom(pk, pk.strength ?? 1, ZERO_D(), null) : effective();
+  const pk = S.peek && S.peek !== "__original" && S.byStyle[S.peek];
+  return pk ? { p: S.p, look: lookOf(pk, pk.strength ?? 1), K: pk.knots } : effective();
 }
 
 let raf = 0;
 export function render() {
-  if (!view.img || !S.params || !view.main) return;
+  if (!view.img || !view.main) return;
   let e = target();
   const tw = view.tween;
-  if (tw && tw.from.knots[0].length === e.knots[0].length) {
+  if (tw && tw.from.look && e.look && tw.from.look.knots[0].length === e.look.knots[0].length) {
     const t = Math.min(1, (performance.now() - tw.t0) / 320), k = 1 - (1 - t) ** 3;
-    e = mixEffective(tw.from, e, k);
+    e = { ...e, look: mixEffective(tw.from.look, e.look, k) };
     if (t < 1) { cancelAnimationFrame(raf); raf = requestAnimationFrame(render); } else view.tween = null;
   }
   view.shown = e;
-  draw(view.main, e, S.params.knots, S.peek === "__original" ? 1 : S.peek ? 2 : modeCode(), S.split);
+  e = { ...e, p: drawnP() };
+  sizeCanvas();
+  draw(view.main, e, { mode: S.peek === "__original" ? 1 : S.peek ? 2 : modeCode(), split: S.split,
+                       clipWarn: S.clip ? 1 : 0 });
   untrack(() => S.frame++);          // no dependency: effects that call render() must not loop
 }
+function sizeCanvas() {
+  const c = view.main.canvas, crop = S.tool === "crop" ? null : S.p.crop;     // the crop tool shows the whole frame
+  const [w, h] = outputSize(view.img.naturalWidth, view.img.naturalHeight, crop ? { ...crop, angle: 0 } : null);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+}
+/** The adjustments as drawn (the crop tool shows the uncropped, straightened frame). */
+export const drawnP = () => (S.tool === "crop" && S.p.crop ? { ...S.p, crop: { angle: S.p.crop.angle ?? 0 } } : S.p);
 function startTween() { if (view.shown) view.tween = { from: view.shown, t0: performance.now() }; }
 export function setPeek(name) {
   if (S.peek === name) return;
   startTween(); S.peek = name;
 }
 
+// ------------------------------------------------------------------ adjustments
+export function setSlider(name, v) {
+  if (v === (DEFAULTS[name] ?? 0)) { const { [name]: _, ...rest } = S.p; S.p = rest; }
+  else S.p = { ...S.p, [name]: v };
+}
+export const slider = (name) => S.p[name] ?? DEFAULTS[name] ?? 0;
+export function setCurve(key, pts) { S.p = { ...S.p, curves: { ...(S.p.curves || {}), [key]: pts } }; }
+export function setCrop(crop) { S.p = { ...S.p, crop }; }
+export function resetGroup(names) {
+  const p = { ...S.p };
+  for (const n of names) delete p[n];
+  S.p = p; commit();
+}
+
+/** White-balance eyedropper: the temperature and tint that make the picked colour neutral.
+ * Two-dimensional Newton iteration on the pipeline's own gains (wbGains), in linear Rec. 2020. */
+export function neutralise(rgbDisplay) {
+  const lin = rgbDisplay.map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  const m = SPEC.m.srgb_to_w, c = [0, 1, 2].map((r) => m[3 * r] * lin[0] + m[3 * r + 1] * lin[1] + m[3 * r + 2] * lin[2]);
+  const err = (t, n) => { const g = wbGains(t, n), o = c.map((v, i) => v * g[i]); return [Math.log(o[0] / o[2]), Math.log(o[1] / Math.sqrt(o[0] * o[2]))]; };
+  let t = slider("temp"), n = slider("tint");
+  for (let it = 0; it < 30; it++) {
+    const e0 = err(t, n), h = 0.5, et = err(t + h, n), en = err(t, n + h);
+    const J = [[(et[0] - e0[0]) / h, (en[0] - e0[0]) / h], [(et[1] - e0[1]) / h, (en[1] - e0[1]) / h]];
+    const det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+    if (Math.abs(det) < 1e-12) break;
+    t -= (J[1][1] * e0[0] - J[0][1] * e0[1]) / det; n -= (-J[1][0] * e0[0] + J[0][0] * e0[1]) / det;
+    t = Math.max(-100, Math.min(100, t)); n = Math.max(-100, Math.min(100, n));
+    if (Math.hypot(...e0) < 1e-5) break;
+  }
+  setSlider("temp", Math.round(t)); setSlider("tint", Math.round(n)); commit();
+}
+
 // ------------------------------------------------------------------ history
-const snap = () => JSON.stringify({ d: S.d, knots: S.knots, strength: S.strength, scene: S.scene });
-export function commit() { S.undo.push(S.last); S.redo = []; S.last = snap(); }
-function restore(s) {
-  const o = JSON.parse(s); S.d = o.d; S.knots = o.knots; S.strength = o.strength;
+const snap = () => JSON.stringify({ p: S.p, strength: S.strength, style: S.style, scene: S.scene });
+export function commit() { const s = snap(); if (s === S.last) return; S.undo.push(S.last); S.redo = []; S.last = s; remember(); }
+async function restore(s) {
+  const o = JSON.parse(s); S.p = o.p; S.strength = o.strength;
+  if (o.style !== S.style) { S.style = o.style; await loadLook(); S.strength = o.strength; }
   const sceneChanged = JSON.stringify(o.scene) !== JSON.stringify(S.scene);
   S.scene = o.scene; if (sceneChanged) applyScene();
+  S.last = s; remember();
 }
 export function undo() { if (S.undo.length) { S.redo.push(snap()); restore(S.undo.pop()); } }
 export function redo() { if (S.redo.length) { S.undo.push(snap()); restore(S.redo.pop()); } }
-export function resetToModel() {
-  S.d = ZERO_D(); S.knots = null; S.strength = S.params?.strength ?? 1; commit();
-}
+export function resetAll() { S.p = {}; S.strength = S.params?.strength ?? 1; commit(); }
+function remember() { if (S.id) edits.set(S.id, { p: S.p, style: S.style, strength: S.strength }); }
 
 // ------------------------------------------------------------------ data flow
 export async function loadStyles() {
   S.styles = await B.styles();
-  if ((!S.style || !S.styles.some((s) => s.name === S.style)) && S.styles.length) S.style = S.styles[0].name;
+  if (S.style === null && S.styles.length) S.style = S.styles[0].name;
 }
 export async function loadPhotos() { S.photos = await B.photos(); }
 export const photoURL = (id, edge = 1600) => B.photoURL(id, edge);
@@ -124,13 +179,18 @@ export async function addSample(s) {
 }
 
 export async function selectPhoto(id) {
-  S.id = id; view.srcPx = null; view.sceneImg = null; view.tween = null; view.shown = null;
-  S.scene = ZERO_SCENE(); S.byStyle = {}; S.peek = null;
+  remember();
+  S.id = id; view.sceneImg = null; view.tween = null; view.shown = null;
+  S.scene = ZERO_SCENE(); S.byStyle = {}; S.peek = null; S.zoom = 0; S.pan = [0, 0]; S.tool = null;
+  const kept = edits.get(id);
+  S.p = kept?.p ?? {};
+  if (kept) S.style = kept.style;
   const img = await loadImage(photoURL(id, 1600));
   view.img = img;
-  view.main.canvas.width = img.naturalWidth; view.main.canvas.height = img.naturalHeight;
   setImage(view.main, img);
-  await predict();
+  await loadLook();
+  if (kept) S.strength = kept.strength;
+  S.undo = []; S.redo = []; S.last = snap();
   S.imgVersion++;
   predictAll(id);
 }
@@ -143,18 +203,19 @@ async function predictAll(id) {
   }
 }
 
-export async function predict() {
-  if (!S.id || !S.style) return;
+async function loadLook() {
+  if (!S.id || !S.style) { S.params = null; return; }
   const p = S.byStyle[S.style] || await B.predict(S.id, S.style);
   S.byStyle[S.style] = p;
   S.params = p;
-  S.d = ZERO_D(); S.knots = null; S.strength = p.strength ?? 1; S.undo = []; S.redo = []; S.last = snap();
+  S.strength = p.strength ?? 1;
 }
 
 export async function setStyle(name) {
   startTween(); S.peek = null;
-  S.style = name; if (S.mode === "before") S.mode = "split";
-  await predict();
+  S.style = name || NO_LOOK; if (S.mode === "before") S.mode = "split";
+  await loadLook();
+  commit();
 }
 
 let sceneTimer = 0, sceneSeq = 0;
@@ -176,12 +237,12 @@ export function applyScene() {
 }
 
 export async function exportCurrent(fmt) {
-  if (!S.params) return;
+  if (!S.id) return;
   S.busy = true;
-  try { await B.export(S.id, exportParams(), effective(), fmt); } finally { S.busy = false; }
+  try { await B.export(S.id, exportParams(), $state.snapshot(effective()), fmt); } finally { S.busy = false; }
 }
 
-export async function remember() {
+export async function rememberEdit() {
   if (!S.params) return;
   const r = await json("/api/remember", { id: S.id, style: S.style, params: exportParams() });
   S.message = `Remembered (${r.stored} correction${r.stored > 1 ? "s" : ""} for ${S.style}).`;
@@ -194,12 +255,11 @@ export async function personalise() {
   await loadStyles();
 }
 
-/** Render `params` on `img` into a small canvas (style list, batch). */
+/** Render a look on `img` into a small canvas (style list, batch). */
 export function renderThumb(img, params, w, target) {
   const h = Math.round((w * img.naturalHeight) / img.naturalWidth);
   view.thumbCanvas.width = w; view.thumbCanvas.height = h; setImage(view.thumb, img);
-  const e = effectiveFrom(params, params.strength ?? 1, ZERO_D(), null);
-  draw(view.thumb, e, params.knots, 2);
+  draw(view.thumb, { p: {}, look: lookOf(params, params.strength ?? 1), K: params.knots }, { mode: 2 });
   target.width = w; target.height = h; target.getContext("2d").drawImage(view.thumbCanvas, 0, 0);
 }
 

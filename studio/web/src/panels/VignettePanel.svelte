@@ -1,7 +1,6 @@
 <script>
-  import { S, commit } from "../lib/studio.svelte.js";
-  import Slider from "../ui/Slider.svelte";
+  import Sliders from "./Sliders.svelte";
 </script>
 
-<Slider id="vig" label="Vignette" min={0} max={60} value={S.d.vig} disabled={!S.params}
-        oninput={(v) => (S.d.vig = v)} onchange={commit} />
+<Sliders names={["vig_amount", "vig_midpoint", "vig_feather", "vig_roundness"]} />
+<p class="hint">Amount − darkens the corners, + brightens them (up to two stops), measured on the cropped frame.</p>

@@ -178,6 +178,7 @@ is shipped as a documented negative result.
 | Document | Contents |
 |---|---|
 | [`docs/user_guide.md`](docs/user_guide.md) | How to use Studio, the command line and the new-style pipeline. |
+| [`docs/pipeline.md`](docs/pipeline.md) | The image pipeline: working space, white balance, hue-preserving tone, Oklab colour, vignette, geometry, with the mathematics. |
 | [`tests/reports/`](tests/reports/) | One report per phase (learning curve, renderers, regional, conditioning, unpaired, atmosphere, sky, Clean Cool, new-style pipeline). |
 | [`CHANGELOG.md`](CHANGELOG.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) | What changed; how to work on the project. |
 | [`legacy/docs/architecture.md`](legacy/docs/architecture.md) | *(legacy)* Mathematics of the feature extractor, every primitive, and the composite loss. Identity-at-init proof. |
@@ -252,6 +253,7 @@ HSV-faithful colour identities used by the Fujifilm renderer are in
 ├── tools/                   # data collection, style-pack and base building, end-to-end checks
 ├── tests/                   # unit tests; tests/reports/ holds every phase report
 ├── docs/user_guide.md       # how to use Studio, the CLI and the new-style pipeline
+├── docs/pipeline.md         # the image pipeline and its mathematics
 ├── reports/ · research_notes/   # research report and literature review
 └── legacy/                  # Phases 1–6 (fixed-function styles, Streamlit UI); run from inside legacy/
 ```

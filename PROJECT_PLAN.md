@@ -2035,28 +2035,28 @@ run together. Phases 23 to 25 can be reordered by the owner.
 
 #### Phase 19: Editor foundations
 
-1. [pending] Pipeline specification in `docs/pipeline.md`: every operator's
+1. [completed] Pipeline specification in `docs/pipeline.md`: every operator's
    formula, range, default and position in the order, with the source of each
    constant.
-2. [pending] Reference implementation `photostyle/pipeline.py`
+2. [completed] Reference implementation `photostyle/pipeline.py`
    (differentiable PyTorch, fully type-annotated), reusing the definitions in
    `photostyle/develop.py` where they are kept.
-3. [pending] WebGL2 implementation.
-   - 16-bit float render targets, linear working space, dithered output.
-   - An 8-bit fallback path for devices without float render targets.
-4. [pending] Agreement and invariant tests (A6.6), with a report.
-5. [pending] Edit layer.
+3. [completed] WebGL2 implementation.
+   - [completed] 32-bit float shader, linear working space, dithered output.
+   - [pending] An 8-bit fallback path: not needed while WebGL2 is required (Phase 19 report).
+4. [completed] Agreement and invariant tests (A6.6), with a report.
+5. [completed] Edit layer.
    - $s_\text{user}$ persists across look changes.
    - Undo history covers look changes.
-6. [pending] Panels.
+6. [completed] Panels.
    - Basic: temperature, tint, exposure, contrast, highlights, shadows,
      whites, blacks, vibrance, saturation.
    - Curves: combined RGB and per-channel, free points, PCHIP.
    - HSL (eight bands), colour grading (three ranges), black-and-white mixer.
    - Vignette in both directions with midpoint and feather.
-7. [pending] Viewing tools: zoom and pan, clipping warnings, white-balance
+7. [completed] Viewing tools: zoom and pan, clipping warnings, white-balance
    eyedropper, pixel readout, crop and straighten.
-8. [pending] Transition: the 22 current looks keep working through the old
+8. [completed] Transition: the 22 current looks keep working through the old
    renderer until Phase 21 replaces them.
 
 Checkpoint: screenshots, the agreement report, and a preview build for the

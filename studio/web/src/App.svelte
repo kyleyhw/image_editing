@@ -8,7 +8,7 @@
   import Welcome from "./ui/Welcome.svelte";
   import CreateStyle from "./dialogs/CreateStyle.svelte";
   import Batch from "./dialogs/Batch.svelte";
-  import { S, boot, upload, selectPhoto, setStyle, undo, redo, resetToModel, exportCurrent, commit } from "./lib/studio.svelte.js";
+  import { S, boot, upload, selectPhoto, setStyle, undo, redo, resetAll, exportCurrent, commit } from "./lib/studio.svelte.js";
   import { loadPrefs, savePrefs } from "./lib/prefs.js";
   import { I } from "./lib/icons.js";
 
@@ -25,13 +25,17 @@
     const k = e.key;
     if (k === "\\") S.holdBefore = true;
     else if (k === "[" || k === "]") { S.strength = Math.max(0, Math.min(1.5, S.strength + (k === "]" ? 0.05 : -0.05))); commit(); }
-    else if (k.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey) resetToModel();
+    else if (k.toLowerCase() === "r" && e.shiftKey && !e.ctrlKey && !e.metaKey) resetAll();
+    else if (k.toLowerCase() === "j" && !e.ctrlKey && !e.metaKey) S.clip = S.clip ? 0 : 1;
+    else if (k.toLowerCase() === "z" && !e.ctrlKey && !e.metaKey) { if (S.zoom) { S.zoom = 0; S.pan = [0, 0]; } else S.zoom = 1; }
+    else if (k.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey) S.tool = S.tool === "wb" ? null : "wb";
+    else if (k.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey) { S.tool = S.tool === "crop" ? null : "crop"; if (!S.tool) commit(); }
     else if (k.toLowerCase() === "e" && !e.ctrlKey && !e.metaKey) exportCurrent(prefs.exportFmt);
     else if (k.toLowerCase() === "y") { const m = ["split", "after", "before"]; S.mode = m[(m.indexOf(S.mode) + 1) % 3]; }
     else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.shiftKey ? redo() : undo(); e.preventDefault(); }
     else if (/^[1-9]$/.test(k) && S.styles[+k - 1]) setStyle(S.styles[+k - 1].name);
     else if (k === "0") S.mode = "before";
-    else if (k === "Escape") sheetOpen = false;
+    else if (k === "Escape") { sheetOpen = false; if (S.tool) { S.tool = null; commit(); } }
     else if (k === "ArrowRight" || k === "ArrowLeft") {
       const i = S.photos.findIndex((p) => p.id === S.id), j = i + (k === "ArrowRight" ? 1 : -1);
       if (S.photos[j]) selectPhoto(S.photos[j].id);
