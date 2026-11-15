@@ -36,7 +36,9 @@ const f32 = (b64) => {
   return out;
 };
 
-let session = null, modelReady = null, styles = [];
+let session = null, modelReady = null, styles = [], models = {};
+const HEAD_KEYS = ["mu", "sigma", "w1", "b1", "ln_w", "ln_b", "w2", "b2", "theta_mean"];
+const decodeHead = (h) => ({ ...h, ...Object.fromEntries(HEAD_KEYS.map((k) => [k, f32(h[k])])) });
 const photos = new Map();
 let seq = 0;
 
@@ -101,7 +103,7 @@ function erf(x) {                                   // Abramowitz & Stegun 7.1.2
   return s * y;
 }
 
-function head(st, f) {
+function head(st, f, withOod = true) {
   const H = st.head, D = f.length, z = new Float32Array(D);
   for (let i = 0; i < D; i++) z[i] = (f[i] - H.mu[i]) / H.sigma[i];
   const h = new Float64Array(H.hidden);
@@ -124,6 +126,7 @@ function head(st, f) {
     for (let j = 0; j < H.hidden; j++) a += H.w2[k * H.hidden + j] * h[j];
     theta.push(H.theta_mean[k] + H.alpha * (a - H.theta_mean[k]));
   }
+  if (!withOod || !st.ood) return { theta, ood: 0 };
   let zz = 0;
   for (let i = 0; i < D; i++) zz += ((f[i] - st.ood.mean[i]) / st.ood.std[i]) ** 2;
   return { theta, ood: Math.sqrt(zz / D) / st.ood.ref };
@@ -138,12 +141,10 @@ export const browser = {
   async init(onModel) {
     const data = await (await fetch(`${BASE}models/styles.json`)).json();
     DTYPE = data.dtype || "float32";
-    styles = data.styles.map((s) => ({
-      ...s,
-      head: { ...s.head, ...Object.fromEntries(["mu", "sigma", "w1", "b1", "ln_w", "ln_b", "w2", "b2", "theta_mean"]
-        .map((k) => [k, f32(s.head[k])])) },
-      ood: { mean: f32(s.ood.mean), std: f32(s.ood.std), ref: s.ood.ref },
-    }));
+    // version 3: tutorial looks are slider settings (no head); others keep a head (A6.4)
+    styles = data.styles.map((s) => (s.head ? { ...s, head: decodeHead(s.head), ood: { mean: f32(s.ood.mean), std: f32(s.ood.std), ref: s.ood.ref } } : s));
+    models = Object.fromEntries(Object.entries(data.models || {}).map(([k, m]) => [k, { ...m, head: decodeHead(m.head) }]));
+    this.caps = { ...this.caps, auto: !!models.auto_c };
     modelReady = (async () => {
       const bytes = await fetchProgress(`${BASE}models/rn18.onnx`, (l, t) => onModel?.({ loaded: l, total: t, ready: false }));
       session = await ort.InferenceSession.create(bytes, { executionProviders: ["wasm"] });
@@ -193,9 +194,18 @@ export const browser = {
   fullSize: (id) => { const p = photos.get(id); return p?.raw ? [p.raw.width, p.raw.height] : [p?.bitmap.width, p?.bitmap.height]; },
   async predict(id, style) {
     const p = photos.get(id), st = styles.find((s) => s.card.name === style);
+    if (!st.head) return { style, kind: "sliders", sliders: st.sliders, strength: st.card.default_strength ?? 1, version: 3 };
     const { theta, ood } = head(st, await features(p));
     return { style, renderer: st.card.renderer, knots: st.card.knots, theta,
              strength: st.card.default_strength ?? 1, ood_score: ood, version: 1 };
+  },
+  /** A slider model's prediction for a photo: {slider: value} (the base correction is "auto_c"). */
+  async sliders(id, model = "auto_c") {
+    const m = models[model]; if (!m) return null;
+    const { theta } = head({ head: m.head, ood: null }, await features(photos.get(id)), false);
+    const out = {};
+    m.names.forEach((n, i) => { const v = theta[i] * m.units[i]; if (Math.abs(v) > 1e-3) out[n] = v; });
+    return out;
   },
   async export(id, params, eff, opts) {
     const { fmt = "jpg", quality = 92, edge = 0, space = "srgb", metadata = true, share = false } = opts;

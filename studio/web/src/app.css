@@ -348,3 +348,4 @@ input.text { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border-radius:
 .item-x { margin-left: auto; padding: 0 6px; color: var(--faint); font-size: 11px; opacity: 0; }
 .item:hover .item-x { opacity: 1; }
 .insp-foot { flex-wrap: wrap; }
+.auto-toggle { margin: 8px 0 2px; }

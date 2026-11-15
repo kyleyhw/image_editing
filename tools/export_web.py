@@ -85,6 +85,48 @@ def export_styles(roots: list[Path], out: Path) -> None:
     print(f"{len(styles)} styles -> {out} ({out.stat().st_size / 1e6:.1f} MB)")
 
 
+def export_v3(src: Path, out: Path, auto: list[Path]) -> None:
+    """styles.json version 3 (A6.4): tutorial looks become slider settings of the pipeline
+    (photostyle.slider_looks, no network needed); looks without a recipe (Fujifilm, trained on film
+    scans) keep their head. Slider models (the base correction "auto", expert styles) are added
+    under "models", in the same head format."""
+    from photostyle import slider_looks as SL
+    from photostyle.auto import SliderModel, units
+    from photostyle.recipe_library import LOOKS
+    from photostyle.recipes import RECIPE_TABLES
+
+    d = json.loads(src.read_text())
+    if d.get("version", 1) >= 3:
+        styles = [s for s in d["styles"]]
+    else:
+        styles = d["styles"]
+    out_styles = []
+    for st in styles:
+        name = st["card"]["name"]
+        if name in LOOKS or (name in RECIPE_TABLES and name != "fujifilm"):
+            card = {**st["card"], "kind": "sliders", "default_strength": 1.0}
+            card.pop("renderer", None)
+            card.pop("knots", None)
+            out_styles.append({"card": card, "attribution": st.get("attribution", []), "sliders": SL.look_sliders(name)})
+            print(f"sliders {name}")
+        else:
+            out_styles.append({**st, "card": {**st["card"], "kind": st["card"].get("kind", "head")}})
+            print(f"head    {name}")
+    models = {}
+    for path in auto:
+        m = SliderModel.load(path)
+        sd = m.head.state_dict()
+        models[path.stem] = {
+            "names": m.names, "units": units(m.names).tolist(),
+            "head": {"mu": _b64(sd["mu"]), "sigma": _b64(sd["sigma"]), "w1": _b64(sd["net.0.weight"]), "b1": _b64(sd["net.0.bias"]),
+                     "ln_w": _b64(sd["net.1.weight"]), "ln_b": _b64(sd["net.1.bias"]), "w2": _b64(sd["net.4.weight"]),
+                     "b2": _b64(sd["net.4.bias"]), "theta_mean": _b64(sd["theta_mean"]), "alpha": float(sd["alpha"]),
+                     "hidden": int(sd["net.0.weight"].shape[0]), "out": int(sd["net.4.weight"].shape[0])}}
+        print(f"model   {path.stem} ({len(m.names)} sliders)")
+    out.write_text(json.dumps({"version": 3, "dtype": "float16", "feature_dim": 1280, "styles": out_styles, "models": models}))
+    print(f"{len(out_styles)} styles, {len(models)} models -> {out} ({out.stat().st_size / 1e6:.1f} MB)")
+
+
 def export_backbone(out: Path) -> None:
     import onnx
     from onnx import TensorProto, helper, numpy_helper
@@ -140,11 +182,18 @@ def main() -> None:
     s.add_argument("--roots", type=Path, nargs="+", default=[Path("stylepacks"), Path("webpacks")],
                    help="style pack folders; webpacks/ holds web-only packs")
     s.add_argument("--out", type=Path, default=Path("studio/web/pages/models/styles.json"))
+    v = sub.add_parser("v3")
+    v.add_argument("--src", type=Path, default=Path("studio/web/pages/models/styles.json"))
+    v.add_argument("--out", type=Path, default=Path("studio/web/pages/models/styles.json"))
+    v.add_argument("--models", type=Path, nargs="*", default=sorted(Path("photostyle/models").glob("auto_*.pt"))
+                   + sorted(Path("photostyle/models").glob("style_*.pt")))
     b = sub.add_parser("backbone")
     b.add_argument("--out", type=Path, default=Path("site/models/rn18.onnx"))
     args = ap.parse_args()
     if args.what == "styles":
         export_styles(args.roots, args.out)
+    elif args.what == "v3":
+        export_v3(args.src, args.out, args.models)
     else:
         export_backbone(args.out)
 

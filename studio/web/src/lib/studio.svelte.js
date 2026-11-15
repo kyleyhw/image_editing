@@ -8,7 +8,7 @@ import { untrack } from "svelte";
 import { api, loadImage, pollJob, json } from "./api.js";
 import { B, initBackend } from "./backend.js";
 import { effectiveFrom, mixEffective } from "./render.js";
-import { draw, makeGL, outputSize, pixelScale, setImage, wbGains, DEFAULTS, SPEC } from "./pipeline.js";
+import { draw, makeGL, outputSize, pixelScale, setImage, wbGains, combine, scaleLook, DEFAULTS, SPEC } from "./pipeline.js";
 import * as store from "./store.js";
 
 export const ZERO_SCENE = () => ({ haze: 0, clarity_near: 0, clarity_far: 0, sky_exposure: 0, sky_warmth: 0, sky_saturation: 0 });
@@ -47,6 +47,8 @@ export const S = $state({
   frame: 0,                  // bumps after every draw (histogram)
   undo: [], redo: [], last: "",
   presets: [],               // the user's own presets (localStorage)
+  auto: null,                // the base correction for this photo ({slider: value}) when on
+  autoOn: false,
   clipboard: null,           // copied settings
   snapshots: [],             // named states of this photo
 });
@@ -76,9 +78,12 @@ export async function boot() {
   if (S.photos.length) await selectPhoto(S.photos[0].id);
 }
 
-const lookOf = (params, strength) => (params ? effectiveFrom(params, strength) : null);
+const lookOf = (params, strength) => (params && params.kind !== "sliders" ? effectiveFrom(params, strength) : null);
+/** The sliders the pipeline runs: auto correction, then a slider look at its strength, then yours. */
+const layered = (params, strength, p) => (params?.kind === "sliders" || (S.autoOn && S.auto)
+  ? combine(S.autoOn ? S.auto : null, params?.kind === "sliders" ? scaleLook(params.sliders, strength) : null, p) : p);
 /** Everything the renderer needs for the current edit. */
-export const effective = () => ({ p: S.p, look: lookOf(S.params, S.strength), K: S.params?.knots ?? 9, brushes: brushList() });
+export const effective = () => ({ p: layered(S.params, S.strength, S.p), look: lookOf(S.params, S.strength), K: S.params?.knots ?? 9, brushes: brushList() });
 export const modeCode = () => (S.holdBefore || S.mode === "before" ? 1 : S.mode === "after" ? 2 : 0);
 export const hasLook = () => !!S.style;
 
@@ -92,7 +97,7 @@ export function exportParams() {       // for the server: the look's EditParams 
 /** What is on screen: the hovered look (peek), else the current edit; look changes tween. */
 function target() {
   const pk = S.peek && S.peek !== "__original" && S.byStyle[S.peek];
-  return pk ? { p: S.p, look: lookOf(pk, pk.strength ?? 1), K: pk.knots } : effective();
+  return pk ? { p: layered(pk, pk.strength ?? 1, S.p), look: lookOf(pk, pk.strength ?? 1), K: pk.knots } : effective();
 }
 
 let raf = 0;
@@ -106,7 +111,7 @@ export function render() {
     if (t < 1) { cancelAnimationFrame(raf); raf = requestAnimationFrame(render); } else view.tween = null;
   }
   view.shown = e;
-  e = { ...e, p: drawnP() };
+  e = { ...e, p: drawnP(e.p) };
   sizeCanvas();
   const full = B.fullSize?.(S.id), c = view.main.canvas;
   const pxScale = full ? pixelScale(c.width, view.main.src, Math.max(...full), drawnP().crop) : 1;
@@ -120,7 +125,7 @@ function sizeCanvas() {
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
 }
 /** The adjustments as drawn (the crop tool shows the uncropped, straightened frame). */
-export const drawnP = () => (S.tool === "crop" && S.p.crop ? { ...S.p, crop: { angle: S.p.crop.angle ?? 0 } } : S.p);
+export const drawnP = (p = S.p) => (S.tool === "crop" && p.crop ? { ...p, crop: { angle: p.crop.angle ?? 0 } } : p);
 function startTween() { if (view.shown) view.tween = { from: view.shown, t0: performance.now() }; }
 export function setPeek(name) {
   if (S.peek === name) return;
@@ -161,10 +166,11 @@ export function neutralise(rgbDisplay) {
 }
 
 // ------------------------------------------------------------------ history
-const snap = () => JSON.stringify({ p: S.p, strength: S.strength, style: S.style, scene: S.scene });
+const snap = () => JSON.stringify({ p: S.p, strength: S.strength, style: S.style, scene: S.scene, autoOn: S.autoOn });
 export function commit() { const s = snap(); if (s === S.last) return; S.undo.push(S.last); S.redo = []; S.last = s; remember(); }
 async function restore(s) {
   const o = JSON.parse(s); S.p = o.p; S.strength = o.strength;
+  if ((o.autoOn ?? false) !== S.autoOn) { S.autoOn = !!o.autoOn; if (S.autoOn && !S.auto && S.id) loadAuto(S.id); }
   if (o.style !== S.style) { S.style = o.style; await loadLook(); S.strength = o.strength; }
   const sceneChanged = JSON.stringify(o.scene) !== JSON.stringify(S.scene);
   S.scene = o.scene; if (sceneChanged) applyScene();
@@ -176,7 +182,7 @@ export function resetAll() { S.p = {}; S.strength = S.params?.strength ?? 1; com
 let saveTimer = 0;
 function remember() {
   if (!S.id) return;
-  const id = S.id, e = { p: $state.snapshot(S.p), style: S.style, strength: S.strength, snapshots: $state.snapshot(S.snapshots) };
+  const id = S.id, e = { p: $state.snapshot(S.p), style: S.style, strength: S.strength, snapshots: $state.snapshot(S.snapshots), autoOn: S.autoOn };
   edits.set(id, e);
   if (S.caps.persist) { clearTimeout(saveTimer); saveTimer = setTimeout(() => store.saveEdit(id, e), 400); }
 }
@@ -216,6 +222,8 @@ export async function selectPhoto(id) {
   if (!kept && B.isRaw?.(id)) S.p = { ...RAW_BASE };
   await loadLook();
   if (kept) S.strength = kept.strength;
+  S.autoOn = kept?.autoOn ?? (S.caps.auto && autoDefault());
+  S.auto = null; if (S.autoOn) loadAuto(id);
   S.undo = []; S.redo = []; S.last = snap();
   S.imgVersion++;
   predictAll(id);
@@ -289,7 +297,7 @@ export async function personalise() {
 export function renderThumb(img, params, w, target) {
   const h = Math.round((w * img.naturalHeight) / img.naturalWidth);
   view.thumbCanvas.width = w; view.thumbCanvas.height = h; setImage(view.thumb, img);
-  draw(view.thumb, { p: {}, look: lookOf(params, params.strength ?? 1), K: params.knots }, { mode: 2 });
+  draw(view.thumb, { p: layered(params, params.strength ?? 1, {}), look: lookOf(params, params.strength ?? 1), K: params.knots }, { mode: 2 });
   target.width = w; target.height = h; target.getContext("2d").drawImage(view.thumbCanvas, 0, 0);
 }
 
@@ -490,4 +498,19 @@ export async function matchTo(refId) {
   for (const k of ["contrast", "temp", "tint", "saturation"]) p[k] = Math.round(p[k]);
   S.p = p; commit();
   S.message = "Matched to the reference photo.";
+}
+
+// ------------------------------------------------------------------ base correction (Phase 21)
+const AUTO_KEY = "irodori.auto.v1";
+const autoDefault = () => { try { return localStorage.getItem(AUTO_KEY) !== "0"; } catch { return true; } };
+async function loadAuto(id) {
+  const a = await B.sliders?.(id, "auto_c");
+  if (S.id === id) { S.auto = a; }
+}
+/** Turn the per-photo correction (predicted from MIT-Adobe FiveK expert C) on or off. */
+export async function setAuto(on) {
+  S.autoOn = on;
+  try { localStorage.setItem(AUTO_KEY, on ? "1" : "0"); } catch { /* storage unavailable */ }
+  if (on && !S.auto && S.id) await loadAuto(S.id);
+  commit();
 }

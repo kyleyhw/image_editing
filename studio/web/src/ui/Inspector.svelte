@@ -1,5 +1,5 @@
 <script>
-  import { S, commit, resetAll, rememberEdit, personalise, pretty, setStyle, resetGroup, copySettings, pasteSettings, syncAll, savePreset, applyPreset, deletePreset } from "../lib/studio.svelte.js";
+  import { S, commit, resetAll, rememberEdit, personalise, pretty, setStyle, resetGroup, copySettings, pasteSettings, syncAll, savePreset, applyPreset, deletePreset, setAuto } from "../lib/studio.svelte.js";
   import HistoryPanel from "../panels/HistoryPanel.svelte";
   import { describe, effectiveFrom } from "../lib/render.js";
   import { SLIDERS } from "../lib/pipeline.js";
@@ -48,6 +48,17 @@
       {#if S.presets.length}<optgroup label="My presets">{#each S.presets as pr (pr.name)}<option value={`preset:${pr.name}`}>{pr.name}</option>{/each}</optgroup>{/if}
     </select>
     {#if card?.description}<p class="desc">{card.description}</p>{/if}
+    {#if S.caps.auto}
+      <label class="toggle auto-toggle" title="A per-photo correction of white balance, exposure and tone, learned from a professional's edits of 5,000 photos (MIT-Adobe FiveK, expert C). The look is applied on top.">
+        <input type="checkbox" checked={S.autoOn} onchange={(e) => setAuto(e.currentTarget.checked)} /> Auto-correct first</label>
+      {#if S.autoOn && S.auto}
+        <div class="changes" aria-label="Auto correction">
+          {#each Object.entries(S.auto).filter(([, v]) => Math.abs(v) >= (Math.abs(v) < 5 ? 0.05 : 1)) as [k, v]}
+            <span class="chip">{k === "temp" ? "Temp" : k.charAt(0).toUpperCase() + k.slice(1)} <b>{k === "exposure" ? (v > 0 ? "+" : "") + v.toFixed(2) : (v > 0 ? "+" : "") + Math.round(v)}</b></span>
+          {/each}
+        </div>
+      {/if}
+    {/if}
     {#if S.style}
       <Slider id="strength" label="Strength" min={0} max={150} suffix="%" reset={Math.round((S.params?.strength ?? 1) * 100)}
               value={Math.round(S.strength * 100)} disabled={!S.params}
