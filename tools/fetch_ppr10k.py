@@ -8,7 +8,11 @@ profile: sources 16-bit, retouches 8-bit; any other profile raises an error rath
 misread), resized in linear light to EDGE px on the long side and saved as an 8-bit sRGB PNG, like the FiveK
 proxies. A file list per zip records progress, so a rerun resumes.
 
-    uv run python tools/fetch_ppr10k.py [--only source a b c] [--list]
+`--split` then lays the proxies out like data/fivek (split/original, split/expert_X, as symbolic
+links) using the official split: the first 8,875 files for training and the last 2,286 for
+testing, in file order (group, then index within the group; README of csjliang/PPR10K).
+
+    uv run python tools/fetch_ppr10k.py [--only source a b c] [--list] [--split]
 """
 
 from __future__ import annotations
@@ -140,11 +144,36 @@ def fetch(name: str, url: str, list_only: bool) -> None:
     print(f"{name}: done in {time.time() - t0:.0f} s", flush=True)
 
 
+N_TRAIN = 8875      # official split (README of csjliang/PPR10K): first 8,875 files train, last 2,286 test
+
+
+def split() -> None:
+    def order(p: Path) -> tuple[int, int]:
+        g, i = p.stem.split("_")[:2]
+        return int(g), int(i)
+
+    src = sorted((OUT / "source").glob("*.png"), key=order)
+    assert len(src) == 11161, f"{len(src)} sources: run the download first"
+    base = ROOT / "data/ppr10k_split"
+    for k, f in enumerate(src):
+        sp = "train" if k < N_TRAIN else "test"
+        for d, name in (("source", "original"), ("a", "expert_a"), ("b", "expert_b"), ("c", "expert_c")):
+            tgt = OUT / d / f.name
+            link = base / sp / name / f.name
+            link.parent.mkdir(parents=True, exist_ok=True)
+            if tgt.exists() and not link.exists():
+                link.symlink_to(tgt)
+    print({sp: len(list((base / sp / "original").iterdir())) for sp in ("train", "test")})
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="+", default=list(ZIPS))
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--split", action="store_true", help="lay out the train/test split (after the download)")
     args = ap.parse_args()
+    if args.split:
+        return split()
     u = urls()
     for k in args.only:
         fetch(k, u[ZIPS[k]], args.list)

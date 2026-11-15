@@ -42,10 +42,10 @@ def misaligned() -> set[tuple[str, str]]:
     return {(r["split"], f"img_{int(r['idx']):04d}") for r in csv.DictReader(man.open()) if float(r["align_r"] or 1) < 0.6}
 
 
-def split_files(split: str, expert: str, limit: int | None) -> list[Path]:
-    bad = misaligned()
-    src = sorted(f for f in (DATA / split / "original").iterdir() if f.suffix.lower() in IMG) if (DATA / split / "original").exists() else []
-    tdir = DATA / split / f"expert_{expert}"
+def split_files(split: str, expert: str, limit: int | None, root: Path = DATA) -> list[Path]:
+    bad = misaligned() if root == DATA else set()
+    src = sorted(f for f in (root / split / "original").iterdir() if f.suffix.lower() in IMG) if (root / split / "original").exists() else []
+    tdir = root / split / f"expert_{expert}"
     return [f for f in src if (split, f.stem) not in bad and any((tdir / (f.stem + e)).exists() for e in IMG)][:limit]
 
 
@@ -75,11 +75,17 @@ def main() -> None:
     ap.add_argument("--dropout", type=float, default=0.2)
     ap.add_argument("--wd", type=float, default=1e-4)
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--extra", type=Path, default=None,
+                    help="a second dataset in the same layout (e.g. data/ppr10k_split): its train split joins the "
+                         "training pairs, its test split is scored separately")
+    ap.add_argument("--extra-expert", default="a")
+    ap.add_argument("--baseline", type=Path, default=None, help="an existing model to score on the extra test split too")
+    ap.add_argument("--tag", default=None, help="model name (default auto_<expert> or style_<expert>)")
     args = ap.parse_args()
     t0 = time.time()
     torch.set_num_threads(3)     # the FiveK download shares the CPU
     names = A.CORRECTION + (A.COLOUR if args.colour else [])
-    tag = f"{'style' if args.colour else 'auto'}_{args.expert}"
+    tag = args.tag or f"{'style' if args.colour else 'auto'}_{args.expert}"
     out = args.out or ROOT / "photostyle/models" / f"{tag}.pt"
     cache = ROOT / "data/cache"
     cache.mkdir(parents=True, exist_ok=True)
@@ -92,29 +98,37 @@ def main() -> None:
         train_f, val_f = train_f[:-k], train_f[-k:]
     print(f"train {len(train_f)}, validation {len(val_f)}, test {len(test_f)}", flush=True)
 
-    def load(files: list[Path], split_hint: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        key = cache / f"pairs_{split_hint}_{args.expert}_{args.edge}_{len(files)}.pt"
+    def load(files: list[Path], split_hint: str, expert: str | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        expert = expert or args.expert
+        root = files[0].parent.parent.parent
+        pre = "" if root == DATA else f"{root.name}_"
+        key = cache / f"pairs_{pre}{split_hint}_{expert}_{args.edge}_{len(files)}.pt"
         if key.exists():
             d = torch.load(key)
             return d["x"], d["y"], d["f"]
-        out = _load(files)
+        out = _load(files, expert)
         torch.save({"x": out[0], "y": out[1], "f": out[2]}, key)
         return out
 
-    def _load(files: list[Path]) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _load(files: list[Path], expert: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        root = files[0].parent.parent.parent
         by_split: dict[str, list[Path]] = {}
         for f in files:
             by_split.setdefault(f.parent.parent.name, []).append(f)
         xs, ys, fs = [], [], []
         for sp, fl in by_split.items():
-            x, y, stems = A.load_pairs(DATA, sp, args.expert, args.edge, None)
+            x, y, stems = A.load_pairs(root, sp, expert, args.edge, None)
             keep = [i for i, s in enumerate(stems) if s in {f.stem for f in fl}]
             xs.append(x[keep])
             ys.append(y[keep])
-            fs.append(A.descriptors([DATA / sp / "original" / (stems[i] + ".png") for i in keep], cache / f"desc_{sp}_{len(keep)}_{stems[keep[0]]}.pt"))
+            fs.append(A.descriptors([root / sp / "original" / (stems[i] + ".png") for i in keep], cache / f"desc_{sp}_{len(keep)}_{stems[keep[0]]}.pt"))
         return torch.cat(xs), torch.cat(ys), torch.cat(fs)
 
     xtr, ytr, ftr = load(train_f, "train")
+    if args.extra:                            # e.g. PPR10K portraits: more training pairs, scored on their own test split
+        xe, ye, fe = load(split_files("train", args.extra_expert, None, args.extra), "train", args.extra_expert)
+        print(f"extra training pairs from {args.extra}: {len(xe)}", flush=True)
+        xtr, ytr, ftr = torch.cat([xtr, xe]), torch.cat([ytr, ye]), torch.cat([ftr, fe])
     xva, yva, fva = load(val_f, "validation")
     print(f"loaded in {time.time() - t0:.0f} s; {xtr.shape[2]}x{xtr.shape[3]} px", flush=True)
 
@@ -140,6 +154,14 @@ def main() -> None:
         report["identity_test"] = {"psnr": float(np.mean([A.psnr(x, y) for x, y in zip(xte, yte)])), "de00": de00(xte, yte)}
         report["test"] = score(model, fte, xte, yte)
         print("test", report["test"], "identity", report["identity_test"], flush=True)
+    if args.extra:
+        xe, ye, fe = load(split_files("test", args.extra_expert, None, args.extra), "test", args.extra_expert)
+        report["identity_test_extra"] = {"psnr": float(np.mean([A.psnr(x, y) for x, y in zip(xe, ye)])), "de00": de00(xe, ye)}
+        report["test_extra"] = score(model, fe, xe, ye)
+        print("extra test", report["test_extra"], "identity", report["identity_test_extra"], flush=True)
+        if args.baseline:                     # the model this one would replace, on the same extra test photos
+            report["test_extra_baseline"] = score(A.SliderModel.load(args.baseline), fe, xe, ye)
+            print("extra test, baseline", report["test_extra_baseline"], flush=True)
     model.save(out)
     pv = model.predict(fva)
     report["slider_stats_val"] = {n: {"median": round(float(pv[:, i].median()), 2), "p05": round(float(pv[:, i].quantile(0.05)), 2),
