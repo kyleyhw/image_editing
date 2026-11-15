@@ -1,0 +1,123 @@
+# Phase 21 report: slider-space models
+
+*2026-11-15. Plan amendment A6, Phase 21.*
+
+## What was done
+
+1. **Oracle study** (`tools/oracle_study.py`). For 64 FiveK training photos, the best slider
+   values per photo were found by gradient descent on the Oklab distance to expert C's edit. This
+   bounds what any model predicting those sliders can reach.
+2. **Range probe.** The same fit with the slider limits lifted, on 32 photos, to see how far the
+   experts' edits push each slider.
+3. **Tone-slider scales revised** from the probe (below).
+4. **Base correction model** (`photostyle/auto.py`, `tools/train_auto.py`). It predicts the ten
+   correction sliders (temperature, tint, exposure, contrast, highlights, shadows, whites, blacks,
+   vibrance, saturation) from the existing 1280-D descriptor (frozen ResNet-18 plus channel CDFs).
+   - The loss is the mean Oklab distance to expert C plus $\lambda = 0.003$ × the L1 norm of the
+     sliders.
+   - Training renders through the differentiable pipeline at 128 px, on 3,499 training pairs; the
+     500 validation photos selected the configuration and the 1,000 test photos were held out.
+   - The model is the `auto_c` entry of `styles.json` and is applied in the browser as an
+     *Auto-correct first* layer, on by default.
+5. **Tutorial looks as slider settings** (`photostyle/slider_looks.py`). The 21 tutorial looks
+   (20 plus Cyberpunk) are now exactly their recipe's slider values. They need no network, so
+   `styles.json` shrank from 5.3 MB to 0.5 MB, and their example panels were re-rendered through
+   the pipeline. Fujifilm, trained on film scans, keeps its learned head, as the plan says.
+6. **Film looks fitted to film colour tables** (`tools/fit_film.py`; results below).
+
+## Data correction during this phase
+
+The Phase 20 data agent found that the FiveK expert edits are 8-bit **ProPhoto RGB** with an
+embedded profile, and that a third of the originals needed rotating.
+
+- My first loader read the experts as sRGB, which desaturated every target. The first oracle run
+  and the first training run used those wrong targets; both were stopped and repeated with
+  colour-managed decoding and resizing in linear light (`auto._read_linear`).
+- The older FiveK tools (`tools/download_fivek_subset.py`, `download_fivek_landscapes.py`) had
+  both faults, so the A5-era FiveK results (`mit5k_expert_c_report.md`) were measured on wrong
+  pairs. Those models were local-only and never published.
+
+## Results
+
+### Oracle and the slider ranges (64 training photos, 96×128 px)
+
+| | Oklab distance ×100 | PSNR | mean ΔE00 |
+|---|---|---|---|
+| Unedited (original against expert C) | 8.22 | 20.41 dB | 10.19 |
+| Oracle, 10 correction sliders, original ranges | 2.43 | 28.79 dB | 3.66 |
+| Oracle, limits lifted (32 photos) | 1.71 | — | — |
+
+With the original ranges, the oracle hit the limit for whites on 97 % of photos, blacks on 80 %,
+highlights on 47 % and shadows on 23 %. With the limits lifted, the experts needed medians of
+whites −229, blacks −202, highlights −56 and shadows −52. That is a strong highlight shoulder and
+shadow toe, the S-shaped curve raw converters apply by default and the FiveK originals lack.
+
+**Decision.** Whites and blacks were made 3× stronger, and highlights and shadows 1.5× (the
+`TONE_ROWS` in `photostyle/pipeline.py`). The experts' typical edits now fall within ±100, and the
+sliders come closer to Lightroom's, whose whites and blacks are strong.
+
+Side effect: tutorial looks keep their published slider numbers, so their whites and blacks act
+more strongly than before.
+
+The configurations that add the 24 HSL sliders and a free curve were not completed: both runs
+were stopped at the 30-minute background limit.
+
+### Base correction model
+
+| | Validation (500) PSNR | ΔE00 | Test (1,000) PSNR | ΔE00 |
+|---|---|---|---|---|
+| Unedited | 20.49 dB | 9.81 | 20.39 dB | 9.95 |
+| Head width 256, dropout 0.2, 30 epochs | 22.33 dB | 7.91 | — | — |
+| **Head width 64, dropout 0.3, weight decay 1e-3, 12 epochs (shipped)** | **22.52 dB** | **7.81** | **22.37 dB** | **7.92** |
+
+![Auto correction on test photos](assets/phase21_auto_test.jpg)
+
+*Each row is a held-out test photo: the FiveK original (left), the model's correction (middle)
+and expert C's edit (right). The corrections go in the expert's direction (lower whites, more
+saturation, small exposure changes) but are milder: on the night harbour, the expert's cool
+white balance is barely attempted.*
+
+**Interpretation.**
+
+- The model gains 2.0 dB and 2.0 ΔE00 on unseen photos. The oracle shows that up to about 8 dB
+  is available to these sliders with perfect per-photo knowledge.
+- Validation stopped improving after about 5 epochs while the training loss kept falling, and the
+  smaller network did slightly better. The predicted slider medians are about a sixth of the
+  oracle's; for example whites −38 against about −76 on the new scale. The model regresses toward
+  a mild average edit, which is safe as a default but conservative.
+- What limits it is how much of each expert decision the frozen ImageNet descriptor can predict,
+  not the slider set. Expected improvements, not tried here:
+  - fine-tuning the backbone;
+  - training at a higher resolution;
+  - adding curve outputs;
+  - training on all five experts.
+- Published FiveK numbers are not comparable: they use Adobe's renders of the raw files as inputs,
+  whereas this copy's originals are LibRaw renders (Phase 20 report).
+
+### Tutorial looks as slider settings
+
+Rendering each recipe through the pipeline differs from the old `develop.py` renders by 2–18/255
+(mean, on 27 photos). The two implementations scale the sliders differently, and neither is
+calibrated against Lightroom. In a side-by-side review the slider versions look similar or more
+natural (Moody Forest keeps its greens; Autumn and Bright Food are less overcooked). Bright & Airy,
+Bright Food and CineStill are milder.
+
+### Film looks
+
+See the [film fit](#film-fit) section below.
+
+## Not done
+
+- **Expert styles A–E.** Their data is still downloading, about 4–6 h at the time of writing.
+- **The colour and curve oracle configurations.** Stopped at the time limit.
+- **Residual colour tables.** Not built; the film-fit errors below decide whether any look needs
+  one.
+
+## Runtime
+
+| Step | Runtime |
+|---|---|
+| Loading and descriptors, first time | 1,211 s (cached afterwards) |
+| Shipped training run | 393 s, after caching |
+| Oracle, correction configuration | about 25 min |
+| Range probe | about 15 min |

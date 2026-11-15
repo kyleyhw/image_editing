@@ -645,17 +645,34 @@ def eval_curve(pts: list[tuple[float, float]], t: torch.Tensor) -> torch.Tensor:
     return torch.where(t > 1, inner + (t - 1), inner)
 
 
+def _tensor_curve(spec: Mapping[str, Any], t: torch.Tensor) -> torch.Tensor:
+    """A curve given as {"x": knots (n,), "y": (B, n) tensor}: differentiable in y (for fitting)."""
+    xs = torch.as_tensor(spec["x"], dtype=t.dtype)
+    ys = spec["y"].to(t)
+    B = t.shape[0]
+    inner = pchip(xs, ys, t.reshape(B, -1).clamp(float(xs[0]), float(xs[-1]))).view_as(t)
+    return torch.where(t > 1, inner + (t - 1), inner)
+
+
 def apply_curves(c: torch.Tensor, curves: Mapping[str, Any] | None) -> torch.Tensor:
     """Lightroom's point curve: RGB applies the same curve to each channel, then R, G, B.
-    Applied to display-encoded values, as the curve panel shows them."""
-    if not any(curve_points(curves, k) for k in CURVE_KEYS):
+    Applied to display-encoded values, as the curve panel shows them. A curve is a list of
+    (input, output) points, or {"x": knots, "y": (B, n) tensor} when fitting."""
+    tensor = {k: v for k, v in (curves or {}).items() if isinstance(v, Mapping)}
+    if not tensor and not any(curve_points(curves, k) for k in CURVE_KEYS):
         return c
     e = srgb_encode(c)
-    rgb = curve_points(curves, "rgb")
-    if rgb:
-        e = eval_curve(rgb, e)
+    if "rgb" in tensor:
+        e = torch.stack([_tensor_curve(tensor["rgb"], e[:, i]) for i in range(3)], 1)
+    else:
+        rgb = curve_points(curves, "rgb")
+        if rgb:
+            e = eval_curve(rgb, e)
     chans = []
     for i, k in enumerate("rgb"):
+        if k in tensor:
+            chans.append(_tensor_curve(tensor[k], e[:, i]))
+            continue
         pts = curve_points(curves, k)
         chans.append(eval_curve(pts, e[:, i]) if pts else e[:, i])
     return srgb_decode(torch.stack(chans, 1))
