@@ -22,6 +22,7 @@ import json
 import random
 import time
 from pathlib import Path
+from typing import Any
 
 import torch
 
@@ -66,7 +67,7 @@ def main() -> None:
     test = random.Random(99).sample(data.split("test"), args.test)   # same subset as Phase 7
 
     out_path = args.out / "results.json"
-    results = json.loads(out_path.read_text()) if out_path.exists() else {"runs": []}
+    results: dict[str, Any] = json.loads(out_path.read_text()) if out_path.exists() else {"runs": []}
     done = {(r["n"], r["renderer"]) for r in results["runs"]}
     for s in args.sizes.split(","):
         n = len(pool) if s == "all" else int(s)

@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import os
 from collections import defaultdict
+from collections.abc import Sized
 from typing import Iterable
 
 import numpy as np
@@ -70,8 +71,8 @@ class ImagePairDataset(Dataset):
     def __len__(self) -> int:
         return len(self.files)
 
-    def __getitem__(self, idx: int):
-        original_name = self.files[idx]
+    def __getitem__(self, index: int):
+        original_name = self.files[index]
         styled_name = original_name.replace("_original.jpg", "_styled.jpg")
         original = ski.io.imread(os.path.join(self.root_dir, original_name))
         styled = ski.io.imread(os.path.join(self.root_dir, styled_name))
@@ -159,6 +160,7 @@ def train(args):
         ]
     )
     dataloader = _build_dataloader(args, transform)
+    assert isinstance(dataloader.dataset, Sized)  # both datasets define __len__
     print(f"Dataset: {len(dataloader.dataset)} pairs, {len(dataloader)} batches/epoch")
 
     model, renderer, criterion, returns_components = _build_model_and_renderer(args, device)

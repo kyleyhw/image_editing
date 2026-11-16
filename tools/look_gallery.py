@@ -112,7 +112,7 @@ def main() -> None:
                     sc = score(st, target)
                     cands.append((sc, item, img, h))
         cands.sort(key=lambda c: -c[0])
-        creators: set[str] = set()
+        creators: set[str | None] = set()   # None: items without a creator (one of those is kept)
         n = 0
         for sc, item, img, h in cands:
             if n >= args.per_look:

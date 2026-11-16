@@ -425,8 +425,9 @@ def train(name: str, recipe: str = "gentle", pairs: tuple[Path, Path] | None = N
         if recipe == "strong":
             pool = input_pool(exclude=name, include_owner=not open_only)
             ins = [_tensor(f) for f in random.Random(seed).sample(pool, min(300, len(pool)))]
-        kw = dict(use_pseudo=True, use_swd=recipe == "strong", use_fidelity=recipe == "strong")
-        head, r, feats, info = learn_unpaired(ex, ins, fx, steps=steps, seed=seed, progress=progress, **kw)
+        strong = recipe == "strong"
+        head, r, feats, info = learn_unpaired(ex, ins, fx, steps=steps, seed=seed, progress=progress,
+                                              use_pseudo=True, use_swd=strong, use_fidelity=strong)
         mode = f"unpaired/{recipe}"
     ck = p.dir / "head.pt"
     torch.save({"kind": kind, "state_dict": head.state_dict(), "renderer": r.kind, "feats": feats, **extra}, ck)

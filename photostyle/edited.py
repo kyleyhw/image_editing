@@ -42,8 +42,9 @@ def fit(root: Path = Path("data/fivek_landscape_c"), n: int = 400) -> None:
     import csv
     import random
 
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.model_selection import cross_val_score
+    # scikit-learn is an optional extra for refitting only, not a project dependency.
+    from sklearn.linear_model import LogisticRegression  # ty: ignore[unresolved-import]
+    from sklearn.model_selection import cross_val_score  # ty: ignore[unresolved-import]
 
     rows = [r for r in csv.DictReader(open(root / "meta.csv")) if r["license"] == "AdobeMIT"]
     random.Random(0).shuffle(rows)

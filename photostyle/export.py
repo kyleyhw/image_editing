@@ -55,6 +55,8 @@ def read_cube(path: Path) -> torch.Tensor:
             size = int(t[1])
             continue
         rows.append([float(v) for v in t])
+    if size is None:
+        raise ValueError(f"{path}: no LUT_3D_SIZE line")
     return torch.tensor(rows).reshape(size, size, size, 3)
 
 

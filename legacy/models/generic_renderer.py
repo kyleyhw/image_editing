@@ -79,6 +79,8 @@ class ToneCurve(nn.Module):
         out   : (B, C, H, W) in [0, 1]
     """
 
+    identity: torch.Tensor  # buffer: identity knot values
+
     def __init__(self, num_points: int = 9):
         super().__init__()
         if num_points < 3:
@@ -121,6 +123,8 @@ class ColorMatrix(nn.Module):
         bias  : (B, 3)
         out   : (B, 3, H, W)
     """
+
+    eye: torch.Tensor  # buffer: 3x3 identity
 
     def __init__(self):
         super().__init__()

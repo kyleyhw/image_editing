@@ -113,8 +113,8 @@ class MIT5KDataset(Dataset):
             img = ski.util.img_as_ubyte(img)
         return img
 
-    def __getitem__(self, idx: int):
-        name = self.files[idx]
+    def __getitem__(self, index: int):
+        name = self.files[index]
         original = self._load_uint8(os.path.join(self.original_dir, name))
         styled = self._load_uint8(os.path.join(self.expert_dir, name))
         if self.transform is not None:

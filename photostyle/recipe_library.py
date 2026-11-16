@@ -17,7 +17,24 @@ picks the training photos and the example photo shown in Studio.
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from photostyle.develop import kelvin_to_temperature as K
+
+# A slider value: a number, a (hue, saturation) pair, or point-curve control points.
+RecipeValue = float | tuple[float, float] | list[tuple[float, float]]
+# (tool, param, value, [sources], kind, note)
+Row = tuple[str, str, RecipeValue, list[str], str, str]
+
+
+class Look(TypedDict):
+    title: str
+    category: str
+    subject: str
+    queries: list[str]
+    grade: str
+    rows: list[Row]
+
 
 S = {
     "RNG": ("Run N Gun Photography, Dark & Moody Lightroom Mobile Tutorial", "https://therunngun.com/dark-moody-lightroom-mobile-tutorial/"),
@@ -75,17 +92,18 @@ S = {
 }
 
 
-def _hsl(src, kind, hue=None, sat=None, lum=None, note=""):
-    rows = []
+def _hsl(src: str, kind: str, hue: dict[str, float] | None = None, sat: dict[str, float] | None = None,
+         lum: dict[str, float] | None = None, note: str = "") -> list[Row]:
+    rows: list[Row] = []
     for key, d in (("hue", hue), ("sat", sat), ("lum", lum)):
         for band, v in (d or {}).items():
             rows.append(("hsl", f"{key}.{band}", v, [src], kind, note or f"{band} {key} {v:+g}"))
     return rows
 
 
-LOOKS = {
+LOOKS: dict[str, Look] = {
     # ------------------------------------------------------------------ day landscapes
-    "moody_forest": dict(
+    "moody_forest": Look(
         title="Moody Forest", category="Day landscape",
         subject="misty, overcast forests with tall trees and lots of green", queries=["misty forest", "foggy forest overcast"],
         grade="A", rows=[
@@ -108,7 +126,7 @@ LOOKS = {
             ("dehaze", "amount", 10, ["RNG"], "direction", "dehaze slightly up"),
             ("vignette", "amount", -25, ["LTJ"], "numeric", "vignette -25"),
         ]),
-    "golden_hour": dict(
+    "golden_hour": Look(
         title="Golden Hour", category="Day landscape",
         subject="sunrise and sunset landscapes", queries=["sunset landscape mountains", "sunrise landscape"],
         grade="B", rows=[
@@ -120,7 +138,7 @@ LOOKS = {
             ("saturation", "vibrance", 15, ["LS"], "direction", "vibrance up"),
             ("dehaze", "amount", 10, ["LS"], "direction", "dehaze up"),
         ]),
-    "velvia": dict(
+    "velvia": Look(
         title="Velvia Vivid", category="Day landscape",
         subject="sunny landscapes with sky, water and foliage", queries=["mountain lake landscape sunny", "green valley landscape"],
         grade="A", rows=[
@@ -135,7 +153,7 @@ LOOKS = {
             ("color_grading", "shadows", (300, 10), ["LPV"], "converted", "shadows magenta +8 to +12 (magenta = hue 300)"),
         ]),
     # ------------------------------------------------------------------ night landscapes
-    "milky_way": dict(
+    "milky_way": Look(
         title="Milky Way", category="Night landscape",
         subject="night skies and the Milky Way over a landscape", queries=["milky way night sky", "astrophotography stars landscape"],
         grade="A", rows=[
@@ -155,7 +173,7 @@ LOOKS = {
             ("saturation", "sat", 10, ["AP"], "numeric", "saturation +10"),
             ("vignette", "amount", -9, ["ML"], "numeric", "vignette -9"),
         ]),
-    "blue_hour": dict(
+    "blue_hour": Look(
         title="Blue Hour", category="Night landscape",
         subject="twilight seascapes and landscapes after sunset", queries=["blue hour seascape", "twilight coast dusk"],
         grade="C", rows=[
@@ -170,7 +188,7 @@ LOOKS = {
             ("point_curve", "rgb", [(0, 0), (64, 56), (192, 200), (255, 255)], ["LPX"], "direction", "gentle S-curve"),
         ]),
     # ------------------------------------------------------------------ day cities
-    "teal_orange": dict(
+    "teal_orange": Look(
         title="Teal & Orange", category="Day city",
         subject="city streets and architecture in daylight", queries=["city street daytime", "downtown architecture street"],
         grade="B", rows=[
@@ -183,7 +201,7 @@ LOOKS = {
             ("point_curve", "rgb", [(0, 18), (64, 55), (192, 205), (255, 245)], ["LTT"], "direction",
              "drag the end points in for a fade, then an S-curve"),
         ]),
-    "kodachrome": dict(
+    "kodachrome": Look(
         title="Kodachrome Street", category="Day city",
         subject="colourful street and travel scenes in daylight", queries=["colorful street market", "street photography colorful"],
         grade="A", rows=[
@@ -201,7 +219,7 @@ LOOKS = {
              "shadow point output 0-8, highlight point 235-245, pronounced S (S shape chosen)"),
             ("color_grading", "highlights", (40, 5), ["ESK"], "direction", "neutral to very slight warm"),
         ]),
-    "matte_urban": dict(
+    "matte_urban": Look(
         title="Matte Urban", category="Day city",
         subject="streets, walls and urban textures", queries=["urban alley street", "city street wall"],
         grade="A", rows=[
@@ -219,7 +237,7 @@ LOOKS = {
             ("vignette", "amount", -15, ["ESV"], "mid", "vignette -10 to -20"),
         ]),
     # ------------------------------------------------------------------ night cities
-    "cinestill_800t": dict(
+    "cinestill_800t": Look(
         title="CineStill 800T", category="Night city",
         subject="city streets at night under street and shop lights", queries=["city street night lights", "night street rain"],
         grade="B", rows=[
@@ -242,7 +260,7 @@ LOOKS = {
             ("hsl", "hue.aqua", 10, ["LM"], "direction", "aquas cooler"),
             ("vignette", "amount", -7.5, ["LM"], "mid", "vignette -5 to -10"),
         ]),
-    "tokyo_night": dict(
+    "tokyo_night": Look(
         title="Tokyo Night", category="Night city",
         subject="neon-lit night streets (Masashi Wakui style)", queries=["tokyo night street", "neon night alley japan"],
         grade="B", rows=[
@@ -259,7 +277,7 @@ LOOKS = {
             ("saturation", "vibrance", 10, ["TD"], "direction", "a little vibrance"),
         ]),
     # ------------------------------------------------------------------ portraits
-    "portra_400": dict(
+    "portra_400": Look(
         title="Portra 400", category="Portrait",
         subject="daylight portraits outdoors", queries=["outdoor portrait natural light", "portrait woman park"],
         grade="A", rows=[
@@ -282,7 +300,7 @@ LOOKS = {
             ("color_grading", "highlights", (35, 8), ["PPP"], "numeric", "highlights hue 35, saturation 8"),
             ("vignette", "amount", -12, ["PPP"], "numeric", "vignette -12"),
         ]),
-    "bright_airy": dict(
+    "bright_airy": Look(
         title="Bright & Airy", category="Portrait",
         subject="weddings and lifestyle portraits in soft light", queries=["wedding bride portrait", "window light portrait"],
         grade="A", rows=[
@@ -298,7 +316,7 @@ LOOKS = {
             ("point_curve", "rgb", [(0, 15), (255, 245)], ["ESA"], "direction", "lift the black point, pull the top anchor down slightly"),
             ("color_grading", "shadows", (210, 5), ["ESA"], "direction", "neutral or very slight cool tint in shadows"),
         ]),
-    "moody_portrait": dict(
+    "moody_portrait": Look(
         title="Moody Portrait", category="Portrait",
         subject="low-key and indoor portraits", queries=["low key portrait", "dark moody portrait"],
         grade="A", rows=[
@@ -316,7 +334,7 @@ LOOKS = {
                   lum={"red": -20, "orange": -6, "yellow": -6, "green": -65}),
             ("point_curve", "rgb", [(0, 8), (64, 58), (192, 200), (255, 250)], ["JYD"], "direction", "gentle S-curve"),
         ]),
-    "tri_x": dict(
+    "tri_x": Look(
         title="Tri-X B&W", category="Portrait",
         subject="street and documentary portraits in black and white", queries=["street portrait man", "documentary portrait"],
         grade="C", rows=[
@@ -330,7 +348,7 @@ LOOKS = {
             ("parametric_curve", "highlights", -10, ["PPB"], "numeric", "curve highlights -10"),
             ("parametric_curve", "shadows", 10, ["PPB"], "numeric", "curve shadows +10"),
         ]),
-    "golden_backlit": dict(
+    "golden_backlit": Look(
         title="Golden Backlit", category="Portrait",
         subject="backlit portraits at sunset", queries=["backlit portrait sunset", "golden hour portrait"],
         grade="A", rows=[
@@ -351,7 +369,7 @@ LOOKS = {
                   lum={"red": -10, "yellow": 10, "blue": 3}),
         ]),
     # ------------------------------------------------------------------ objects and food
-    "bright_food": dict(
+    "bright_food": Look(
         title="Bright Food", category="Food & objects",
         subject="food on light tables, overhead and daylight", queries=["food flat lay", "breakfast table food"],
         grade="B", rows=[
@@ -367,7 +385,7 @@ LOOKS = {
             ("color_grading", "shadows", (200, 6.5), ["FSA"], "converted", "cool blue/teal shadows, saturation 5-8 %"),
             ("color_grading", "balance", 15, ["FSA"], "mid", "balance +10 to +20"),
         ]),
-    "moody_food": dict(
+    "moody_food": Look(
         title="Moody Food", category="Food & objects",
         subject="food, drinks and still life on dark surfaces", queries=["dark food photography", "coffee cup dark background"],
         grade="A", rows=[
@@ -390,7 +408,7 @@ LOOKS = {
             ("vignette", "amount", -20, ["FL"], "numeric", "vignette -20"),
             ("point_curve", "rgb", [(0, 0), (64, 50), (192, 207), (255, 255)], ["FL"], "direction", "S-curve"),
         ]),
-    "ektar_100": dict(
+    "ektar_100": Look(
         title="Ektar 100", category="Food & objects",
         subject="colourful travel scenes and objects in daylight", queries=["colorful building travel", "colorful umbrellas street"],
         grade="A", rows=[
@@ -406,7 +424,7 @@ LOOKS = {
                   lum={"red": -9, "orange": -5, "yellow": -5, "aqua": -8, "blue": -13.5}, note="Ektar colour table"),
         ]),
     # ------------------------------------------------------------------ seasons
-    "autumn": dict(
+    "autumn": Look(
         title="Autumn", category="Seasons",
         subject="autumn foliage and cosy autumn scenes", queries=["autumn leaves forest", "fall foliage trees"],
         grade="A", rows=[
@@ -425,7 +443,7 @@ LOOKS = {
                   lum={"red": 10, "orange": -10, "yellow": -20, "green": -20, "aqua": -20, "blue": -20}),
             ("color_grading", "shadows", (30, 20), ["WG"], "numeric", "shadows hue 30, saturation 20"),
         ]),
-    "winter": dict(
+    "winter": Look(
         title="Winter", category="Seasons",
         subject="snowy landscapes", queries=["snowy landscape", "snow mountains winter"],
         grade="C", rows=[

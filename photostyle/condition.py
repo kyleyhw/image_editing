@@ -21,6 +21,9 @@ import torch.nn.functional as F
 
 
 class StyleHead(nn.Module):
+    mu: torch.Tensor
+    sigma: torch.Tensor
+
     def __init__(self, in_dim: int, out_dim: int, n_styles: int, code_dim: int = 32, hidden: int = 64,
                  dropout: float = 0.3):
         super().__init__()
@@ -54,6 +57,9 @@ class StyleHead(nn.Module):
 class StyleEncoder(nn.Module):
     """Descriptors of in-style images -> style code (mean-pooled, L2-normalised x scale)."""
 
+    mu: torch.Tensor
+    sigma: torch.Tensor
+
     def __init__(self, in_dim: int, code_dim: int = 32, hidden: int = 128, scale: float = 1.0):
         super().__init__()
         self.register_buffer("mu", torch.zeros(in_dim))
@@ -81,6 +87,8 @@ class CodedHead(nn.Module):
     This is how a style made on the shared base is stored in a style pack: the
     base weights plus the style's code (fitted on pairs, or from the encoder).
     """
+
+    code: torch.Tensor
 
     def __init__(self, head: StyleHead, code: torch.Tensor):
         super().__init__()

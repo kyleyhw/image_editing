@@ -1,5 +1,7 @@
 """Unit tests for the Phase 7 engine core (photostyle/)."""
 
+import dataclasses
+
 import numpy as np
 import pytest
 import torch
@@ -23,6 +25,7 @@ def test_gradients_reach_all_parameters(kind):
     img = torch.rand(1, 3, 16, 16)
     p = (0.01 * torch.randn(1, r.num_params)).requires_grad_()
     r(img, p).sum().backward()
+    assert p.grad is not None
     assert (p.grad.abs() > 0).float().mean() > 0.9
 
 
@@ -93,6 +96,7 @@ def test_regional_identity_and_gradients():
     assert torch.allclose(r(img, torch.zeros(2, r.num_params)), img, atol=1e-5)
     p = (0.05 * torch.randn(1, r.num_params)).requires_grad_()
     r(img[:1], p).sum().backward()
+    assert p.grad is not None
     q = r.unpack(p.grad)
     for k in ("grad", "tone", "sky"):
         assert q[k].abs().sum() > 0, k
@@ -117,6 +121,7 @@ def test_lut_renderer_identity_and_learnable():
     p = torch.zeros(2, r.num_params)
     loss = (r(img, p) - img.flip(1)).abs().mean() + r.regularizer()
     loss.backward()
+    assert r.bases.grad is not None
     assert r.bases.grad.abs().sum() > 0
 
 
@@ -130,7 +135,9 @@ def test_engine_round_trip(tmp_path):
     head = Head(FEATURE_DIM, r.num_params)
     feats = torch.randn(10, FEATURE_DIM)
     head.set_norm(feats)
-    torch.nn.init.normal_(head.net[-1].weight, std=0.01)  # a non-identity style
+    last = head.net[-1]
+    assert isinstance(last, torch.nn.Linear)
+    torch.nn.init.normal_(last.weight, std=0.01)  # a non-identity style
     save_stylepack(tmp_path / "packs" / "t", "t", head, r, feats, {"source": "test"})
     save_stylepack(tmp_path / "packs" / "u", "u", head, r, feats, {"source": "test", "default_strength": 0.7})
     eng = Engine(roots=[tmp_path / "packs"])
@@ -175,7 +182,7 @@ def test_scene_in_edit_params_reaches_the_render():
     p = EditParams(style="t", renderer="per_channel", knots=r.K, theta=[0.0] * r.num_params)
     eng = Engine.__new__(Engine)                      # render() needs no style packs
     same = eng.render(img, p)
-    hazy = eng.render(img, EditParams(**{**p.__dict__, "scene": {"clarity_near": 0.8}}))
+    hazy = eng.render(img, dataclasses.replace(p, scene={"clarity_near": 0.8}))
     assert np.abs(np.asarray(same, float) - np.asarray(img, float)).max() <= 2
     assert np.abs(np.asarray(hazy, float) - np.asarray(img, float)).mean() > 0.5
     assert EditParams.from_json(p.to_json()).scene == {}

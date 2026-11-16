@@ -99,7 +99,7 @@ def profile_loss(img: torch.Tensor, regimes: list[str], profile: LookProfile,
     """
     s = image_stats(img)
     r = image_stats(ref) if ref is not None else None
-    total = 0.0
+    total: torch.Tensor | float = 0.0
     for i, reg in enumerate(regimes):
         t = dict(profile.targets(reg))
         if r is not None:
@@ -111,6 +111,7 @@ def profile_loss(img: torch.Tensor, regimes: list[str], profile: LookProfile,
             elif k.startswith("high"):
                 w = float(torch.clamp(s["_w_h"][i].detach() / 0.05, max=1.0))
             total = total + w * ((s[k][i] - target) / tol) ** 2
+    assert isinstance(total, torch.Tensor)  # at least one regime and one statistic were added
     return total / (len(regimes) * len(STATS))
 
 
@@ -205,7 +206,11 @@ def chroma_retention(out: torch.Tensor, ref: torch.Tensor, sky: torch.Tensor | N
                      sky_only: bool = False) -> float:
     """Chroma of the edit / chroma of the input, over sky and strongly coloured pixels (1 = kept).
     With ``sky_only`` (needs ``sky``), over the sky alone."""
-    w = sky[:, 0] if sky_only else _keep_weight(ref, sky)
+    if sky_only:
+        assert sky is not None, "sky_only needs a sky mask"
+        w = sky[:, 0]
+    else:
+        w = _keep_weight(ref, sky)
     if sky_only and float(w.mean()) < 0.02:  # (almost) no sky in this photo
         return float("nan")
     return float((_chroma(out) * w).sum() / (_chroma(ref) * w).sum().clamp_min(1e-6))

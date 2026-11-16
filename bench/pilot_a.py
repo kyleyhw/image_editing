@@ -34,6 +34,7 @@ import json
 import random
 import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -273,7 +274,7 @@ def main() -> None:
     print(f"inputs={len(pool)} test={len(test)} {counts} seed={len(seed)} pseudo={len(pseudo)} "
           f"[{time.time() - t0:.0f}s]", flush=True)
 
-    results = {"profile": CLEAN_COOL.name, "counts": {"inputs": len(pool), "test": len(test), **counts,
+    results: dict[str, Any] = {"profile": CLEAN_COOL.name, "counts": {"inputs": len(pool), "test": len(test), **counts,
                                                       "seed": len(seed), "pseudo_pairs": len(pseudo)},
                "methods": {}, "cells": {}, "spread": {}, "train_log": {}}
     feats_test = torch.stack([it["feat"] for it in test])
@@ -296,7 +297,7 @@ def main() -> None:
     for kind in ("preset", "head"):
         seed_all(0)
         m = Preset(r.num_params) if kind == "preset" else Head(FEATURE_DIM, r.num_params)
-        if kind == "head":
+        if isinstance(m, Head):     # kind == "head"
             m.set_norm(torch.stack([it["feat"] for it in pool]))
         print(f"training {kind} ...", flush=True)
         results["train_log"][kind] = train(m, r, pool, seed, pseudo, args.steps, keep_chroma=args.keep_chroma)
@@ -306,11 +307,12 @@ def main() -> None:
         models[kind] = (m, theta)
 
     theta = models["head"][1]
-    results["spread"] = {
+    spread: dict[str, Any] = {      # JSON report section; values are lists of effect sizes or numbers
         "night_vs_day": effect_sizes(theta, [it["regime"] for it in test], "night", "day"),
         "urban_vs_nature": effect_sizes(theta, [it["meta"]["subject"] for it in test], "man_made", "nature"),
         "theta_std_mean": float(theta.std(0).mean()),
     }
+    results["spread"] = spread
     for k in ("night_vs_day", "urban_vs_nature"):
         es = results["spread"][k]
         results["spread"][k + "_n_params_d>0.8"] = int(sum(e > 0.8 for e in es))

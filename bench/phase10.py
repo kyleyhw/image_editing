@@ -109,6 +109,7 @@ def train_joint(data, r, n, steps=3000, seed=0, styles=None):
                 bad += 1
                 if bad >= 12:
                     break
+    assert state is not None, "needs steps >= 50: the first validation (step 50) always improves on inf"
     head.load_state_dict(state[0])
     enc.load_state_dict(state[1])
     head.eval()

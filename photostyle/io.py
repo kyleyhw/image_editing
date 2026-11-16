@@ -38,7 +38,7 @@ def load_image(path: str | Path) -> tuple[Image.Image, dict]:
         return Image.fromarray(rgb), info
     if path.suffix.lower() in {".heic", ".heif"}:
         try:
-            import pillow_heif  # type: ignore[import-not-found]
+            import pillow_heif  # ty: ignore[unresolved-import]  # optional extra, not a project dependency
 
             pillow_heif.register_heif_opener()
         except ImportError as exc:  # pragma: no cover
@@ -52,6 +52,7 @@ def load_image(path: str | Path) -> tuple[Image.Image, dict]:
         info["icc"] = ImageCms.getProfileDescription(src).strip()
         img = ImageCms.profileToProfile(img.convert("RGB"), src, _SRGB,
                                         renderingIntent=ImageCms.Intent.PERCEPTUAL, outputMode="RGB")
+        assert img is not None  # inPlace=False: profileToProfile returns a new image
     else:
         info["icc"] = "none (assumed sRGB)"
         img = img.convert("RGB")

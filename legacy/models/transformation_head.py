@@ -32,8 +32,10 @@ class TransformationHead(nn.Module):
         )
         
         # Initialize last layer to output near 0 (neutral)
-        nn.init.constant_(self.net[-1].weight, 0)
-        nn.init.constant_(self.net[-1].bias, 0)
+        final = self.net[-1]
+        assert isinstance(final, nn.Linear)
+        nn.init.constant_(final.weight, 0)
+        nn.init.constant_(final.bias, 0)
 
     def forward(self, x):
         """

@@ -25,6 +25,7 @@ import json
 import random
 import time
 from pathlib import Path
+from typing import TypedDict
 
 import torch
 
@@ -32,9 +33,17 @@ from bench.learning_curve import Pairs, evaluate, hwc, render_items, summarise
 from photostyle.features import FeatureExtractor
 from photostyle.train import learn_unpaired
 
-VARIANTS = {"swd": dict(use_pseudo=False, use_swd=True, use_fidelity=True),
-            "pseudo": dict(use_pseudo=True, use_swd=False, use_fidelity=False),
-            "swd+pseudo": dict(use_pseudo=True, use_swd=True, use_fidelity=True)}
+class Variant(TypedDict):
+    """Loss switches passed to ``learn_unpaired``."""
+
+    use_pseudo: bool
+    use_swd: bool
+    use_fidelity: bool
+
+
+VARIANTS: dict[str, Variant] = {"swd": Variant(use_pseudo=False, use_swd=True, use_fidelity=True),
+                                "pseudo": Variant(use_pseudo=True, use_swd=False, use_fidelity=False),
+                                "swd+pseudo": Variant(use_pseudo=True, use_swd=True, use_fidelity=True)}
 
 
 def main() -> None:

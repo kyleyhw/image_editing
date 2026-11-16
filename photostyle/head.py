@@ -16,6 +16,13 @@ class Head(nn.Module):
     is self-contained.
     """
 
+    # Buffers registered in __init__ (declared here so their type is Tensor,
+    # not the Tensor | Module that nn.Module.__getattr__ reports).
+    mu: torch.Tensor
+    sigma: torch.Tensor
+    theta_mean: torch.Tensor
+    alpha: torch.Tensor
+
     # Defaults chosen by a small-data check on FiveK landscapes (n = 10 / 50):
     # hidden 64 + dropout 0.3 beat hidden 256 + dropout 0.1 by +1.1 / +0.3 dB
     # and ~3 / ~1.4 dE, which the wider head lost to overfitting.
@@ -27,8 +34,10 @@ class Head(nn.Module):
             nn.Linear(in_dim, hidden), nn.LayerNorm(hidden), nn.GELU(), nn.Dropout(dropout),
             nn.Linear(hidden, out_dim),
         )
-        nn.init.zeros_(self.net[-1].weight)
-        nn.init.zeros_(self.net[-1].bias)
+        last = self.net[-1]
+        assert isinstance(last, nn.Linear)
+        nn.init.zeros_(last.weight)
+        nn.init.zeros_(last.bias)
         # Shrinkage toward the mean training prediction (alpha = 1: off). Set by
         # photostyle.train.calibrate_shrinkage; stabilises small-data heads.
         self.register_buffer("theta_mean", torch.zeros(out_dim))

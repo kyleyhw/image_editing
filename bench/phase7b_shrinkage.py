@@ -16,6 +16,7 @@ import json
 import random
 import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -43,7 +44,7 @@ def main() -> None:
     val, pool = pool[:30], pool[30:]
     test = random.Random(99).sample(data.split("test"), 200)
     r = GlobalRenderer("per_channel")
-    res = {"runs": []}
+    res: dict[str, Any] = {"runs": []}     # JSON report
     for n in map(int, args.sizes.split(",")):
         for seed in (0, 1, 2):
             seed_all(seed)

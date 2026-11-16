@@ -7,6 +7,7 @@ import glob
 import json
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 import torch
 
@@ -16,13 +17,18 @@ from photostyle.photo_filter import embed_images  # noqa: E402
 OUT = Path("data/cache/clip_cache_embeddings.pt")
 
 
+class _Cache(TypedDict):
+    files: list[str]      # image paths, in row order of ``emb``
+    emb: torch.Tensor     # (N, 512) CLIP image embeddings
+
+
 def main() -> None:
     torch.set_num_threads(4)
     meta = set()
     for f in glob.glob("data/cache/openverse/search/*.json"):
         meta.update(it["id"] for it in json.loads(Path(f).read_text()))
     files = [p for p in sorted(glob.glob("data/cache/openverse/images/*.jpg")) if Path(p).stem in meta]
-    done = torch.load(OUT) if OUT.exists() else {"files": [], "emb": torch.zeros(0, 512)}
+    done: _Cache = torch.load(OUT) if OUT.exists() else {"files": [], "emb": torch.zeros(0, 512)}
     todo = [f for f in files if f not in set(done["files"])]
     print(f"{len(files)} images, {len(todo)} to embed", flush=True)
     for i in range(0, len(todo), 256):

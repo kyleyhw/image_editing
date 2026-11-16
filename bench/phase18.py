@@ -29,6 +29,7 @@ import csv
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -80,12 +81,12 @@ def main() -> None:
         meta = [r for r in csv.DictReader(f) if r["split"] == "test" and r["subject"] == "nature"
                 and r["license"] == "AdobeMIT" and r["location"] == "outdoor"]
     meta = meta[: args.n]
-    res = {"images": [], "identity_exact": True}
+    res: dict[str, Any] = {"images": [], "identity_exact": True}     # JSON report
     rows = []
     for m in meta:
         full = to_t(args.data / "original" / m["file"])
         img = shrink(full, 1024)[None]
-        rec = {"file": m["file"], "size": list(full.shape[1:])}
+        rec: dict[str, Any] = {"file": m["file"], "size": list(full.shape[1:])}
         t = time.time()
         near = depth_map(img)
         rec["depth_s_1024"] = time.time() - t

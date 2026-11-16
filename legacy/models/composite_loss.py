@@ -52,6 +52,9 @@ class _VGGFeatures(nn.Module):
     pre-trained weights expect.
     """
 
+    mean: torch.Tensor  # buffer: ImageNet channel mean
+    std: torch.Tensor   # buffer: ImageNet channel std
+
     IMAGENET_MEAN = (0.485, 0.456, 0.406)
     IMAGENET_STD = (0.229, 0.224, 0.225)
 
@@ -114,7 +117,8 @@ class CompositeLoss(nn.Module):
             return torch.zeros((), device=pred.device)
         feats_pred = self.vgg(pred)
         feats_tgt = self.vgg(target)
-        return sum(F.l1_loss(p, t) for p, t in zip(feats_pred, feats_tgt)) / len(feats_pred)
+        losses = [F.l1_loss(p, t) for p, t in zip(feats_pred, feats_tgt)]
+        return sum(losses[1:], start=losses[0]) / len(losses)
 
     def _cdf_loss(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         cdf_pred = self.cdf(pred)

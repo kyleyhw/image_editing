@@ -41,8 +41,10 @@ class GenericTransformationHead(nn.Module):
         # Zero-initialise the final layer so the rendered output equals the
         # input at the start of training (see DifferentiableGenericRenderer
         # docstring for the identity-at-zero property).
-        nn.init.constant_(self.net[-1].weight, 0.0)
-        nn.init.constant_(self.net[-1].bias, 0.0)
+        final = self.net[-1]
+        assert isinstance(final, nn.Linear)
+        nn.init.constant_(final.weight, 0.0)
+        nn.init.constant_(final.bias, 0.0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)

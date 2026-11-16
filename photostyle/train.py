@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable
+from typing import TypedDict
 
 import torch
 import torch.nn.functional as F
@@ -203,6 +204,14 @@ def distort_recover_pairs(examples: list[torch.Tensor], renderer: GlobalRenderer
     return out
 
 
+class _UnpairedInput(TypedDict):
+    """One unedited input photo for ``learn_unpaired``."""
+
+    feat: torch.Tensor     # descriptor
+    src_t: torch.Tensor    # training-size image
+    regime: str            # lighting regime for the look profile ("day" / "night")
+
+
 def learn_unpaired(examples: list[torch.Tensor], inputs: list[torch.Tensor], fx: FeatureExtractor,
                    profile: LookProfile | None = None, regime_fn: Callable | None = None, steps: int = 1200,
                    seed: int = 0, progress: Callable | None = None, use_pseudo: bool = True,
@@ -225,9 +234,9 @@ def learn_unpaired(examples: list[torch.Tensor], inputs: list[torch.Tensor], fx:
     r = GlobalRenderer("per_channel")
     ex = [shrink(e, TRAIN_EDGE) for e in examples]
     pseudo = distort_recover_pairs(ex, r, fx, k=16, seed=seed) if use_pseudo else []
-    ins = [{"feat": fx(x), "src_t": shrink(x, TRAIN_EDGE)} for x in inputs]
-    for it in ins:
-        it["regime"] = regime_fn(it["src_t"]) if regime_fn else "day"
+    feat_src = [(fx(x), shrink(x, TRAIN_EDGE)) for x in inputs]
+    ins: list[_UnpairedInput] = [{"feat": f, "src_t": src, "regime": regime_fn(src) if regime_fn else "day"}
+                                 for f, src in feat_src]
     ex_pix = torch.cat([lab_pixels(e[None], 4096) for e in ex])
     head = Head(FEATURE_DIM, r.num_params)
     feats = torch.stack([it["feat"] for it in ins + pseudo] or [fx(e) for e in ex])

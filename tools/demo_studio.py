@@ -79,6 +79,7 @@ def main() -> None:
 
         cap("Drag the divider to compare before / after")
         box = page.locator("#view").bounding_box()
+        assert box is not None, "#view is not visible"
         page.mouse.move(box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.5)
         page.mouse.down()
         for fr in (0.3, 0.2, 0.7, 0.8, 0.5):
@@ -93,6 +94,7 @@ def main() -> None:
         cap("Curves stay editable: drag a knot (G channel)")
         page.click(".tab:has-text('G')")
         cb = page.locator("#curves").bounding_box()
+        assert cb is not None, "#curves is not visible"
         page.mouse.move(cb["x"] + cb["width"] * 0.5, cb["y"] + cb["height"] * 0.5)
         page.mouse.down()
         page.mouse.move(cb["x"] + cb["width"] * 0.5, cb["y"] + cb["height"] * 0.38, steps=8)
@@ -150,6 +152,7 @@ def main() -> None:
             page.click("#btnExport")
         cap("Export: full-res JPEG, .cube LUT (Resolve, Premiere, …), Lightroom XMP, JSON", 2200)
         cap("", 300, shot=False)
+        assert page.video is not None   # the context records video (record_video_dir)
         video = page.video.path()
         ctx.close()
         b.close()

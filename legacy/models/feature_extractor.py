@@ -7,6 +7,9 @@ class DifferentiableCDF(nn.Module):
     Computes a differentiable Cumulative Distribution Function (CDF) for an image.
     Uses soft binning (Gaussian kernels) to make the histogram calculation differentiable.
     """
+
+    centers: torch.Tensor  # buffer: bin centres
+
     def __init__(self, bins=256, sigma=0.01):
         super().__init__()
         self.bins = bins

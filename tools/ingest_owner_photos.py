@@ -59,6 +59,7 @@ def to_srgb(img: Image.Image) -> tuple[Image.Image, str]:
     dst = ImageCms.createProfile("sRGB")
     out = ImageCms.profileToProfile(img.convert("RGB"), src, dst,
                                     renderingIntent=ImageCms.Intent.PERCEPTUAL, outputMode="RGB")
+    assert out is not None  # inPlace=False: profileToProfile returns a new image
     return out, desc
 
 

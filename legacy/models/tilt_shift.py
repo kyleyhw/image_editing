@@ -76,6 +76,8 @@ class DifferentiableTiltShift(nn.Module):
 
     DEFAULT_FEATHER = 0.15
 
+    kernel_1d: torch.Tensor  # buffer: 1-D Gaussian kernel
+
     def __init__(self, max_sigma: float = 8.0):
         super().__init__()
         self.max_sigma = float(max_sigma)
@@ -199,6 +201,7 @@ class _TiltShiftHead(nn.Module):
             nn.Linear(256, num_outputs),
         )
         final = self.net[-1]
+        assert isinstance(final, nn.Linear)
         nn.init.constant_(final.weight, 0.0)
         nn.init.constant_(final.bias, 0.0)
         if tail_bias_init is not None:

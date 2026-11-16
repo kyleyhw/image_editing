@@ -62,7 +62,7 @@ def _save_jpeg(img: Image.Image, path: str, max_edge: int, quality: int) -> None
     scale = min(1.0, max_edge / max(w, h))
     if scale < 1.0:
         new_size = (int(round(w * scale)), int(round(h * scale)))
-        img = img.resize(new_size, Image.LANCZOS)
+        img = img.resize(new_size, Image.Resampling.LANCZOS)
     img.save(path, format="JPEG", quality=quality, optimize=True)
 
 

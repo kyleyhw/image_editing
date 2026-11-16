@@ -50,7 +50,7 @@ def label_names(pf: pq.ParquetFile) -> dict[str, list[str]]:
 
 def save_jpeg(data: bytes, path: Path, max_edge: int, quality: int) -> None:
     img = Image.open(io.BytesIO(data)).convert("RGB")
-    img.thumbnail((max_edge, max_edge), Image.LANCZOS)
+    img.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
     img.save(path, format="JPEG", quality=quality, optimize=True)
 
 

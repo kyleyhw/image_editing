@@ -25,7 +25,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from photostyle import newstyle as ns  # noqa: E402
 from photostyle.edited import p_edited  # noqa: E402
-from photostyle.recipe_library import LOOKS, NOT_MODELLED  # noqa: E402
+from photostyle.recipe_library import LOOKS, NOT_MODELLED, Look  # noqa: E402
 from photostyle.recipes import SOURCES  # noqa: E402
 
 EXAMPLES = Path("studio/web/public/examples")
@@ -38,7 +38,7 @@ def tutorials(rows):
     return [{"title": SOURCES[k][0], "url": SOURCES[k][1]} for k in keys]
 
 
-def local_candidates(look: dict, out: Path, n: int = 60) -> list[dict]:
+def local_candidates(look: Look, out: Path, n: int = 60) -> list[dict]:
     """Fallback when Openverse refuses (daily limit): the n openly licensed images already downloaded
     (data/cache/openverse) that best match the look's subject and queries, by CLIP similarity."""
     import glob
@@ -104,7 +104,7 @@ def pick_example(p: ns.Project, subject: str) -> int:
     return idx[max(range(len(idx)), key=key)]
 
 
-def build(name: str, look: dict, order: int, skip_search: bool, examples_only: bool = False) -> None:
+def build(name: str, look: Look, order: int, skip_search: bool, examples_only: bool = False) -> None:
 
     proj = ns.ROOT / name / "project.json"
     if not proj.exists():

@@ -21,6 +21,7 @@ import json
 import sys
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -42,7 +43,7 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     from playwright.sync_api import sync_playwright
 
-    report = {}
+    report: dict[str, Any] = {}     # JSON report
     with sync_playwright() as pw:
         exe = CHROMIUM if Path(CHROMIUM).exists() else None
         b = pw.chromium.launch(executable_path=exe, args=["--use-gl=angle", "--use-angle=swiftshader",
@@ -83,6 +84,7 @@ def main() -> None:
         page.fill("#strength", "60")
         page.dispatch_event("#strength", "input")
         box = page.locator("#curves").bounding_box()
+        assert box is not None, "#curves is not visible"
         page.mouse.move(box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.5)
         page.mouse.down()
         page.mouse.move(box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.35, steps=5)

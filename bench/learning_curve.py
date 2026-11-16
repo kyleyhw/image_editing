@@ -269,7 +269,7 @@ def main() -> None:
                         continue
                     seed_all(seed)
                     model = Head(FEATURE_DIM, r.num_params) if kind == "head" else Preset(r.num_params)
-                    if kind == "head":
+                    if isinstance(model, Head):     # kind == "head"
                         model.set_norm(torch.stack([it["feat"] for it in pool]))
                     info = train(model, r, train_items, val)
                     outs, theta = render_items(model, r, test)

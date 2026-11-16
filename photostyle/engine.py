@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -29,6 +30,9 @@ from photostyle.features import FEATURE_DIM, FeatureExtractor
 from photostyle.head import Head
 from photostyle.io import load_image, to_pil, to_tensor
 from photostyle.render import GlobalRenderer, _vignette
+
+if TYPE_CHECKING:
+    from photostyle.condition import CodedHead
 
 DEFAULT_ROOTS = [Path("stylepacks"), Path.home() / ".photostyle" / "styles"]
 PREDICT_EDGE = 512
@@ -65,7 +69,9 @@ class EditParams:
         return GlobalRenderer(self.renderer, self.knots)
 
     def with_strength(self, s: float) -> EditParams:
-        return EditParams(**{**asdict(self), "strength": float(s)})
+        d = asdict(self)
+        d["strength"] = float(s)
+        return EditParams(**d)
 
     # human-readable views (read-only) --------------------------------------
     def curves(self) -> dict[str, list[float]]:
@@ -150,7 +156,7 @@ class EditParams:
 class StylePack:
     name: str
     card: dict
-    head: Head
+    head: Head | CodedHead    # CodedHead: a style on the shared base (Phase 10)
     renderer: GlobalRenderer
     feat_mean: torch.Tensor
     feat_std: torch.Tensor
@@ -173,7 +179,7 @@ class StylePack:
         return StylePack(card["name"], card, head, r, ck["feat_mean"], ck["feat_std"], ck["ood_ref"])
 
 
-def save_stylepack(folder: Path, name: str, head: Head, renderer: GlobalRenderer, train_feats: torch.Tensor,
+def save_stylepack(folder: Path, name: str, head: Head | CodedHead, renderer: GlobalRenderer, train_feats: torch.Tensor,
                    card: dict) -> Path:
     """Write a style pack. ``train_feats`` (N, D) are the training features, used for OOD."""
     folder.mkdir(parents=True, exist_ok=True)

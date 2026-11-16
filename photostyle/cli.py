@@ -122,7 +122,8 @@ def cmd_style(args) -> None:
     elif args.step == "flag":
         ns.flag(args.name)
     elif args.step == "train":
-        ns.train(args.name, args.recipe, tuple(Path(d) for d in args.pairs) if args.pairs else None, args.steps,
+        pairs = (Path(args.pairs[0]), Path(args.pairs[1])) if args.pairs else None   # --pairs has nargs=2
+        ns.train(args.name, args.recipe, pairs, args.steps,
                  open_only=args.open_only)
     elif args.step == "preview":
         ns.preview(args.name, [Path(f) for f in args.photos] or None)

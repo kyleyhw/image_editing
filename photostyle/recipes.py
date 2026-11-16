@@ -29,6 +29,7 @@ import torch
 
 from photostyle.develop import develop
 from photostyle.hsv import hsv_to_rgb, rgb_to_hsv  # noqa: F401  (re-exported for older callers)
+from photostyle.recipe_library import Row
 
 SOURCES = {
     # cyberpunk
@@ -50,7 +51,7 @@ SOURCES = {
 }
 
 # (tool, param) -> (value, [sources], kind, note)
-CYBERPUNK = [
+CYBERPUNK: list[Row] = [
     ("white_balance", "temperature", -25, ["TB", "SG"], "direction", "temperature toward blue"),
     ("white_balance", "tint", 20, ["TB", "SG"], "direction", "tint toward magenta"),
     ("contrast", "amount", 25, ["DT", "DD"], "direction", "S-curve: darker shadows, brighter highlights"),
@@ -83,7 +84,7 @@ CYBERPUNK = [
 ]
 CYBERPUNK_NOT_MODELLED = ["clarity - (softer glow; SG, DT): a local operation", "neon glow layers (SG, DD)"]
 
-FUJIFILM = [
+FUJIFILM: list[Row] = [
     ("white_balance", "temperature", -8, ["LP"], "numeric",
      "white balance 5000-5200 K instead of 5500 K daylight, i.e. slightly cooler (converted to this scale)"),
     ("contrast", "amount", 10, ["PL", "JP"], "direction", "a bit more contrast than neutral (Classic Negative)"),
@@ -104,7 +105,7 @@ FUJIFILM = [
 FUJIFILM_NOT_MODELLED = ["grain 25-30 (LP)"]
 
 # Classic Chrome: The Editing Studio gives ranges; the midpoint of each range is used.
-CLASSIC_CHROME = [
+CLASSIC_CHROME: list[Row] = [
     ("tone_regions", "highlights", -25, ["ES"], "numeric", "highlights -20 to -30"),
     ("tone_regions", "shadows", 15, ["ES"], "numeric", "shadows +10 to +20"),
     ("tone_regions", "blacks", 15, ["ES"], "numeric", "blacks +10 to +20"),
@@ -120,7 +121,7 @@ CLASSIC_CHROME = [
 ]
 CLASSIC_CHROME_NOT_MODELLED = ["grain 15-20 amount, 20-25 size, 40-50 roughness (ES)"]
 
-RECIPE_TABLES = {"cyberpunk": CYBERPUNK, "fujifilm": FUJIFILM, "classic_chrome": CLASSIC_CHROME}
+RECIPE_TABLES: dict[str, list[Row]] = {"cyberpunk": CYBERPUNK, "fujifilm": FUJIFILM, "classic_chrome": CLASSIC_CHROME}
 
 # the twenty-look library (photostyle/recipe_library.py)
 from photostyle.recipe_library import LOOKS, S as _LIB_SOURCES  # noqa: E402

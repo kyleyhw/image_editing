@@ -21,6 +21,7 @@ class CSRLite(nn.Module):
         self.l2 = nn.Conv2d(hidden, hidden, 1)
         self.l3 = nn.Conv2d(hidden, 3, 1)
         nn.init.zeros_(self.l3.weight)
+        assert self.l3.bias is not None  # Conv2d(bias=True) by default
         nn.init.zeros_(self.l3.bias)
         self.layout = {"film": 4 * hidden}
         self.num_params = 4 * hidden
