@@ -2111,7 +2111,7 @@ Checkpoint: metrics table, side-by-side sheets per look, rating results.
     TIFF, resize, output sharpening, metadata kept, settings sidecar.
 27. [completed] Lightroom preset export of the slider part (approximate) and
     `.cube` export.
-28. [pending] Memory limits on phones: maximum megapixels, tiling (not done; the export is limited by the GPU's texture size only).
+28. [completed] (tiled export above 16.7 MP or the texture limit; coarse means tiled at full resolution; 16-bit RGB buffers; canvas-free JPEG/PNG; tests/reports/phase22_25_editor.md) Memory limits on phones: maximum megapixels, tiling.
 
 #### Phase 23: Local adjustments
 

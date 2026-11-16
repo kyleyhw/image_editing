@@ -1,10 +1,10 @@
 # Sample photos
 
-Public-domain (CC0 / Public Domain Mark) photos found through Openverse, used as try-it samples in Studio.
+Unedited camera pictures (each camera's own JPEG from a CC0 raw file, or a straight-out-of-camera file), used as try-it samples. Made by tools/build_examples.py.
 
-- `mountain-lake.jpg`: "Free mountain, lake landscape image" by unknown, CC0 1.0, via rawpixel (https://www.rawpixel.com/image/5904011/photo-image-public-domain-tree-green)
-- `valley.jpg`: "Sun on the landscape" by AlaskaNPS, Public Domain Mark, via flickr (https://www.flickr.com/photos/75182224@N04/9024877289)
-- `lisbon-street.jpg`: "Calçada da Glória Lisbon" by Terry Kearney, CC0 1.0, via flickr (https://www.flickr.com/photos/24490288@N04/52558428971)
-- `harbour-dusk.jpg`: "Coastal Landscape" by JJ Skys the Limit, CC0 1.0, via stocksnap (https://stocksnap.io/photo/coastal-landscape-FIMX5UYOIC)
-- `forest-path.jpg`: "Forest Trail" by GlacierNPS, Public Domain Mark, via flickr (https://www.flickr.com/photos/43288043@N04/48920669091)
-- `neon-night.jpg`: "Susukino" by Peter Cartledge, Public Domain Mark, via flickr (https://www.flickr.com/photos/61482680@N02/26738302018)
+- `forest-path.jpg`: "Fujifilm FinePix HS50EXR sample 6018", CC0 1.0, via raw.pixls.us (https://raw.pixls.us/)
+- `pier-dusk.jpg`: "Olympus E-M1X sample 3041", CC0 1.0, via raw.pixls.us (https://raw.pixls.us/)
+- `mountain-lake.jpg`: "Canon EOS Rebel T4i sample 2203", CC0 1.0, via raw.pixls.us (https://raw.pixls.us/)
+- `valley.jpg`: "Fujifilm X-A10 sample 3570", CC0 1.0, via raw.pixls.us (https://raw.pixls.us/)
+- `waterfront.jpg`: "Sony DSC-RX100M5A sample 2816", CC0 1.0, via raw.pixls.us (https://raw.pixls.us/)
+- `night-skyline.jpg`: "Nikon D7000 sample 2578", CC0 1.0, via raw.pixls.us (https://raw.pixls.us/)

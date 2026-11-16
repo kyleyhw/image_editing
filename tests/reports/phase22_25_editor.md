@@ -131,13 +131,63 @@ The Pages build is driven through its controls. Raw files are CC0 samples from r
 The Phase 25 checks (copy and paste, history, service worker, reload) were added afterwards; their
 results are in the [Phase 26 report](phase26_release.md).
 
+### Tiled export and memory limits (task 28, added 16 November)
+
+**What and why.** An iPhone 14 Pro (the owner's phone) takes 48-megapixel ProRAW photos. Rendering one in a single pass
+needs a 48 MP half-float source texture (387 MB), three full-size work textures for the detail
+means and a full-size float output (774 MB). Safari also refuses canvases above 16.7 MP
+(4096 × 4096), which the 8-bit encoders used. Above those limits the export now renders in tiles:
+
+- **Output tiles.** The output is drawn in 2048 px tiles (`pipeline.js` `renderTiled`). Each tile
+  draws from the source window it maps to through the crop and geometry, widened by the reach of
+  the 1-pixel detail means ($3\sigma$) and of the lens-blur radius. The shader takes the tile's
+  place in the full frame (`tileUV`, `tileOff`) and the source window (`srcWin`) as uniforms, so
+  every coordinate-dependent operation (vignette, grain, masks, geometry) is computed in
+  full-frame coordinates.
+- **Coarse local means.** These feed clarity, dehaze and halation and are computed once for the
+  whole photo, from full-resolution pixels, tile by tile (`coarseTiled`). Each tile's core is
+  reduced into its place in a shared half-, quarter- or eighth-resolution texture, and the
+  Gaussian blurs then run on the shared textures. A first version took these means from a
+  2048 px copy of the photo. Halation and dehaze extract nonlinear quantities (highlight excess
+  above a threshold, the dark channel) before averaging, so that version lost small bright
+  lights. It missed by up to 58 code values; the tests below caught it.
+- **Raw sources.** These are read window by window from the 16-bit decode (`raw.js`
+  `rawSource`), so the full float image is never held.
+- **Output buffers.** 16-bit output is kept as 16-bit RGB (290 MB at 48 MP, against 774 MB as
+  float). Above 16.7 MP, JPEG is encoded with `jpeg-js` (BSD-3-Clause, loaded only then) and PNG
+  with the editor's own PNG writer, both in sRGB. For Display P3 at that size, export PNG 16-bit,
+  which carries a cICP tag.
+- **When it applies.** Tiling is used when the source or the output exceeds 16.7 MP or the GPU's
+  texture size. Smaller exports are unchanged.
+
+**Test: tiled against one-pass rendering (`tools/check_tiles.py`).** The input is a real
+23.9-megapixel photo: the CC0 Leica M10 DNG, developed with rawpy. It was chosen because it is
+above the canvas limit and has both fine detail and bright point lights. It is rendered in
+headless Chromium in one pass and in 700 px tiles; small tiles give many seams to test. Both
+renders are 16-bit, so there is no dithering. Values are in 8-bit code values.
+
+| Case | Max difference | Mean ΔE00 | Largest difference at a seam |
+|---|---|---|---|
+| Per-pixel controls | 1 | 0.001 | 1 |
+| Spatial operators (texture, clarity, sharpening, noise reduction, dehaze, halation) | 2 | 0.004 | 1 |
+| Two masks with local clarity | 1 | 0.001 | 1 |
+| Geometry (crop, 3.5° rotation, perspective, distortion) | 1 | 0.001 | 1 |
+| Grain | 1 | 0.001 | 1 |
+
+The tiles are invisible: no case differs by more than 2 code values anywhere, or by more than 1
+along a seam. In the editor itself (`tools/check_editor.py`), a forced tiled export of the sample
+photo matches the one-pass export to 0.001 code values on average in 16 bits. In 8 bits the mean
+difference is 1.2, which is the dither noise plus JPEG re-encoding. Runtime of the comparison:
+1,238 s, under SwiftShader. In this test the tiled path took up to 1.4× the one-pass time
+(spatial case: 73 s against 51 s), because each tile repeats the prep pass over its margin.
+
+**Not tested here:** a real 48 MP export on the phone. It is in the phone checklist (steps 15 and 16).
+
 ## Not done
 
 - **Learned sky and subject masks in the browser.** These need a segmentation model download; the
   download budget is an open question for the owner (A6.10, question 4). The local server keeps
   its learned sky mask.
-- **Tiled export and explicit memory limits on phones.** Export is limited to the GPU's texture
-  size (4096–16384 px, depending on the device).
 - **Spot removal.** Out of scope (A6.9).
 - **The phone checklist on a real phone.** It waits on the owner.
 
