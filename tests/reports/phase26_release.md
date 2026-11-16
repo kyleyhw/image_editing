@@ -75,17 +75,16 @@ cumulative down the table (each row adds passes to the one above). Median of 5 f
 |---|---|---|
 | ruff 0.15.14 | A6 modules and tools | clean (one unused import fixed in `tools/fit_film.py`) |
 | ty 0.0.39 | A6 modules and tools (18 files) | clean after fixes: Playwright's optional bounding box asserted (`tools/check_editor.py`), `log_message` signature, annotations on mixed-type dicts, an unreachable `None` asserted in `tools/train_auto.py` |
-| ty 0.0.39 | whole repository | **125 diagnostics, all in pre-A6 code** (`tools/demo_studio.py` 17, `tests/test_photostyle.py` 12, `tools/check_studio.py` 10, `photostyle/engine.py` 9, `bench/phase18.py` 9, `photostyle/{train,head,condition}.py` 7 each, `legacy/` and older `bench/` and `tools/` files the rest). Left as they are: outside this phase's scope |
+| ty 0.0.39 | whole repository | 125 diagnostics in the pre-A6 code at first; **all fixed on 16 November** at the owner's request (no behaviour change; 65 tests pass), so the pre-commit `ty` hook can check the whole repository |
 | detect-secrets 1.5.0 | repository, excluding `data/`, `site/`, build output and generated JSON | no findings |
 
 **Configuration added** (`pyproject.toml`): `[tool.ty.environment] python-version = "3.11"` (the
 project venv), `[tool.ty.terminal] error-on-warning = true`, and `onnx` / `onnxruntime` as allowed
 unresolved imports (they are run-time extras, `uv run --with onnx --with onnxruntime`).
 
-**Finding for the owner.** `.pre-commit-config.yaml` follows the project template, but the hooks
-are not installed in this clone (`.git/hooks` has no `pre-commit`), and its `ty` hook checks the
-whole repository, so it would currently block every commit on the 125 legacy diagnostics. Two
-options: fix the legacy diagnostics, or limit the hook to the maintained paths. Not changed here.
+**Pre-commit.** `.pre-commit-config.yaml` follows the project template. Its `ty` hook checks the
+whole repository, which now passes. The hooks are not installed in this cloud clone
+(`uv run pre-commit install` installs them in a local clone).
 
 ## Release
 

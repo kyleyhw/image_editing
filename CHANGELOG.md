@@ -34,6 +34,16 @@ that agrees with it (147 of 151 cases within 1 code value or mean ΔE00 0.5). Re
 - Twelve film stocks fitted to film colour tables (held-out ΔE00 0.7–1.7).
 - Expert styles A–E: per-photo slider predictions trained on each FiveK retoucher.
 
+**Large photos and examples (16 November)**
+- Tiled export for photos above 16.7 MP or the GPU's texture size (48 MP iPhone ProRAW): output in
+  2048 px tiles, coarse detail means tiled at full resolution, raw data read window by window,
+  16-bit RGB buffers, canvas-free JPEG (jpeg-js) and PNG above Safari's canvas limit. Matches the
+  one-pass render to 2 code values on a 24 MP photo.
+- Every example "before" panel and every try-it sample is now an unedited camera picture (the
+  camera's own JPEG from CC0 raw files); the previous ones were photos their authors had already
+  edited. New README figure.
+- The whole repository passes ty (121 diagnostics in the pre-A6 code fixed).
+
 **Tools**: `check_pipeline.py` (browser against reference), `check_editor.py` (end to end),
 `bench_pipeline.py`, `train_auto.py`, `oracle_study.py`, `fit_film.py`, `fetch_fivek.py`,
 `make_rating_set.py`.
