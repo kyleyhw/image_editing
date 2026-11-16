@@ -219,6 +219,17 @@ def main() -> None:
                 res["xmp_has_exposure"] = "crs:Exposure2012=" in xmp and "ToneCurvePV2012" in xmp
                 cube = (args.out / "export.cube").read_text().splitlines()
                 res["cube_rows"] = sum(1 for ln in cube if ln and ln[0].isdigit())
+                # tiled export (forced with small tiles): must match the one-pass export
+                import numpy as np
+                for fmt, ext in (("jpg", "jpg"), ("png16", "png")):
+                    with pg.expect_download(timeout=240_000) as dl:
+                        pg.evaluate(f"() => window.__studio.exportCurrent({{ fmt: '{fmt}', tile: 256 }})")
+                    t = args.out / f"export_tiled.{ext}"
+                    dl.value.save_as(t)
+                    one = np.asarray(Image.open(args.out / f"export.{ext}").convert("RGB"), np.float64)
+                    til = np.asarray(Image.open(t).convert("RGB"), np.float64)
+                    res[f"tiled_{fmt}_same_size"] = one.shape == til.shape
+                    res[f"tiled_{fmt}_mean_diff"] = round(float(np.abs(one - til).mean()), 3) if one.shape == til.shape else None
                 # workflow: copy / paste, preset, snapshot, history, persistence across a reload
                 pg.keyboard.press("Control+Shift+C")
                 res["copied"] = S("!!window.__studio.S.clipboard")
