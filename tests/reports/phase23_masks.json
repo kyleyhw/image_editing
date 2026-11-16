@@ -1,0 +1,85 @@
+{
+ "rows": [
+  {
+   "photo": "samples/mountain-lake.jpg",
+   "kind": "sky",
+   "selected": 0.318,
+   "seconds": 4.0,
+   "iou_vs_upernet": 0.994
+  },
+  {
+   "photo": "samples/valley.jpg",
+   "kind": "sky",
+   "selected": 0.434,
+   "seconds": 6.7,
+   "iou_vs_upernet": 0.996
+  },
+  {
+   "photo": "samples/pier-dusk.jpg",
+   "kind": "sky",
+   "selected": 0.47,
+   "seconds": 7.4,
+   "iou_vs_upernet": 0.992
+  },
+  {
+   "photo": "examples/teal_orange/before.jpg",
+   "kind": "sky",
+   "selected": 0.361,
+   "seconds": 6.3,
+   "iou_vs_upernet": 0.995
+  },
+  {
+   "photo": "examples/winter/before.jpg",
+   "kind": "sky",
+   "selected": 0.282,
+   "seconds": 5.9,
+   "iou_vs_upernet": 0.994
+  },
+  {
+   "photo": "examples/cyberpunk/before.jpg",
+   "kind": "sky",
+   "selected": 0.463,
+   "seconds": 5.9,
+   "iou_vs_upernet": 0.958
+  },
+  {
+   "photo": "examples/moody_food/before.jpg",
+   "kind": "sky",
+   "selected": 0.005,
+   "seconds": 4.9,
+   "iou_vs_upernet": 1.0
+  },
+  {
+   "photo": "examples/portra_400/before.jpg",
+   "kind": "subject",
+   "selected": 0.303,
+   "seconds": 5.3
+  },
+  {
+   "photo": "examples/bright_airy/before.jpg",
+   "kind": "subject",
+   "selected": 0.492,
+   "seconds": 6.4
+  },
+  {
+   "photo": "examples/tri_x/before.jpg",
+   "kind": "subject",
+   "selected": 0.477,
+   "seconds": 6.0
+  },
+  {
+   "photo": "examples/moody_portrait/before.jpg",
+   "kind": "subject",
+   "selected": 0.368,
+   "seconds": 6.7
+  },
+  {
+   "photo": "examples/velvia/before.jpg",
+   "kind": "subject",
+   "selected": 0.0,
+   "seconds": 5.7
+  }
+ ],
+ "page_errors": [],
+ "runtime_s": 115.2
+}

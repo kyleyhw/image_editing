@@ -131,6 +131,70 @@ The Pages build is driven through its controls. Raw files are CC0 samples from r
 The Phase 25 checks (copy and paste, history, service worker, reload) were added afterwards; their
 results are in the [Phase 26 report](phase26_release.md).
 
+### Learned masks: sky and subject (task 31, added 16 November)
+
+**What.** In the browser, **+ Sky** and **+ Subject** in the Masks section select the sky or the
+people in a photo. The model is SegFormer-B0 fine-tuned on ADE20K (150 scene classes; sky is class
+2, person 12), used as Xenova's ONNX export. It is 15 MB in fp32, within the owner's download
+budget, is downloaded once on first use, and runs on the device with onnxruntime-web.
+
+Its weights are under the NVIDIA Source Code License for non-commercial research use. That suits
+this personal project, as with the FiveK data. A commercial release would need another model.
+
+The model's class probability comes out at 128 × 128. It is upsampled and refined against the
+photo's luminance with a guided filter (He et al. 2010; `learnedmask.js`), with a radius of 1 % of
+the long edge and $\epsilon = 10^{-3}$. The filter fits a local linear map $q = aI + b$ from
+luminance $I$ to the coarse probability, so the mask follows real edges (ridges, rooftops, hair)
+instead of the model's 8-px cells.
+
+The result is stored as a painted mask with a label. The brush can correct it, and history,
+persistence, the Python reference and export treat it like any other mask.
+
+**Why.** The A6 plan lists learned masks among the local tools a professional editor needs. They
+waited on the download budget, which the owner approved on 16 November ("ok" to up to about
+40 MB).
+
+**Test (`tools/check_masks.py`).** The built site is served locally and driven in Chromium. Twelve
+unedited example photos were used:
+
+- seven for **Sky**: landscapes, a lake, a seascape, a city in daylight, a night skyline, and a
+  food photo with no sky;
+- five for **Subject**: four portraits, and a coast with no people.
+
+They were chosen to cover hard sky boundaries (snowy ridges, a lit skyline at night) and to
+include photos without the class. For the sky, the result is compared with the Python side's
+sky mask (`photostyle/sky.py`), which uses UperNet with a ConvNeXt backbone, about 15× the size,
+by intersection over union of the masks thresholded at 0.5.
+
+| Photo | Mask | Share selected | IoU with the reference | Time |
+|---|---|---|---|---|
+| Mountain lake | sky | 0.32 | 0.994 | 4.0 s |
+| Valley | sky | 0.43 | 0.996 | 6.7 s |
+| Pier at dusk | sky | 0.47 | 0.992 | 7.4 s |
+| San Francisco waterfront | sky | 0.36 | 0.995 | 6.3 s |
+| Snowy village | sky | 0.28 | 0.994 | 5.9 s |
+| Night skyline | sky | 0.46 | 0.958 | 5.9 s |
+| Fruit and vegetables (no sky) | sky | 0.005 | 1.0 (both empty) | 4.9 s |
+| Outdoor portrait | subject | 0.30 | — | 5.3 s |
+| Studio portrait | subject | 0.49 | — | 6.4 s |
+| Documentary portrait | subject | 0.48 | — | 6.0 s |
+| Two men indoors | subject | 0.37 | — | 6.7 s |
+| Coast (no people) | subject | 0.0 | — | 5.7 s |
+
+![Learned masks on twelve photos](assets/phase23_learned_masks.jpg)
+
+*Each panel shows the selected area tinted red. The sky masks follow the ridges, the tower and the
+lit skyline closely. The subject masks take whole people, including small figures in the
+background and a camera held in front of the body, because the class is "person", not "main
+subject". The food photo and the coast are left (almost) empty.*
+
+The night skyline has the lowest agreement (IoU 0.958). The two models differ on the glow just
+above the lit towers. The times are for inference on this machine's CPU (WebAssembly); the first row
+also includes the 15 MB download, after which the model is cached. No page errors. Runtime of the whole check: 115 s.
+
+**Not done.** A "main subject" mask for objects other than people would need a salient-object
+model; none was added within this scope.
+
 ### Tiled export and memory limits (task 28, added 16 November)
 
 **What and why.** An iPhone 14 Pro (the owner's phone) takes 48-megapixel ProRAW photos. Rendering one in a single pass
@@ -185,9 +249,6 @@ difference is 1.2, which is the dither noise plus JPEG re-encoding. Runtime of t
 
 ## Not done
 
-- **Learned sky and subject masks in the browser.** These need a segmentation model download; the
-  download budget is an open question for the owner (A6.10, question 4). The local server keeps
-  its learned sky mask.
 - **Spot removal.** Out of scope (A6.9).
 - **The phone checklist on a real phone.** It waits on the owner.
 

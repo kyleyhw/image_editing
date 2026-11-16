@@ -1,13 +1,13 @@
 <script>
   // Local adjustments (Phase 23): up to four masks, each a shape (linear gradient, radial, brush or
   // the whole photo), optionally limited to a luminance or colour range, with its own sliders.
-  import { S, addMask, updateMask, setMaskSlider, removeMask, commit } from "../lib/studio.svelte.js";
+  import { S, addMask, addLearnedMask, updateMask, setMaskSlider, removeMask, commit } from "../lib/studio.svelte.js";
   import { SLIDERS, SPEC } from "../lib/pipeline.js";
   import Slider from "../ui/Slider.svelte";
   const NAMES = { linear: "Linear gradient", radial: "Radial", brush: "Brush", all: "Range" };
   const sel = $derived(S.p.masks?.[S.maskSel]);
   const spec = (n) => SLIDERS.find((s) => s.name === n);
-  const label = (m, i) => `${m.range?.hue != null && m.type === "all" ? "Colour range" : m.range?.lum && m.type === "all" ? "Luminance range" : NAMES[m.type]} ${i + 1}`;
+  const label = (m, i) => `${m.label ?? (m.range?.hue != null && m.type === "all" ? "Colour range" : m.range?.lum && m.type === "all" ? "Luminance range" : NAMES[m.type])} ${i + 1}`;
   const setRange = (patch) => { updateMask(S.maskSel, { range: { ...(sel.range || {}), ...patch } }); };
 </script>
 
@@ -17,6 +17,14 @@
   {/each}
   <button class="btn small" disabled={!S.id || (S.p.masks?.length ?? 0) >= SPEC.masks.max} onclick={() => addMask("all", { lum: [0.6, 1], feather: 10 })}>+ Luminance</button>
   <button class="btn small" disabled={!S.id || (S.p.masks?.length ?? 0) >= SPEC.masks.max} onclick={() => { addMask("all", { hue: 0, hue_width: 30 }); S.tool = "pickhue"; }}>+ Colour</button>
+  {#if S.caps.seg}
+    {#each [["sky", "Sky"], ["subject", "Subject"]] as [k, l]}
+      <button class="btn small" disabled={!S.id || S.seg?.loading || (S.p.masks?.length ?? 0) >= SPEC.masks.max}
+        title={`Select the ${l.toLowerCase()} with a segmentation model (SegFormer-B0, ADE20K; 15 MB, downloaded once, runs on this device)`}
+        onclick={() => addLearnedMask(k)}>+ {l}</button>
+    {/each}
+    {#if S.seg?.loading}<span class="hint">Finding… {S.seg.progress ? Math.round(100 * S.seg.progress) + " %" : ""}</span>{/if}
+  {/if}
 </div>
 {#if S.p.masks?.length}
   <ul class="mask-list">

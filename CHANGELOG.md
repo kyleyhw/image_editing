@@ -42,6 +42,8 @@ that agrees with it (147 of 151 cases within 1 code value or mean ΔE00 0.5). Re
 - Every example "before" panel and every try-it sample is now an unedited camera picture (the
   camera's own JPEG from CC0 raw files); the previous ones were photos their authors had already
   edited. New README figure.
+- Learned **Sky** and **Subject** masks in the browser (SegFormer-B0, 15 MB, guided-filter edges);
+  sky masks agree with the server's much larger model at IoU 0.96–1.00.
 - The whole repository passes ty (121 diagnostics in the pre-A6 code fixed).
 
 **Tools**: `check_pipeline.py` (browser against reference), `check_editor.py` (end to end),

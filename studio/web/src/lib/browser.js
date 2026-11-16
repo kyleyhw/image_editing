@@ -36,7 +36,15 @@ const f32 = (b64) => {
   return out;
 };
 
-let session = null, modelReady = null, styles = [], models = {}, depthSession = null;
+let session = null, modelReady = null, styles = [], models = {}, depthSession = null, segSession = null;
+// Learned masks (Phase 23 task 31): SegFormer-B0 fine-tuned on ADE20K (150 scene classes), ONNX
+// export by Xenova; 15 MB fp32, downloaded once on first use. Weights: NVIDIA Source Code License
+// (non-commercial research use). Preprocessing as its preprocessor_config.json: 512 x 512, ImageNet
+// mean and standard deviation; the output is class logits at 1/4 resolution (128 x 128).
+const SEG_URL = "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/resolve/main/onnx/model.onnx";
+const SEG_EDGE = 512;
+/** ADE20K class ids (config.json id2label) behind each learned mask. */
+export const SEG_CLASSES = { sky: [2], subject: [12] };      // 2 sky, 12 person
 const DEPTH_URL = "https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model_quantized.onnx";
 const DEPTH_EDGE = 518;                          // the model's native input (37 x 14 px patches)
 const HEAD_KEYS = ["mu", "sigma", "w1", "b1", "ln_w", "ln_b", "w2", "b2", "theta_mean"];
@@ -136,7 +144,7 @@ function head(st, f, withOod = true) {
 
 export const browser = {
   kind: "browser",
-  caps: { scene: false, batch: false, create: false, remember: false, persist: true, depth: true },
+  caps: { scene: false, batch: false, create: false, remember: false, persist: true, depth: true, seg: true },
   formats: [["jpg", "JPEG"], ["png", "PNG"], ["png16", "PNG 16-bit"], ["tif16", "TIFF 16-bit"], ["cube", ".cube LUT"],
             ["xmp", "Lightroom preset"], ["json", "Settings (JSON)"]],
   accept: "image/*",
@@ -225,6 +233,33 @@ export const browser = {
     const data = Float32Array.from(y, (v) => (v - lo) / Math.max(hi - lo, 1e-6));
     p.depth = { data, width: N, height: N };
     return p.depth;
+  },
+  /** Probability of a learned-mask class (SEG_CLASSES) at each pixel of a photo: {data, width,
+   * height} at the model's 128 x 128 output, top row first. Logits are cached per photo. */
+  async segment(id, kind, onProgress) {
+    const p = photos.get(id);
+    if (!p.seg) {
+      segSession ??= (async () => {
+        const bytes = await fetchProgress(SEG_URL, (l, t) => onProgress?.(l, t));
+        return ort.InferenceSession.create(bytes, { executionProviders: ["wasm"] });
+      })();
+      const sess = await segSession, N = SEG_EDGE;
+      const d = canvasOf(p.bitmap, N, N).getContext("2d").getImageData(0, 0, N, N).data, x = new Float32Array(3 * N * N);
+      const mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
+      for (let i = 0; i < N * N; i++) for (let k = 0; k < 3; k++) x[k * N * N + i] = (d[4 * i + k] / 255 - mean[k]) / std[k];
+      const out = await sess.run({ [sess.inputNames[0]]: new ort.Tensor("float32", x, [1, 3, N, N]) });
+      const t = out[sess.outputNames[0]];
+      p.seg = { data: t.data, C: t.dims[1], H: t.dims[2], W: t.dims[3] };
+    }
+    const { data, C, H, W } = p.seg, n = H * W, prob = new Float32Array(n), want = SEG_CLASSES[kind];
+    for (let i = 0; i < n; i++) {                   // softmax over the classes, summed over the wanted ones
+      let mx = -Infinity;
+      for (let c = 0; c < C; c++) mx = Math.max(mx, data[c * n + i]);
+      let z = 0, w = 0;
+      for (let c = 0; c < C; c++) { const e = Math.exp(data[c * n + i] - mx); z += e; if (want.includes(c)) w += e; }
+      prob[i] = w / z;
+    }
+    return { data: prob, width: W, height: H };
   },
   /** A slider model's prediction for a photo: {slider: value} (the base correction is "auto_c"). */
   async sliders(id, model = "auto_c") {

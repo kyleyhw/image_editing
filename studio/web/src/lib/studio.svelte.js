@@ -10,6 +10,7 @@ import { B, initBackend } from "./backend.js";
 import { effectiveFrom, mixEffective } from "./render.js";
 import { draw, makeGL, outputSize, pixelScale, setImage, wbGains, combine, scaleLook, DEFAULTS, SPEC } from "./pipeline.js";
 import * as store from "./store.js";
+import { refine } from "./learnedmask.js";
 
 export const ZERO_SCENE = () => ({ haze: 0, clarity_near: 0, clarity_far: 0, sky_exposure: 0, sky_warmth: 0, sky_saturation: 0 });
 const NO_LOOK = "";
@@ -50,6 +51,7 @@ export const S = $state({
   auto: null,                // the base correction for this photo ({slider: value}) when on
   autoOn: false,
   depth: { loading: false, progress: 0, ready: false, show: false, error: "" },
+  seg: { loading: false, progress: 0 },
   clipboard: null,           // copied settings
   snapshots: [],             // named states of this photo
 });
@@ -62,7 +64,7 @@ export function initGL(canvas) {
   view.main = makeGL(canvas);
   view.thumbCanvas = document.createElement("canvas");
   view.thumb = makeGL(view.thumbCanvas);
-  /** @type {any} */ (window).__studio = { S, effective, exportParams, setSlider, setStyle, setAuto, exportCurrent, get main() { return view.main; } };   // automated tests
+  /** @type {any} */ (window).__studio = { S, effective, exportParams, setSlider, setStyle, setAuto, exportCurrent, addLearnedMask, get main() { return view.main; } };   // automated tests
 }
 
 export async function boot() {
@@ -361,6 +363,30 @@ function newBrushCanvas() {
   const x = c.getContext("2d"); x.fillStyle = "#000"; x.fillRect(0, 0, c.width, c.height);
   return c;
 }
+/** A learned mask (sky or subject): the segmentation model's probability, refined against the
+ * photo (learnedmask.js), added as a painted mask so it can be edited further with the brush. */
+export async function addLearnedMask(kind) {
+  if (!B.segment || !S.id) return;
+  if ((S.p.masks?.length ?? 0) >= SPEC.masks.max) { S.message = `At most ${SPEC.masks.max} masks.`; return; }
+  const id = S.id, label = kind === "sky" ? "Sky" : "Subject";
+  S.seg = { loading: true, progress: 0 };
+  try {
+    const prob = await B.segment(id, kind, (l, t) => (S.seg.progress = t ? l / t : 0));
+    if (S.id !== id || !view.img) return;
+    const c = newBrushCanvas(), q = refine(prob, view.img, c.width, c.height);
+    const x = /** @type {CanvasRenderingContext2D} */ (c.getContext("2d")), im = x.createImageData(c.width, c.height);
+    for (let i = 0; i < q.length; i++) { const v = Math.round(255 * q[i]); im.data[4 * i] = im.data[4 * i + 1] = im.data[4 * i + 2] = v; im.data[4 * i + 3] = 255; }
+    x.putImageData(im, 0, 0);
+    const data = c.toDataURL("image/png").split(",")[1];
+    addMask("brush");
+    const j = S.p.masks.length - 1;
+    view.brushes.set(S.p.masks[j].id, { canvas: c, version: 1, data });
+    updateMask(j, { data, label }); S.tool = null; commit();
+    if (q.every((v) => v < 0.05)) S.message = `No ${label.toLowerCase()} found in this photo; the mask is empty (paint it with the brush).`;
+  } catch (e) { S.message = `${label} mask failed: ${e}`; }
+  finally { S.seg = { loading: false, progress: 0 }; }
+}
+
 /** Paint a dab at source uv (u, v) into mask j. Soft round brush; hardness sets the solid core. */
 export function paint(j, u, v) {
   const m = S.p.masks[j], b = view.brushes.get(m.id); if (!b) return;

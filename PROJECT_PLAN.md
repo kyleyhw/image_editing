@@ -2118,7 +2118,7 @@ Checkpoint: metrics table, side-by-side sheets per look, rating results.
 29. [completed] Mask types: linear gradient, radial, brush, luminance range,
     colour range.
 30. [completed] Per-mask settings through spatially varying sliders (A6.3).
-31. [pending] Learned masks for sky and subject in the browser (deferred: download budget, A6.10 question 4), within a
+31. [completed] (browser: + Sky and + Subject, SegFormer-B0 ADE20K 15 MB with guided-filter refinement; sky IoU 0.96-1.00 against the server's UperNet; tests/reports/phase22_25_editor.md) Learned masks for sky and subject in the browser (deferred: download budget, A6.10 question 4), within a
     download budget agreed with the owner; edge refinement by guided filter
     (ported from `photostyle/regional.py`).
 32. [completed] Mask interface: overlay, feather, invert, intersect, touch.
