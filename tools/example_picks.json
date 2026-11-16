@@ -1,0 +1,108 @@
+{
+ "looks": {
+  "moody_forest": {
+   "raw": 1744,
+   "why": "a foggy, overcast park road under tall trees: the misty green scene the tutorial was written for"
+  },
+  "golden_hour": {
+   "raw": 8769,
+   "why": "a landscape in low evening sun, with bright sky to recover"
+  },
+  "velvia": {
+   "raw": 1561,
+   "why": "a sunny coast with sky, sea and foliage"
+  },
+  "milky_way": {
+   "raw": 7725,
+   "why": "a night sky with star trails over a lit horizon (no unedited Milky Way photo was available)"
+  },
+  "blue_hour": {
+   "raw": 3041,
+   "why": "a seascape just after sunset"
+  },
+  "teal_orange": {
+   "raw": 2979,
+   "why": "city architecture by the water in daylight"
+  },
+  "kodachrome": {
+   "raw": 2755,
+   "why": "a colourful street of shops and houses in daylight"
+  },
+  "matte_urban": {
+   "raw": 881,
+   "why": "a city street corner of plain buildings"
+  },
+  "cinestill_800t": {
+   "raw": 6457,
+   "why": "a wet city street at night under car and shop lights"
+  },
+  "tokyo_night": {
+   "raw": 6457,
+   "why": "a wet city street at night with car and shop lights"
+  },
+  "cyberpunk": {
+   "raw": 2578,
+   "why": "a city skyline lit up at night"
+  },
+  "portra_400": {
+   "raw": 3332,
+   "why": "a daylight portrait outdoors"
+  },
+  "bright_airy": {
+   "raw": 231,
+   "why": "a portrait in soft, even light"
+  },
+  "moody_portrait": {
+   "raw": 165,
+   "why": "an indoor portrait of two people in low light"
+  },
+  "tri_x": {
+   "raw": 5907,
+   "why": "a documentary-style portrait outdoors"
+  },
+  "golden_backlit": {
+   "raw": 1642,
+   "why": "a scene lit by a low sun (no unedited backlit sunset portrait was available)"
+  },
+  "bright_food": {
+   "raw": 2062,
+   "why": "food on a light table in daylight"
+  },
+  "moody_food": {
+   "raw": 4691,
+   "why": "fruit and vegetables against a dark background"
+  },
+  "ektar_100": {
+   "raw": 1731,
+   "why": "a colourful facade in daylight"
+  },
+  "autumn": {
+   "raw": 6262,
+   "why": "an autumn forest in sunlight"
+  },
+  "winter": {
+   "raw": 2421,
+   "why": "a snowy mountain village under a blue sky"
+  }
+ },
+ "samples": {
+  "forest-path": {
+   "raw": 6018
+  },
+  "pier-dusk": {
+   "raw": 3041
+  },
+  "mountain-lake": {
+   "raw": 2203
+  },
+  "valley": {
+   "raw": 3570
+  },
+  "waterfront": {
+   "raw": 2816
+  },
+  "night-skyline": {
+   "raw": 2578
+  }
+ }
+}

@@ -29,6 +29,9 @@
     <p class="ex-note">The authors' own before/after photos are on their pages.</p>
   {/if}
   {#if look.grade}<p class="ex-note">{GRADES[look.grade]} ({look.grade}).</p>{/if}
+  {#if ex?.photo?.unedited}
+    <p class="ex-note">Before: {typeof ex.photo.unedited === "string" ? ex.photo.unedited : "an unedited camera file"}, with no editing.</p>
+  {/if}
   {#if ex?.photo}
     <p class="ex-note">Example photo:
       <a href={ex.photo.url} target="_blank" rel="noopener">{ex.photo.title || "untitled"}</a>

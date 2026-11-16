@@ -66,7 +66,17 @@ export function rawSource(r) {
   return {
     width: r.width, height: r.height,
     region: (win, scale) => box(r, Math.max(1, Math.round(r.width * scale)), Math.max(1, Math.round(r.height * scale)), win),
-    proxy: (edge) => linearRGBA(r, edge),
+    /** the whole image at most ``edge`` px, box-filtered, or with ``nearest`` point-sampled */
+    proxy: (edge, nearest = false) => {
+      if (!nearest) return linearRGBA(r, edge);
+      const s = Math.min(1, edge / Math.max(r.width, r.height)), w = Math.max(1, Math.round(r.width * s)), h = Math.max(1, Math.round(r.height * s));
+      const out = new Float32Array(4 * w * h), d = r.data16, k = r.gain / 65535;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = 3 * (Math.min(r.height - 1, Math.floor((y + 0.5) * r.height / h)) * r.width + Math.min(r.width - 1, Math.floor((x + 0.5) * r.width / w)));
+        const o = 4 * (y * w + x); out[o] = d[i] * k; out[o + 1] = d[i + 1] * k; out[o + 2] = d[i + 2] * k; out[o + 3] = 1;
+      }
+      return { data: out, width: w, height: h, linear: true };
+    },
   };
 }
 

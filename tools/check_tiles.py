@@ -42,6 +42,9 @@ CASES: dict[str, dict] = {
     "geometry": {**BASE, "crop": {"x": 0.1, "y": 0.08, "w": 0.8, "h": 0.84, "angle": 3.5, "vertical": 20, "distortion": 15, "scale": 100}},
     "grain": {**BASE, "grain": 40, "grain_size": 30},
 }
+# one spatial operator at a time (--spatial-each), to locate a disagreement
+SPATIAL_EACH = {f"only {k}": {k: v} for k, v in [("texture", 30), ("clarity", 30), ("sharpen", 50), ("nr_luma", 30),
+                                                  ("nr_colour", 40), ("dehaze", 25), ("halation", 40)]}
 
 PAGE = """<!doctype html><meta charset=utf-8><script type=module>
 import * as PL from "data:text/javascript;base64,%s";
@@ -76,9 +79,15 @@ def main() -> None:
     ap.add_argument("--raw", type=Path, default=RAW)
     ap.add_argument("--tile", type=int, default=700, help="small tiles: many seams to test")
     ap.add_argument("--out", type=Path, default=ROOT / "tests/reports/phase22_tiles.json")
+    ap.add_argument("--edge", type=int, default=0, help="downsize the photo first (quicker diagnosis)")
+    ap.add_argument("--spatial-each", action="store_true", help="the spatial operators one at a time")
     args = ap.parse_args()
     t0 = time.time()
     img = develop(args.raw)
+    if args.edge:
+        im = Image.fromarray(img)
+        im.thumbnail((args.edge, args.edge), Image.Resampling.LANCZOS)
+        img = np.asarray(im)
     H, W = img.shape[:2]
     print(f"photo {W} x {H} ({W * H / 1e6:.1f} MP)", flush=True)
     buf = io.BytesIO()
@@ -93,7 +102,7 @@ def main() -> None:
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.set_content(PAGE % (base64.b64encode(browser_module().encode()).decode(), base64.b64encode(buf.getvalue()).decode()))
         page.wait_for_function("window.ready === true", timeout=600_000)
-        for name, p in CASES.items():
+        for name, p in (SPATIAL_EACH if args.spatial_each else CASES).items():
             r = page.evaluate("([p, t]) => window.run(p, t)", [p, args.tile])
             assert (r["w"], r["h"]) == (r["w2"], r["h2"]), (r["w"], r["h"], r["w2"], r["h2"])
             w, h = r["w"], r["h"]

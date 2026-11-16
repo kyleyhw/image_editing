@@ -80,45 +80,25 @@ direction is summarised in
 Phases 1–6 (the earlier, broader groundwork: fixed-function styles and a
 Streamlit UI) are kept below and in `legacy/`.
 
-## Examples of every trained mode
+## Looks on unedited photos
 
-The figure below (Phases 1–6, now in `legacy/`) was produced by `legacy/tools/make_examples.py`. Rows
-are deliberately diverse sample images; columns are the original input
-and the trained-model output for each style. Sample images were chosen
-to exercise different aspects of each style:
+![Three unedited camera photos (mountain lake, night street, outdoor portrait) in rows; columns show the unedited photo and the same photo through the Portra 400, Teal & Orange, Cyberpunk and Tri-X B&W looks](tests/reports/assets/looks_overview.jpg)
 
-- *Foggy pine forest* — strong vertical sky/ground contrast for
-  tilt-shift; saturated greens for tone-curve probing.
-- *Misty pastel mountains* — already warm and low-saturation, so the
-  cyberpunk grade has to push aggressively to differentiate.
-- *Backlit bike portrait* — full photographic scene with a centred
-  human subject, ideal for showcasing tilt-shift's focus band.
+*Each row is one photo exactly as the camera rendered it: the JPEG each camera embedded in a CC0
+raw file from raw.pixls.us, with no editing. Each further column is that photo through one look's
+slider settings at full strength, rendered by the reference pipeline as the editor applies them.
+The comparison shows how a look's settings act differently on different light. Portra 400 is a mild
+warm shift that is most visible on skin and foliage. Teal & Orange moves blues toward teal and
+reds toward orange, which recolours the blue robe and red sash in the portrait. Cyberpunk turns
+the night street's warm lights magenta and its shadows navy. Tri-X is a black-and-white mix with
+deep blacks.* Made by `tools/readme_figure.py`.
 
-![Trained-model predictions across three sample inputs: rows are samples, columns are Original / Fujifilm Classic Chrome / Cyberpunk / Tilt-shift](tests/reports/assets/style_comparison.png)
-
-How to read it:
-
-- **Fujifilm Classic Chrome column.** Each output is a slightly darker,
-  warm-shifted version of its row's original — exactly the recipe's
-  signature (negative WB-blue shift, soft highlights, ~20% vignette).
-  The effect is intentionally subtle; Classic Chrome is a "look", not a
-  filter.
-- **Cyberpunk column.** Each output reproduces the teal-and-orange
-  S-curve: shadows crushed, highlights lifted, R/G channels pulled
-  down and B pushed up. The transformation is most visible on the
-  pastel mountains, where the warm fog is pushed into an unmistakable
-  orange-teal sunset palette.
-- **Tilt-shift column.** A horizontal sharp band remains in the middle
-  of every output while sky and foreground are progressively blurred.
-  The model recovers the focus-band geometry to within $|\Delta| < 0.01$
-  on both centre and width; the blur amount saturates at roughly half
-  of the data generator's, a known optimisation artefact documented in
-  `models/tilt_shift.py`.
-
-Full quantitative interpretation (per-channel mean shifts,
-effect-magnitude ratios, target-vs-prediction comparison on a held-out
-test image) is in
-[`tests/reports/phase3_to_phase6_report.md`](tests/reports/phase3_to_phase6_report.md).
+Every example in the editor follows the same rule: its "before" panel is an unedited camera
+picture (`tools/build_examples.py`, choices in `tools/example_picks.json`). The earlier figure of
+Phases 1–6 used stock photos that had already been edited by their authors, so the starting point
+of each look was someone else's edit. It remains in the repository as
+`tests/reports/assets/style_comparison.png` (made by `legacy/tools/make_examples.py`); the legacy modes'
+results are in [`tests/reports/phase3_to_phase6_report.md`](tests/reports/phase3_to_phase6_report.md).
 
 ## MIT-5K: where the NN earns its complexity
 

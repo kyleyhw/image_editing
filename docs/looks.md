@@ -8,6 +8,12 @@ editable and needs no model. Two further groups are described at the end: [film
 stocks](#film-stocks), fitted to film colour tables, and [expert styles](#expert-styles), predicted
 per photo by models trained on FiveK retouchers ([data.md](data.md)).
 
+Each look's example in the editor starts from an unedited camera picture: the JPEG a camera
+embedded in a CC0 raw file from raw.pixls.us (or, where the preview is small, a neutral development
+of that raw file), so the look is shown acting on the camera's own rendering rather than on someone
+else's edit. The choices are in `tools/example_picks.json`; `tools/build_examples.py` makes the
+panels with the reference pipeline.
+
 Kinds:
 - **numeric**: the tutorial states the value.
 - **mid**: the middle of a range the tutorial states.
