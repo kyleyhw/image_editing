@@ -62,7 +62,7 @@ export function initGL(canvas) {
   view.main = makeGL(canvas);
   view.thumbCanvas = document.createElement("canvas");
   view.thumb = makeGL(view.thumbCanvas);
-  /** @type {any} */ (window).__studio = { S, effective, exportParams, setSlider, setStyle, get main() { return view.main; } };   // automated tests
+  /** @type {any} */ (window).__studio = { S, effective, exportParams, setSlider, setStyle, setAuto, get main() { return view.main; } };   // automated tests
 }
 
 export async function boot() {
@@ -504,7 +504,9 @@ export async function matchTo(refId) {
 
 // ------------------------------------------------------------------ base correction (Phase 21)
 const AUTO_KEY = "irodori.auto.v1";
-const autoDefault = () => { try { return localStorage.getItem(AUTO_KEY) !== "0"; } catch { return true; } };
+// Off unless the user turned it on: in the owner's blind test it was not preferred to the unedited photo
+// (tests/reports/phase20_rating.md). Photos saved with it on keep it.
+const autoDefault = () => { try { return localStorage.getItem(AUTO_KEY) === "1"; } catch { return false; } };
 async function loadAuto(id) {
   const a = await B.sliders?.(id, "auto_c");
   if (S.id === id) { S.auto = a; }

@@ -28,7 +28,8 @@ that agrees with it (147 of 151 cases within 1 code value or mean ΔE00 0.5). Re
 
 **Looks and models** ([docs/looks.md](docs/looks.md), [docs/data.md](docs/data.md))
 - *Auto-correct*: ten correction sliders predicted per photo by a model trained on FiveK expert C
-  (test set: 20.4 → 22.4 dB PSNR, ΔE00 9.95 → 7.92).
+  (test set: 20.4 → 22.4 dB PSNR, ΔE00 9.95 → 7.92). Off by default: the owner's blind ratings
+  found no preference for it (21–22, 17 ties).
 - Tutorial looks are now exact slider settings; `styles.json` version 3 (5.3 MB → 0.5 MB).
 - Twelve film stocks fitted to film colour tables (held-out ΔE00 0.7–1.7).
 - Expert styles A–E: per-photo slider predictions trained on each FiveK retoucher.

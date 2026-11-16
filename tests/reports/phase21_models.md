@@ -18,7 +18,7 @@
    - Training renders through the differentiable pipeline at 128 px, on 3,499 training pairs; the
      500 validation photos selected the configuration and the 1,000 test photos were held out.
    - The model is the `auto_c` entry of `styles.json` and is applied in the browser as an
-     *Auto-correct first* layer, on by default.
+     *Auto-correct first* layer (off by default since the owner's blind ratings).
 5. **Tutorial looks as slider settings** (`photostyle/slider_looks.py`). The 21 tutorial looks
    (20 plus Cyberpunk) are now exactly their recipe's slider values. They need no network, so
    `styles.json` shrank from 5.3 MB to 0.5 MB, and their example panels were re-rendered through

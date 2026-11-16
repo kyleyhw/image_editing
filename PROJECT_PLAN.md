@@ -2142,7 +2142,7 @@ Checkpoint: metrics table, side-by-side sheets per look, rating results.
     installable on the home screen.
 39. [in-progress] Phone interface (built; the checklist in docs/phone_checklist.md waits on the owner's phone): touch gestures, saving to the photo library,
     a test checklist run by the owner on a physical device.
-40. [completed] One-click auto (Phase 21 base model, the Auto-correct layer); match to a reference photo.
+40. [completed] (Auto-correct off by default after the owner's blind ratings, by the owner's decision) One-click auto (Phase 21 base model, the Auto-correct layer); match to a reference photo.
 
 #### Phase 26: Verification and release
 

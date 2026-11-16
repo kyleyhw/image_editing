@@ -33,7 +33,7 @@ End-to-end checks:
 
 | Check | Result |
 |---|---|
-| Auto-correct available and on by default; predicts ten sliders | ✓ |
+| Auto-correct available; off by default after the owner's ratings (rerun 16 November); predicts ten sliders when turned on | ✓ |
 | Exposure, curves, detail, linear mask, brush mask, crop, white-balance picker change the picture | ✓ |
 | A user edit survives a look change; undo restores the look | ✓ |
 | Expert style (`expert_c`) predicts its sliders for the photo (new check) | ✓ 30 non-zero sliders, kind `sliders` |

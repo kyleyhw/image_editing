@@ -93,8 +93,12 @@ def main() -> None:
             if tag == "desk":
                 pg.wait_for_timeout(2500)
                 res["auto_available"] = S("window.__studio.S.caps.auto === true")
-                res["auto_on"] = S("window.__studio.S.autoOn")
+                res["auto_off_by_default"] = S("window.__studio.S.autoOn") is False
+                pg.evaluate("() => window.__studio.setAuto(true)")
+                pg.wait_for_function("window.__studio.S.auto !== null", timeout=60_000)
                 res["auto_sliders"] = S("window.__studio.S.auto")
+                pg.evaluate("() => window.__studio.setAuto(false)")
+                pg.wait_for_timeout(300)
                 res["look_kind"] = S("window.__studio.S.params?.kind ?? 'head'")
                 pg.click("button[data-mode=after]")
                 pg.wait_for_timeout(300)
