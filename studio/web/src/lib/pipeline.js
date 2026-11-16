@@ -188,7 +188,11 @@ uniform sampler2D br0; uniform sampler2D br1; uniform sampler2D br2; uniform sam
 uniform int lensOn; uniform int showDepth; uniform sampler2D depthTex; uniform vec4 lens;   // lens: (rmax px, focus, range, span)
 uniform int stage; uniform int spatialOn; uniform sampler2D tPx; uniform sampler2D tMid; uniform sampler2D tBig;
 uniform vec4 det; uniform vec4 det2; uniform vec4 haze; uniform vec3 halTint; uniform vec4 grain; uniform float outH;
+// tiled rendering (export): tileUV places this canvas in the full output (uv offset, uv size), tileOff in output
+// pixels; srcWin is the part of the source the img texture holds (source uv offset, size). Defaults: everything.
+uniform vec4 tileUV; uniform vec2 tileOff; uniform vec4 srcWin;
 in vec2 uv; out vec4 o;
+vec2 winUV(vec2 q) { return (q - srcWin.xy) / srcWin.zw; }
 
 float knot(int i) { return lk[i / 4][i % 4]; }
 float lcurve(int ch, float x) {
@@ -259,7 +263,7 @@ float maskAt(int j, vec2 q, float L, float h, float C) {
   return a.y > 0.5 ? 1.0 - m : m;
 }
 vec3 inputAt(vec2 q) {                              // source colour entering the pipeline: look, linear, WB, exposure
-  vec3 x = texture(img, q).rgb;
+  vec3 x = texture(img, winUV(q)).rgb;
   if (linIn == 1 && lookOn == 0) return x * wb * expo;
   if (linIn == 1) x = enc3(clamp(wToSrgb * x, 0.0, 1.0));
   if (lookOn == 1) {
@@ -273,16 +277,17 @@ float cocAt(float d) { return lens.x * clamp((abs(d - lens.y) - lens.z) / lens.w
 float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
 void main() {
-  vec2 suv = uv;
+  vec2 guv = tileUV.xy + uv * tileUV.zw;            // output uv in the full frame
+  vec2 suv = srcWin.xy + uv * srcWin.zw;            // stage 1 renders the source window itself
   if (stage != 1) {                                 // crop, straighten, scale, perspective, lens (pipeline.geometry_map)
-    vec3 q = geo * vec3(uv, 1.0); q.xy /= 1.0 + geoP.x * q.x + geoP.y * q.y;
+    vec3 q = geo * vec3(guv, 1.0); q.xy /= 1.0 + geoP.x * q.x + geoP.y * q.y;
     q.xy *= 1.0 - geoP.z * dot(q.xy, q.xy) / geoP.w;
     suv = 0.5 + q.xy * geoN;
   }
   bool inside = all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)));
-  vec3 x = inside ? texture(img, suv).rgb : vec3(0.0);
-  if (mode == 1 || (mode == 0 && uv.x < split)) {
-    vec3 b = inside ? texture(orig, suv).rgb : vec3(0.0);
+  vec3 x = inside ? texture(img, winUV(suv)).rgb : vec3(0.0);
+  if (mode == 1 || (mode == 0 && guv.x < split)) {
+    vec3 b = inside ? texture(orig, winUV(suv)).rgb : vec3(0.0);
     if (linIn == 1) b = enc3(clamp(wToSrgb * b, 0.0, 1.0));
     o = vec4(b, 1.0); return;
   }
@@ -322,7 +327,8 @@ void main() {
   float dL = 0.0;
   if (spatialOn == 1) {                             // detail and dehaze from the local means (pipeline.py 3a)
     vec2 fuv = vec2(suv.x, 1.0 - suv.y);             // render targets store the image top at t = 1
-    float Lpx = texture(tPx, fuv).r; vec4 mid = texture(tMid, fuv); vec4 big = texture(tBig, fuv);
+    vec2 wq = winUV(suv);                           // the 1-px means cover the source window only
+    float Lpx = texture(tPx, vec2(wq.x, 1.0 - wq.y)).r; vec4 mid = texture(tMid, fuv); vec4 big = texture(tBig, fuv);
     float A = haze.x, amt = haze.y + mS.w;
     if (amt > 0.0) { float t = 1.0 - haze.z * amt * clamp(big.g / A, 0.0, 1.0); c = (c - A * (1.0 - t)) / max(t, haze.w); }
     else if (amt < 0.0) { float v = -amt * kc3.x; c = c * (1.0 - v) + min(A, kc3.y) * v; }
@@ -397,7 +403,7 @@ void main() {
   if (spatialOn == 1 && det2.y > 0.0) c += kc3.z * det2.y * texture(tBig, vec2(suv.x, 1.0 - suv.y)).b * halTint;     // halation
 
   if (vig.x != 0.0) {                               // exposure-like vignette, as pipeline.vignette_mask
-    vec2 q = uv * 2.0 - 1.0; float asp = frame.x / frame.y, rn = vigRound;
+    vec2 q = guv * 2.0 - 1.0; float asp = frame.x / frame.y, rn = vigRound;
     float sx = 1.0 + max(rn, 0.0) * (asp - 1.0), pw = 2.0 * pow(2.0, -min(rn, 0.0) * 1.5);
     float r = pow((pow(abs(q.x * sx), pw) + pow(abs(q.y), pw)) / (pow(sx, pw) + 1.0), 1.0 / pw);
     float m0 = clamp(vig.y, 0.01, 1.0), f = clamp(vig.z, 0.01, 1.0);
@@ -415,7 +421,7 @@ void main() {
   if (clipWarn == 1) { if (dot(outY, s) > 1.0) outc = vec3(1.0, 0.15, 0.15); else if (dot(outY, s) <= 0.0) outc = vec3(0.15, 0.35, 1.0); }
   else if (clipWarn == 2 && (over || under)) outc = vec3(1.0, 0.0, 1.0);
   if (grain.x > 0.0) {                              // film grain, as pipeline.apply_grain
-    vec2 q = vec2(gl_FragCoord.x, outH - gl_FragCoord.y);
+    vec2 q = tileOff + vec2(gl_FragCoord.x, outH - gl_FragCoord.y);
     float n = (1.0 - 0.5 * grain.z) * vnoise(q, grain.y, 17u) + 0.5 * grain.z * vnoise(q, grain.y * 0.5, 91u);
     vec3 lin = dec3(outc); float Yg = dot(outY, lin), Lg = enc(Yg), wmid = clamp(1.0 - (2.0 * Lg - 1.0) * (2.0 * Lg - 1.0), 0.0, 1.0);
     float Yn = dec(clamp(Lg + grain.w * grain.x * wmid * n, 0.0, 1.0)), kg = Yn / max(Yg, kc.x);
@@ -457,19 +463,23 @@ function target(gl, w, h, fmt) {
 }
 
 /** The local means (pipeline.local_means) on the GPU: a prep pass (linear colour + L in source
- * space), then Gaussian blurs; mid at 1/2 and big at 1/8 resolution after 2x box downsamples. */
-function spatial(R, e) {
-  const { gl } = R, [W, H] = R.src;
+ * space), then Gaussian blurs; mid at 1/2 and big at 1/8 resolution after 2x box downsamples.
+ * ``which``: "all", "coarse" (mid and big only: tiled export computes them once from a downsampled
+ * whole image) or "px" (the 1-px means only, for one source window). Targets are sized to the
+ * uploaded texture (R.texSize), which is the whole source except in tiled export. */
+function spatial(R, e, which = "all") {
+  const { gl } = R, [W, H] = R.texSize ?? R.src;
+  const half = gl.getExtension("EXT_color_buffer_float") || gl.getExtension("EXT_color_buffer_half_float");
+  const fmt = half ? { internal: gl.RGBA16F, type: gl.HALF_FLOAT } : { internal: gl.RGBA8, type: gl.UNSIGNED_BYTE };
+  const free = (o) => o && Object.values(o).flat().forEach((t) => { if (t?.t) { gl.deleteTexture(t.t); gl.deleteFramebuffer(t.fb); } });
   const key = `${W}x${H}`;
-  if (!R.sp || R.sp.key !== key) {
-    const half = gl.getExtension("EXT_color_buffer_float") || gl.getExtension("EXT_color_buffer_half_float");
-    const fmt = half ? { internal: gl.RGBA16F, type: gl.HALF_FLOAT } : { internal: gl.RGBA8, type: gl.UNSIGNED_BYTE };
+  if (!R.spB || R.spB.key !== key) { free(R.spB && { b: R.spB.base, p: R.spB.px }); R.spB = { key, base: target(gl, W, H, fmt), px: [target(gl, W, H, fmt), target(gl, W, H, fmt)] }; }
+  if (which !== "px" && (!R.spC || R.spC.key !== key)) {
     const d = (k) => [Math.max(1, Math.round(W / k)), Math.max(1, Math.round(H / k))];
-    R.sp = { key, base: target(gl, W, H, fmt), px: [target(gl, W, H, fmt), target(gl, W, H, fmt)],
-             mid: [target(gl, ...d(2), fmt), target(gl, ...d(2), fmt)],
-             d4: target(gl, ...d(4), fmt), big: [target(gl, ...d(8), fmt), target(gl, ...d(8), fmt)] };
+    free(R.spC && { m: R.spC.mid, d: [R.spC.d4], b: R.spC.big });
+    R.spC = { key, mid: [target(gl, ...d(2), fmt), target(gl, ...d(2), fmt)], d4: target(gl, ...d(4), fmt), big: [target(gl, ...d(8), fmt), target(gl, ...d(8), fmt)] };
   }
-  const sp = R.sp, B = R.blur;
+  const sp = { ...R.spB, ...(R.spC ?? {}) }, B = R.blur;
   // prep: the main program at stage 1, in source space
   gl.useProgram(R.prog);
   gl.bindFramebuffer(gl.FRAMEBUFFER, sp.base.fb); gl.viewport(0, 0, W, H);
@@ -493,23 +503,29 @@ function spatial(R, e) {
   };
   gl.uniform4f(B.u("thr"), SPEC.detail.halation_thr, 0, 0, 0);
   const D = SPEC.detail, edge = Math.max(W, H), pxs = e.pxScale ?? 1;
-  // px: L at sigma_px (in this image's pixels)
-  run(sp.base, sp.px[1], 1, 0, 0, 0);
-  run(sp.px[1], sp.px[0], 0, D.sigma_px * pxs, 1, 0); run(sp.px[0], sp.px[1], 0, D.sigma_px * pxs, 0, 1);
-  // mid: [rgb, L] at 1/2 resolution
-  run(sp.base, sp.mid[1], 0, 0, 0, 0);
-  // the 2x and 8x box downsamples already blur by sqrt((k^2 - 1) / 12) full-resolution pixels; the
-  // Gaussian adds the rest, so the total matches the reference's single full-resolution Gaussian
-  const rest = (sigma, k) => Math.sqrt(Math.max(0, sigma * sigma - (k * k - 1) / 12)) / k;
-  const sm = rest(D.sigma_mid * edge, 2);
-  run(sp.mid[1], sp.mid[0], 0, sm, 1, 0); run(sp.mid[0], sp.mid[1], 0, sm, 0, 1);
-  // big: [L, dark, highlight] at 1/8 resolution (2x box steps)
-  run(sp.base, sp.mid[0], 2, 0, 0, 0); run(sp.mid[0], sp.d4, 0, 0, 0, 0); run(sp.d4, sp.big[1], 0, 0, 0, 0);
-  const sb = rest(D.sigma_big * edge, 8);
-  run(sp.big[1], sp.big[0], 0, sb, 1, 0); run(sp.big[0], sp.big[1], 0, sb, 0, 1);
+  if (which !== "coarse") {
+    // px: L at sigma_px (in this image's pixels)
+    run(sp.base, sp.px[1], 1, 0, 0, 0);
+    run(sp.px[1], sp.px[0], 0, D.sigma_px * pxs, 1, 0); run(sp.px[0], sp.px[1], 0, D.sigma_px * pxs, 0, 1);
+  }
+  if (which !== "px") {
+    // mid: [rgb, L] at 1/2 resolution
+    run(sp.base, sp.mid[1], 0, 0, 0, 0);
+    // the 2x and 8x box downsamples already blur by sqrt((k^2 - 1) / 12) full-resolution pixels; the
+    // Gaussian adds the rest, so the total matches the reference's single full-resolution Gaussian
+    const rest = (sigma, k) => Math.sqrt(Math.max(0, sigma * sigma - (k * k - 1) / 12)) / k;
+    const sm = rest(D.sigma_mid * edge, 2);
+    run(sp.mid[1], sp.mid[0], 0, sm, 1, 0); run(sp.mid[0], sp.mid[1], 0, sm, 0, 1);
+    // big: [L, dark, highlight] at 1/8 resolution (2x box steps)
+    run(sp.base, sp.mid[0], 2, 0, 0, 0); run(sp.mid[0], sp.d4, 0, 0, 0, 0); run(sp.d4, sp.big[1], 0, 0, 0, 0);
+    const sb = rest(D.sigma_big * edge, 8);
+    run(sp.big[1], sp.big[0], 0, sb, 1, 0); run(sp.big[0], sp.big[1], 0, sb, 0, 1);
+  }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.useProgram(R.prog);
-  for (const [unit, name, tex] of [[2, "tPx", sp.px[1]], [3, "tMid", sp.mid[1]], [4, "tBig", sp.big[1]]]) {
+  const bind = which === "px" ? [[2, "tPx", sp.px[1]]] : which === "coarse" ? [[3, "tMid", sp.mid[1]], [4, "tBig", sp.big[1]]]
+    : [[2, "tPx", sp.px[1]], [3, "tMid", sp.mid[1]], [4, "tBig", sp.big[1]]];
+  for (const [unit, name, tex] of bind) {
     gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex.t); gl.uniform1i(R.u(name), unit);
   }
 }
@@ -629,6 +645,7 @@ export function setImage(R, img, asOriginal = true) {
   upload(R, R.tex, 0, img);
   if (asOriginal) upload(R, R.origTex, 1, img);
   R.src = [img.width ?? img.naturalWidth, img.height ?? img.naturalHeight];
+  R.texSize = R.src; R.win = [0, 0, 1, 1];
   R.linear = !!img.linear;
   if (asOriginal) { R.srcImg = img; R.q99 = null; }
 }
@@ -668,7 +685,11 @@ export function draw(R, e, opts = {}) {
   gl.uniformMatrix3fv(u("geo"), true, new Float32Array(geometryAffine(R.src[0], R.src[1], p.crop).flat()));
   const gt = geoTerms(R.src[0], R.src[1], p.crop);
   gl.uniform4f(u("geoP"), gt.kh, gt.kv, gt.kd, gt.rmax2); gl.uniform2f(u("geoN"), gt.nx, gt.ny);
-  gl.uniform2f(u("frame"), R.canvas.width, R.canvas.height);
+  const tl = opts.tile;                               // {x, y, W, H}: this canvas at (x, y) of a W x H output
+  gl.uniform2f(u("frame"), tl ? tl.W : R.canvas.width, tl ? tl.H : R.canvas.height);
+  gl.uniform4f(u("tileUV"), tl ? tl.x / tl.W : 0, tl ? tl.y / tl.H : 0, tl ? R.canvas.width / tl.W : 1, tl ? R.canvas.height / tl.H : 1);
+  gl.uniform2f(u("tileOff"), tl ? tl.x : 0, tl ? tl.y : 0);
+  gl.uniform4f(u("srcWin"), ...(R.win ?? [0, 0, 1, 1]));
 
   const lk = e.look;
   gl.uniform1i(u("lookOn"), lk ? 1 : 0);
@@ -745,7 +766,8 @@ export function draw(R, e, opts = {}) {
     gl.uniform4f(u("lens"), SPEC.lens.r * (get(p, "lens_amount") / 100) * Math.max(R.src[0], R.src[1]), get(p, "lens_focus"),
                  (get(p, "lens_range") / 100) * 0.3, SPEC.lens.span);
   } else { gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, R.depthTex ?? null); gl.uniform1i(u("depthTex"), 12); }
-  if (on) spatial(R, { ...e, pxScale: pxs });
+  if (on && opts.spatial !== "none") spatial(R, { ...e, pxScale: pxs }, opts.spatial ?? "all");
+  if (opts.noDraw) return on;
   gl.bindFramebuffer(gl.FRAMEBUFFER, opts.fb ?? null);
   gl.viewport(0, 0, R.canvas.width, R.canvas.height);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -834,6 +856,104 @@ export function renderPixels(src, e, { edge = 0, space = "srgb", float = false, 
   const row = 4 * w, out = float ? new Float32Array(px.length) : new Uint8ClampedArray(px.length);
   for (let y = 0; y < h; y++) out.set(px.subarray((h - 1 - y) * row, (h - y) * row), y * row);   // bottom-up -> top-down
   return { data: out, width: w, height: h };
+}
+// ------------------------------------------------------------------ tiled export (Phase 22 task 28)
+/** Largest canvas iOS Safari will draw or encode: 4096 x 4096 = 16,777,216 px (its documented
+ * canvas area limit). Exports above it are rendered in tiles and encoded without a canvas. */
+export const CANVAS_AREA_LIMIT = 4096 * 4096;
+/** Output tile edge: 2048 px tiles keep each tile's textures to tens of MB (a 2048^2 RGBA16F
+ * texture is 32 MB) on phones, and are few enough (12 for 48 MP) that the per-tile overhead is small. */
+export const TILE = 2048;
+/** The coarse local means (mid, big) and the dehaze light come from the whole photo at this size:
+ * their scales are 0.4 % and 1.5 % of the long edge, so 2048 px resolves them (8 and 31 px). */
+const COARSE_EDGE = 2048;
+
+/** An image/bitmap as an export source: windows of it at a scale, drawn through a canvas. */
+export function bitmapSource(img) {
+  const W = img.width ?? img.naturalWidth, H = img.height ?? img.naturalHeight;
+  const draw = (sx, sy, sw, sh, w, h) => {
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(img, sx, sy, sw, sh, 0, 0, w, h); return c;
+  };
+  return {
+    width: W, height: H,
+    /** [x, y, w, h] in pixels of the image scaled by ``s`` */
+    region: ([x, y, w, h], s) => draw(x / s, y / s, w / s, h / s, w, h),
+    proxy: (edge) => { const s = Math.min(1, edge / Math.max(W, H)); return draw(0, 0, W, H, Math.max(1, Math.round(W * s)), Math.max(1, Math.round(H * s))); },
+  };
+}
+
+/**
+ * Render an edit in tiles (export of photos larger than the GPU or the canvas allows). ``source`` is
+ * {width, height, region([x, y, w, h], scale), proxy(edge)} (bitmapSource, raw.rawSource). Each
+ * output tile is drawn from the source window it maps to (through the crop and geometry), widened
+ * by the reach of the 1-px detail means and of the lens blur; the coarse means and the dehaze light
+ * are computed once from a COARSE_EDGE proxy of the whole photo. Returns 8-bit RGBA, or with
+ * ``float`` 16-bit RGB (Uint16Array, 3 channels), top row first.
+ */
+export function renderTiled(source, e, { edge = 0, space = "srgb", float = false, fullEdge = 0, tile = TILE, onProgress = null } = {}) {
+  const p = e.p || {}, crop = p.crop;
+  const [w0, h0] = outputSize(source.width, source.height, crop);
+  const sc = edge && Math.max(w0, h0) > edge ? edge / Math.max(w0, h0) : 1;     // source scale = output scale
+  const Ws = Math.max(1, Math.round(source.width * sc)), Hs = Math.max(1, Math.round(source.height * sc));
+  const [w, h] = outputSize(Ws, Hs, crop);
+  const c = document.createElement("canvas"), R = makeGL(c), { gl } = R;
+  if (float && !gl.getExtension("EXT_color_buffer_float")) throw new Error("16-bit export needs float rendering, which this browser does not offer.");
+  const pxs = pixelScale(w, [Ws, Hs], fullEdge || Math.max(source.width, source.height), crop);
+  // the whole photo, small: dehaze light and the coarse means
+  const proxy = source.proxy(Math.min(COARSE_EDGE, Math.max(Ws, Hs)));
+  setImage(R, proxy);
+  R.src = [Ws, Hs]; R.texSize = [proxy.width, proxy.height];
+  c.width = 1; c.height = 1;
+  const spatialOn = draw(R, e, { mode: 2, space, pxScale: pxs, spatial: "coarse", noDraw: true });
+  // reach of one output pixel into the source: 3 sigma of the 1-px means, the lens-blur radius, bilinear taps
+  const lensR = get(p, "lens_amount") > 0 && e.depth ? SPEC.lens.r * (get(p, "lens_amount") / 100) * Math.max(Ws, Hs) : 0;
+  const halo = (spatialOn ? Math.ceil(3 * SPEC.detail.sigma_px * pxs) + 2 : 0) + Math.ceil(lensR) + 2;
+  const out = float ? new Uint16Array(3 * w * h) : new Uint8ClampedArray(4 * w * h);
+  const nx = Math.ceil(w / tile), ny = Math.ceil(h / tile);
+  let fbT = null, fb = null;
+  for (let ty = 0; ty < ny; ty++) for (let tx = 0; tx < nx; tx++) {
+    const ox = tx * tile, oy = ty * tile, tw = Math.min(tile, w - ox), th = Math.min(tile, h - oy);
+    // source window: the tile's border mapped through the geometry (16 points a side), widened by the halo
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let k = 0; k <= 16; k++) for (const [u, v] of [[ox + (tw * k) / 16, oy], [ox + (tw * k) / 16, oy + th], [ox, oy + (th * k) / 16], [ox + tw, oy + (th * k) / 16]]) {
+      const [su, sv] = geometryMap(Ws, Hs, crop, u / w, v / h);
+      x0 = Math.min(x0, su * Ws); x1 = Math.max(x1, su * Ws); y0 = Math.min(y0, sv * Hs); y1 = Math.max(y1, sv * Hs);
+    }
+    const X0 = Math.max(0, Math.min(Ws - 1, Math.floor(x0) - halo)), Y0 = Math.max(0, Math.min(Hs - 1, Math.floor(y0) - halo));
+    const X1 = Math.min(Ws, Math.max(X0 + 1, Math.ceil(x1) + halo)), Y1 = Math.min(Hs, Math.max(Y0 + 1, Math.ceil(y1) + halo));
+    const win = source.region([X0, Y0, X1 - X0, Y1 - Y0], sc);
+    upload(R, R.tex, 0, win);
+    R.linear = !!win.linear; R.texSize = [X1 - X0, Y1 - Y0]; R.win = [X0 / Ws, Y0 / Hs, (X1 - X0) / Ws, (Y1 - Y0) / Hs];
+    if (c.width !== tw || c.height !== th) {
+      c.width = tw; c.height = th;
+      if (float) {
+        if (fbT) { gl.deleteTexture(fbT); gl.deleteFramebuffer(fb); }
+        fbT = gl.createTexture(); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, fbT);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, tw, th, 0, gl.RGBA, gl.FLOAT, null);
+        fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fbT, 0);
+      }
+    }
+    draw(R, e, { mode: 2, dither: float ? 0 : 1, space, fb, pxScale: pxs, spatial: "px", tile: { x: ox, y: oy, W: w, H: h } });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    const px = float ? new Float32Array(4 * tw * th) : new Uint8Array(4 * tw * th);
+    gl.readPixels(0, 0, tw, th, gl.RGBA, float ? gl.FLOAT : gl.UNSIGNED_BYTE, px);
+    for (let y = 0; y < th; y++) {                 // bottom-up tile rows -> top-down output rows
+      const src = (th - 1 - y) * 4 * tw, row = oy + y;
+      if (float) for (let x = 0; x < tw; x++) for (let k = 0; k < 3; k++) out[3 * (row * w + ox + x) + k] = Math.max(0, Math.min(65535, Math.round(px[src + 4 * x + k] * 65535)));
+      else out.set(px.subarray(src, src + 4 * tw), 4 * (row * w + ox));
+    }
+    onProgress?.((ty * nx + tx + 1) / (nx * ny));
+  }
+  gl.getExtension("WEBGL_lose_context")?.loseContext();
+  return float ? { data: out, width: w, height: h, channels: 3 } : { data: out, width: w, height: h };
+}
+
+/** Should this export be tiled? Yes when the source or the output exceeds the canvas area limit or
+ * the GPU's texture size (``force`` for tests). */
+export function needsTiles(srcW, srcH, outW, outH, maxTex) {
+  return Math.max(srcW, srcH) > maxTex || srcW * srcH > CANVAS_AREA_LIMIT || outW * outH > CANVAS_AREA_LIMIT;
 }
 // ------------------------------------------------------------------ edit layers (as photostyle.slider_looks)
 const SAMPLES = 16;

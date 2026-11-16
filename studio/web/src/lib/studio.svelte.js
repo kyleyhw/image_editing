@@ -277,7 +277,7 @@ export function applyScene() {
 export async function exportCurrent(opts) {
   if (!S.id) return;
   S.busy = true;
-  try { await B.export(S.id, exportParams(), $state.snapshot(effective()), typeof opts === "string" ? { fmt: opts } : opts); }
+  try { const note = await B.export(S.id, exportParams(), $state.snapshot(effective()), typeof opts === "string" ? { fmt: opts } : opts); if (note) S.message = note; }
   catch (e) { S.message = String(e); }
   finally { S.busy = false; }
 }

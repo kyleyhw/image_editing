@@ -6,9 +6,9 @@
 // Models come from tools/export_web.py. Photos stay in memory on this device.
 import * as ort from "onnxruntime-web/wasm";
 import { downloadBlob } from "./api.js";
-import { bakeCube, renderPixels } from "./pipeline.js";
+import { bakeCube, bitmapSource, CANVAS_AREA_LIMIT, needsTiles, outputSize, renderPixels, renderTiled } from "./pipeline.js";
 import { encode8, encodePNG16, encodeTIFF16, lightroomXMP } from "./export.js";
-import { decodeRaw, displayCanvas, isRaw, linearRGBA } from "./raw.js";
+import { decodeRaw, displayCanvas, isRaw, linearRGBA, rawSource } from "./raw.js";
 import * as store from "./store.js";
 
 const BASE = import.meta.env.BASE_URL;
@@ -242,16 +242,37 @@ export const browser = {
     if (fmt === "cube") return save(new Blob([bakeCube(eff, 33, `Irodori ${params.style ?? "edit"}`)], { type: "text/plain" }), `${stem}.cube`);
     if (fmt === "json") return save(new Blob([JSON.stringify(params, null, 1)], { type: "application/json" }), `${stem}.json`);
     if (fmt === "xmp") return save(new Blob([lightroomXMP(eff.p, stem)], { type: "application/rdf+xml" }), `${stem}.xmp`);
-    const src = p.raw ? (lim) => linearRGBA(p.raw, lim) : p.bitmap;
-    const full = Math.max(...this.fullSize(id));
-    const px = renderPixels(src, eff, { edge, space, float: fmt === "png16" || fmt === "tif16", fullEdge: full });
-    if (fmt === "png16") return save(await encodePNG16(px, space), `${stem}.png`);
-    if (fmt === "tif16") return save(encodeTIFF16(px), `${stem}.tif`);
-    const type = fmt === "png" ? "image/png" : "image/jpeg";
-    const blob = await encode8(px, { type, quality: quality / 100, space, exif: metadata ? p.exif : null });
-    return save(blob, `${stem}.${fmt === "png" ? "png" : "jpg"}`);
+    const [W, H] = this.fullSize(id), float = fmt === "png16" || fmt === "tif16";
+    let [w, h] = outputSize(W, H, eff.p?.crop);
+    if (edge && Math.max(w, h) > edge) { const s = edge / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+    // large photos (a 48 MP iPhone ProRAW, say) are rendered in tiles: beyond the canvas area or GPU
+    // texture limit, one full-size render would fail or exhaust a phone's memory (pipeline.renderTiled)
+    const tiled = opts.tile || needsTiles(W, H, w, h, maxTexture());
+    let note = null, sp = space;
+    if (!float && sp === "p3" && w * h > CANVAS_AREA_LIMIT) { sp = "srgb"; note = "Exported in sRGB: Display P3 JPEG and PNG are limited to 16.7 megapixels here; use PNG 16-bit for P3 at full size."; }
+    const px = tiled
+      ? renderTiled(p.raw ? rawSource(p.raw) : bitmapSource(p.bitmap), eff, { edge, space: sp, float, fullEdge: Math.max(W, H), tile: opts.tile || undefined })
+      : renderPixels(p.raw ? (lim) => linearRGBA(p.raw, lim) : p.bitmap, eff, { edge, space: sp, float, fullEdge: Math.max(W, H) });
+    if (fmt === "png16") await save(await encodePNG16(px, sp), `${stem}.png`);
+    else if (fmt === "tif16") await save(encodeTIFF16(px), `${stem}.tif`);
+    else {
+      const type = fmt === "png" ? "image/png" : "image/jpeg";
+      await save(await encode8(px, { type, quality: quality / 100, space: sp, exif: metadata ? p.exif : null }), `${stem}.${fmt === "png" ? "png" : "jpg"}`);
+    }
+    return note;
   },
 };
+
+let maxTex = 0;
+/** The GPU's texture size limit (asked once). */
+function maxTexture() {
+  if (!maxTex) {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    maxTex = gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : 4096;
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  }
+  return maxTex;
+}
 
 function saveFile(blob, name) {
   return downloadBlob({ headers: new Headers({ "content-disposition": `attachment; filename="${name}"` }), blob: async () => blob }, name);

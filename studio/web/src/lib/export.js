@@ -1,10 +1,11 @@
 // Export (Phase 22): encode rendered pixels as JPEG / PNG (8-bit, via the browser's encoder, with
 // the colour space tagged), 16-bit PNG or 16-bit TIFF (encoded here), and write a Lightroom preset
 // (.xmp) of the slider part of an edit.
-import { DEFAULTS, BANDS, curvePoints } from "./pipeline.js";
+import { DEFAULTS, BANDS, curvePoints, CANVAS_AREA_LIMIT } from "./pipeline.js";
 
 /** 8-bit JPEG or PNG via a 2D canvas in the output colour space (the browser embeds its profile). */
 export async function encode8(px, { type = "image/jpeg", quality = 0.92, space = "srgb", exif = null } = {}) {
+  if (px.width * px.height > CANVAS_AREA_LIMIT) return encodeLarge8(px, { type, quality, exif });
   const c = document.createElement("canvas");
   c.width = px.width; c.height = px.height;
   const opts = space === "p3" ? { colorSpace: "display-p3" } : {};
@@ -13,6 +14,21 @@ export async function encode8(px, { type = "image/jpeg", quality = 0.92, space =
   let blob = await new Promise((res) => c.toBlob(res, type, quality));
   if (exif && type === "image/jpeg") blob = await withExif(blob, exif);
   return blob;
+}
+
+/** 8-bit export above the canvas area limit (iOS Safari refuses larger canvases): PNG through the
+ * PNG writer below, JPEG through jpeg-js (BSD-3-Clause, loaded only here). Both are untagged sRGB,
+ * so callers render these in sRGB (Display P3 needs the canvas path or a 16-bit PNG). */
+async function encodeLarge8(px, { type, quality, exif }) {
+  if (type === "image/png") return encodePNG(px, "srgb", 8);
+  const { encode } = await import("jpeg-js");
+  const g = /** @type {any} */ (globalThis), had = "Buffer" in g;
+  if (!had) g.Buffer = { from: (a) => Uint8Array.from(a) };   // jpeg-js returns Buffer.from(bytes) when bundled as CommonJS
+  try {
+    const out = encode({ data: px.data, width: px.width, height: px.height }, Math.round(quality * 100));
+    const blob = new Blob([out.data], { type: "image/jpeg" });
+    return exif ? withExif(blob, exif) : blob;
+  } finally { if (!had) delete g.Buffer; }
 }
 
 /** Insert an EXIF APP1 segment (orientation reset to 1: the pixels are already upright). */
@@ -39,19 +55,33 @@ function resetOrientation(seg) {
 }
 
 const to16 = (v) => Math.max(0, Math.min(65535, Math.round(v * 65535)));
+/** Channel value reader: pixels are float RGBA (display-encoded, 0-1), 16-bit RGB (Uint16Array,
+ * ``channels`` 3, from tiled export) or 8-bit RGBA. Returns a 16-bit or 8-bit code value. */
+function reader(px, bits) {
+  const { data } = px, ch = px.channels ?? 4;
+  if (data instanceof Uint16Array) return bits === 16 ? (i, c) => data[ch * i + c] : (i, c) => data[ch * i + c] >> 8;
+  if (data instanceof Float32Array) return bits === 16 ? (i, c) => to16(data[ch * i + c]) : (i, c) => to16(data[ch * i + c]) >> 8;
+  return bits === 16 ? (i, c) => data[ch * i + c] * 257 : (i, c) => data[ch * i + c];
+}
 
 /** 16-bit RGB PNG (zlib via CompressionStream). sRGB is tagged with an sRGB chunk, Display P3 with
  * a cICP chunk (primaries 12 = P3 D65, transfer 13 = sRGB, full range). */
-export async function encodePNG16(px, space = "srgb") {
-  const { width: w, height: h, data } = px;
-  const raw = new Uint8Array(h * (1 + 6 * w));
+export const encodePNG16 = (px, space = "srgb") => encodePNG(px, space, 16);
+
+/** RGB PNG of 8 or 16 bits per channel, written here (no canvas, so no size limit but memory). */
+export async function encodePNG(px, space = "srgb", bits = 16) {
+  const { width: w, height: h } = px, get = reader(px, bits), B = bits / 8;
+  const raw = new Uint8Array(h * (1 + 3 * B * w));
   for (let y = 0, o = 0; y < h; y++) {
     raw[o++] = 0;                                   // filter: none
-    for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) { const v = to16(data[4 * (y * w + x) + c]); raw[o++] = v >> 8; raw[o++] = v & 255; }
+    for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) {
+      const v = get(y * w + x, c);
+      if (B === 2) { raw[o++] = v >> 8; raw[o++] = v & 255; } else raw[o++] = v;
+    }
   }
   const z = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
   const ihdr = new Uint8Array(13); const dv = new DataView(ihdr.buffer);
-  dv.setUint32(0, w); dv.setUint32(4, h); ihdr[8] = 16; ihdr[9] = 2;
+  dv.setUint32(0, w); dv.setUint32(4, h); ihdr[8] = bits; ihdr[9] = 2;
   const colour = space === "p3" ? chunk("cICP", new Uint8Array([12, 13, 0, 1])) : chunk("sRGB", new Uint8Array([0]));
   return new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), colour, chunk("IDAT", z), chunk("IEND", new Uint8Array(0))], { type: "image/png" });
 }
@@ -69,7 +99,7 @@ function chunk(type, body) {
 
 /** 16-bit RGB TIFF, uncompressed, little-endian (baseline TIFF 6.0; colour space untagged = sRGB). */
 export function encodeTIFF16(px) {
-  const { width: w, height: h, data } = px, nTags = 11, ifdOff = 8, bpsOff = ifdOff + 2 + 12 * nTags + 4, imgOff = bpsOff + 6;
+  const { width: w, height: h } = px, get = reader(px, 16), nTags = 11, ifdOff = 8, bpsOff = ifdOff + 2 + 12 * nTags + 4, imgOff = bpsOff + 6;
   const buf = new ArrayBuffer(imgOff + 6 * w * h), dv = new DataView(buf);
   dv.setUint16(0, 0x4949, true); dv.setUint16(2, 42, true); dv.setUint32(4, ifdOff, true);
   dv.setUint16(ifdOff, nTags, true);
@@ -81,7 +111,7 @@ export function encodeTIFF16(px) {
   });
   dv.setUint32(ifdOff + 2 + 12 * nTags, 0, true);
   for (let i = 0; i < 3; i++) dv.setUint16(bpsOff + 2 * i, 16, true);
-  for (let i = 0, o = imgOff; i < w * h; i++) for (let c = 0; c < 3; c++, o += 2) dv.setUint16(o, to16(data[4 * i + c]), true);
+  for (let i = 0, o = imgOff; i < w * h; i++) for (let c = 0; c < 3; c++, o += 2) dv.setUint16(o, get(i, c), true);
   return new Blob([buf], { type: "image/tiff" });
 }
 

@@ -37,22 +37,37 @@ export async function decodeRaw(file) {
   } finally { raw.dispose(); }
 }
 
-/** Linear Rec. 2020 RGBA float data at most ``edge`` px on the long side (box filter). */
-export function linearRGBA(r, edge = PREVIEW_EDGE) {
+/** Linear Rec. 2020 RGBA float data at most ``edge`` px on the long side (box filter); with ``win``
+ * = [x, y, w, h] (pixels of that scaled image) only that window. */
+export function linearRGBA(r, edge = PREVIEW_EDGE, win = null) {
   const s = Math.min(1, edge / Math.max(r.width, r.height)), w = Math.max(1, Math.round(r.width * s)), h = Math.max(1, Math.round(r.height * s));
-  const out = new Float32Array(4 * w * h), d = r.data16, k = r.gain / 65535;
+  return box(r, w, h, win ?? [0, 0, w, h]);
+}
+
+function box(r, w, h, [wx, wy, ww, wh]) {
+  const out = new Float32Array(4 * ww * wh), d = r.data16, k = r.gain / 65535;
   const fx = r.width / w, fy = r.height / h;
-  for (let y = 0; y < h; y++) {
+  for (let y = wy; y < wy + wh; y++) {
     const y0 = Math.floor(y * fy), y1 = Math.max(y0 + 1, Math.floor((y + 1) * fy));
-    for (let x = 0; x < w; x++) {
+    for (let x = wx; x < wx + ww; x++) {
       const x0 = Math.floor(x * fx), x1 = Math.max(x0 + 1, Math.floor((x + 1) * fx));
       let a = 0, b = 0, c = 0, m = 0;
       for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) { const i = 3 * (yy * r.width + xx); a += d[i]; b += d[i + 1]; c += d[i + 2]; m++; }
-      const o = 4 * (y * w + x);
+      const o = 4 * ((y - wy) * ww + (x - wx));
       out[o] = (a / m) * k; out[o + 1] = (b / m) * k; out[o + 2] = (c / m) * k; out[o + 3] = 1;
     }
   }
-  return { data: out, width: w, height: h, linear: true };
+  return { data: out, width: ww, height: wh, linear: true };
+}
+
+/** A decoded raw file as a tiled-export source (pipeline.renderTiled): windows of the image scaled
+ * by ``scale``, decoded from the 16-bit data on demand, so the full float image is never held. */
+export function rawSource(r) {
+  return {
+    width: r.width, height: r.height,
+    region: (win, scale) => box(r, Math.max(1, Math.round(r.width * scale)), Math.max(1, Math.round(r.height * scale)), win),
+    proxy: (edge) => linearRGBA(r, edge),
+  };
 }
 
 /** A display (sRGB, 8-bit) canvas of linear Rec. 2020 data: for thumbnails, features, the picker. */
